@@ -33,4 +33,14 @@ a.nb.select(1); a.redraw(); a.nb.select(0); a.redraw()
 d = tempfile.gettempdir()
 print("svg", a.rv.export_svg(os.path.join(d, "r.svg")), a.lv.export_svg(os.path.join(d, "l.svg")))
 a.dirty = False
+
+# real equipment: front + rear, import matching, svg
+a.doc = R.new_doc(); a.dirty = False
+print("imported", a.build_from_text("Rack2\n- Dell PowerEdge R750 - (2U)\n- Dell R650 - (1U)\n- UniFi USW Pro 24 - (1U)\n- Synology RS822+ - (1U)\n- Synology DS923+ - (4U)\n", 0))
+for dv in a.doc['devices']:
+    print(dv['name'], dv.get('plate'), dv['face'], dv['u_size'])
+for face in ("front", "rear"):
+    a.rv.face = face; a.redraw()
+    print(face, "svg", a.rv.export_svg(os.path.join(tempfile.gettempdir(), "real_%s.svg" % face)))
+a.dirty = False
 root.destroy()

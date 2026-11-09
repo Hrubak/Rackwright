@@ -105,9 +105,14 @@ def ports(prefix, n, typ, start=1):
              "type": typ, "label": ""} for i in range(n)]
 
 
-def tpl(name, typ, u, color, plist, half=False, rows=0):
-    return {"name": name, "type": typ, "u_size": u, "color": color, "ports": plist, "half": half, "rows": rows,
-            "model": "", "ip": ""}
+def tpl(name, typ, u, color, plist, half=False, rows=0, plate=None, group="", short="", model=""):
+    t = {"name": name, "type": typ, "u_size": u, "color": color, "ports": plist, "half": half, "rows": rows,
+         "model": model, "ip": ""}
+    if plate:
+        t["plate"] = plate
+        t["group"] = group
+        t["short"] = short
+    return t
 
 
 BUILTIN = [
@@ -134,6 +139,58 @@ BUILTIN = [
     tpl("Cable manager 1U", "Cable manager", 1, "#222428", []),
     tpl("Blank panel 1U", "Blank", 1, "#33363b", []),
 ]
+
+
+# ---- real-equipment templates (front + rear faceplates)
+# Dell PowerEdge: (model, U, bays, bay rows, drive size)
+DELL = [("R230", 1, 4, 1, "3.5"), ("R240", 1, 4, 1, "3.5"), ("R250", 1, 4, 1, "3.5"), ("R340", 1, 4, 1, "3.5"),
+        ("R350", 1, 4, 1, "3.5"), ("R420", 1, 4, 1, "3.5"), ("R430", 1, 8, 1, "2.5"), ("R440", 1, 8, 1, "2.5"),
+        ("R450", 1, 8, 1, "2.5"), ("R620", 1, 8, 1, "2.5"), ("R630", 1, 8, 1, "2.5"), ("R640", 1, 10, 1, "2.5"),
+        ("R650", 1, 10, 1, "2.5"), ("R660", 1, 10, 1, "2.5"), ("R6515", 1, 10, 1, "2.5"),
+        ("R6525", 1, 10, 1, "2.5"), ("R720", 2, 8, 2, "3.5"), ("R730", 2, 8, 2, "3.5"),
+        ("R730xd", 2, 12, 3, "3.5"), ("R740", 2, 8, 2, "3.5"), ("R740xd", 2, 12, 3, "3.5"),
+        ("R740 (24 x 2.5)", 2, 24, 3, "2.5"), ("R540", 2, 8, 2, "3.5"), ("R550", 2, 8, 2, "3.5"),
+        ("R750", 2, 12, 3, "3.5"), ("R750 (24 x 2.5)", 2, 24, 3, "2.5"), ("R760", 2, 12, 3, "3.5"),
+        ("R760 (24 x 2.5)", 2, 24, 3, "2.5"), ("R7515", 2, 12, 3, "3.5"), ("R7525", 2, 12, 3, "3.5")]
+UNIFI = [("USW-24", "UniFi Switch 24", False, 24, 2, "SFP"), ("USW-24-PoE", "UniFi Switch 24 PoE", False, 24, 2, "SFP"),
+         ("USW-Pro-24", "UniFi Switch Pro 24", True, 24, 2, "SFP+"),
+         ("USW-Pro-24-PoE", "UniFi Switch Pro 24 PoE", True, 24, 2, "SFP+"),
+         ("USW-Pro-Max-24", "UniFi Switch Pro Max 24", True, 24, 2, "SFP+"),
+         ("USW-Enterprise-24-PoE", "UniFi Switch Enterprise 24 PoE", True, 24, 2, "SFP+"),
+         ("USW-Pro-48", "UniFi Switch Pro 48", True, 48, 4, "SFP+"),
+         ("USW-Pro-48-PoE", "UniFi Switch Pro 48 PoE", True, 48, 4, "SFP+")]
+SYN_DESK = ["DS923+", "DS423+", "DS423", "DS920+", "DS918+", "DS418"]
+SYN_RACK = [("RS422+", 1, 4, 1, 1), ("RS822+", 1, 4, 1, 1), ("RS822RP+", 1, 4, 1, 2), ("RS1221+", 2, 8, 2, 1),
+            ("RS1221RP+", 2, 8, 2, 2)]
+
+
+def real_templates():
+    out = []
+    for m, u, n, rows, size in DELL:
+        base = m.split()[0]
+        out.append(tpl('Dell PowerEdge %s (%d x %s")' % (base, n, size) if "(" not in m else "Dell PowerEdge " + m,
+                       "Server", u, "#2a2c30",
+                       ports("NIC{n}", 4, "RJ45") + ports("iDRAC", 1, "Mgmt", 0) + ports("PSU{n}", 2, "Power"),
+                       rows=2 if u == 1 else 4,
+                       plate={"k": "dell", "bays": n, "brows": rows, "size": size}, group="Dell PowerEdge",
+                       short="PE-" + base, model="PowerEdge " + base))
+    for model, nm, lcd, n, nsfp, st in UNIFI:
+        out.append(tpl("%s (%s)" % (nm, model), "Switch", 1, "#dfe2e6",
+                       ports("{n}", n, "RJ45") + ports("SFP%s{n}" % ("+" if st == "SFP+" else ""), nsfp, st), rows=2,
+                       plate={"k": "unifi", "lcd": lcd}, group="Ubiquiti UniFi", short=model, model=nm))
+    for m in SYN_DESK:
+        out.append(tpl("Synology %s (4-bay desktop, 4U half)" % m, "Storage", 4, "#2a2c30",
+                       ports("LAN{n}", 2, "RJ45") + ports("Power", 1, "Power", 0), half=True, rows=3,
+                       plate={"k": "syn_desk"}, group="Synology", short="NAS-" + m, model="Synology " + m))
+    for m, u, n, rows, psu in SYN_RACK:
+        out.append(tpl("Synology %s (%d-bay rack, %dU)" % (m, n, u), "Storage", u, "#2a2c30",
+                       ports("LAN{n}", 4, "RJ45") + ports("PSU{n}", psu, "Power"), rows=2 if u == 1 else 4,
+                       plate={"k": "syn_rack", "bays": n, "brows": rows, "size": "3.5"}, group="Synology",
+                       short="NAS-" + m, model="Synology " + m))
+    return out
+
+
+BUILTIN += real_templates()
 
 
 def new_doc():
@@ -602,25 +659,172 @@ class RackView(ViewBase):
         labw = min(150, w * 0.3)
         fg = fg_for(col)
         tg = ("dev:%d" % d["id"],)
+        pg = a.port_geom(d)
+        plate = d.get("plate")
+        lx = l + 7
+        if plate:
+            lx, labw, fg = self.draw_plate(d, l, t, r, b, pg, self.face == "rear")
         two = (b - t) * self.z >= 22
         f1 = font(11 * self.z, True)
-        cv.create_text(S(l + 7), S(t + ((b - t) / 2 - 6 if two and b - t < 40 else (b - t) / 2 - (6 if two else 0))
-                                   if False else t + (9 if two else (b - t) / 2)),
+        cv.create_text(S(lx), S(t + (9 if two else (b - t) / 2)),
                        text=fit(d["name"], f1, S(labw - 8)), anchor="w", fill=fg, font=f1, tags=tg)
         if two:
             sub = d.get("ip") or d.get("model") or d.get("type", "")
             f2 = font(8.5 * self.z)
-            cv.create_text(S(l + 7), S(t + 20), text=fit(sub, f2, S(labw - 8)), anchor="w", fill=fg, font=f2, tags=tg)
-        for p, cx, cy, s in a.port_geom(d):
+            cv.create_text(S(lx), S(t + 20), text=fit(sub, f2, S(labw - 8)), anchor="w", fill=fg, font=f2, tags=tg)
+        for p, cx, cy, s in pg:
             c = a.cable_on_port(p["id"])
-            fill = c["color"] if c else PORT_TYPES.get(p["type"], "#cccccc")
+            fill = c["color"] if c else ("#101113" if plate else PORT_TYPES.get(p["type"], "#cccccc"))
             pend = self.pend == p["id"]
+            if pend:
+                oc, ow = "#00e5ff", 3
+            elif plate and not c:
+                oc, ow = PORT_TYPES.get(p["type"], "#cccccc"), 1
+            else:
+                oc, ow = "#000000", 1
             cv.create_rectangle(S(cx - s / 2), S(cy - s / 2), S(cx + s / 2), S(cy + s / 2), fill=fill,
-                                outline="#00e5ff" if pend else "#000000", width=3 if pend else 1,
-                                tags=("port:%d" % p["id"],))
+                                outline=oc, width=ow, tags=("port:%d" % p["id"],))
             if s * self.z >= 15 and p["name"]:
                 cv.create_text(S(cx), S(cy), text=p["name"][-3:], font=font(7 * self.z), fill=fg_for(fill),
                                tags=("port:%d" % p["id"],))
+
+    # ---- faceplates: front and rear art for real equipment (rect/oval/line/text only, so SVG export works)
+    def draw_plate(self, d, l, t, r, b, pg, rear):
+        """Draws chassis art. Returns (label_x, label_width, label_fg)."""
+        S, cv = self.S, self.cv
+        tg = ("dev:%d" % d["id"],)
+        p = d["plate"]
+        k = p["k"]
+        h = b - t
+        pl = min([cx - s / 2 for _, cx, cy, s in pg], default=r - 8) - 6
+
+        def rc(x0, y0, x1, y1, fill, out=""):
+            cv.create_rectangle(S(x0), S(y0), S(x1), S(y1), fill=fill, outline=out, tags=tg)
+
+        def ov(cx, cy, rad, fill, out=""):
+            cv.create_oval(S(cx - rad), S(cy - rad), S(cx + rad), S(cy + rad), fill=fill, outline=out, tags=tg)
+
+        def tx(x, y, s_, size, fill, bold=False, anchor="w"):
+            if self.z >= 0.7:
+                cv.create_text(S(x), S(y), text=s_, anchor=anchor, fill=fill, font=font(size * self.z, bold), tags=tg)
+
+        def vents(x0, y0, x1, y1, fill, step=5):
+            x = x0
+            while x < x1:
+                cv.create_line(S(x), S(y0), S(x), S(y1), fill=fill, tags=tg)
+                x += step
+
+        def bays(x0, x1, brand_light):
+            n, rows = p["bays"], p["brows"]
+            cols = math.ceil(n / rows)
+            g = 2
+            bw = (x1 - x0 - g * (cols - 1)) / cols
+            bh = (h - 10 - g * (rows - 1)) / rows
+            rc(x0 - 3, t + 3, x1 + 3, b - 3, "#0c0d0f", "#3a3d42")
+            for i in range(n):
+                cx, cy = x0 + (i % cols) * (bw + g), t + 5 + (i // cols) * (bh + g)
+                rc(cx, cy, cx + bw, cy + bh, "#24262a", "#5b6068")
+                rc(cx + 2, cy + 2, cx + bw - 2, cy + bh - 2, "#17181b", "#2f3237")
+                if p.get("size") == "2.5" and bh > 18:
+                    rc(cx + 3, cy + bh - 6, cx + bw - 3, cy + bh - 3, brand_light)
+                elif bw >= 18:
+                    ov(cx + 4, cy + 4, 1.4, "#3ddc5b")
+                    cv.create_line(S(cx + 8), S(cy + bh / 2), S(cx + bw - 4), S(cy + bh / 2), fill="#3d4046", tags=tg)
+
+        def ear(brand_led):
+            rc(l + 1, t + 1, l + 31, b - 1, "#34373c", "#4a4e54")
+            ov(l + 15, t + h * 0.3, 4.5, "#14151a", "#c9ced4")
+            ov(l + 15, t + h * 0.3, 1.5, "#3ddc5b")
+            ov(l + 9, t + h * 0.62, 1.6, brand_led)
+            ov(l + 21, t + h * 0.62, 1.6, "#ffb020")
+
+        def rear_server(psus, fans):
+            rc(l + 1, t + 1, r - 1, b - 1, "#2c2e33", "#4a4e54")
+            ph = (h - 6) / psus if h > 30 else h - 6
+            for i in range(psus):
+                if h > 30:
+                    x0, y0, x1, y1 = l + 4, t + 3 + i * ph, l + 64, t + 3 + (i + 1) * ph - 2
+                else:
+                    x0, y0, x1, y1 = l + 4 + i * 62, t + 3, l + 62 + i * 62, b - 3
+                rc(x0, y0, x1, y1, "#1a1b1e", "#6b717a")
+                ov(x0 + 9, (y0 + y1) / 2, 3, "#3ddc5b")
+                vents(x0 + 18, y0 + 4, x1 - 4, y1 - 4, "#33363b", 3)
+            x0 = l + (68 if h > 30 else 4 + psus * 62 + 4)
+            slots = max(1, int((pl - 8 - x0) // 60))
+            sw = (pl - 8 - x0) / slots
+            for i in range(slots):
+                rc(x0 + i * sw + 1, t + 4, x0 + (i + 1) * sw - 1, b - 4, "#202226", "#454950")
+                rc(x0 + i * sw + 4, t + 7, x0 + (i + 1) * sw - 4, t + 10, "#0c0d0f")
+                vents(x0 + i * sw + 4, t + 14, x0 + (i + 1) * sw - 4, b - 8, "#2e3136", 3)
+
+        psus = sum(1 for q in d["ports"] if q["type"] == "Power") or 1
+        if k == "dell":
+            if not rear:
+                ear("#4aa3ff")
+                tx(l + 15, b - 6, "DELL", 6, "#c9ced4", True, "center")
+                bays(l + 156, pl - 4, "#6b717a")
+                vents(l + 34, b - 5, l + 150, b - 3, "#2d3035", 3)
+                return l + 34, 120, "#e6e8eb"
+            rear_server(psus, 0)
+            return l + 6, 54, "#e6e8eb"
+        if k == "syn_rack":
+            if not rear:
+                ear("#3ddc5b")
+                bays(l + 156, pl - 4, "#6b717a")
+                tx(l + 34, b - 6, "Synology", 6.5, "#9aa0a6", True)
+                rc(l + 1, t + 1, l + 1, t + 1, "#2a2c30")
+                return l + 34, 120, "#e6e8eb"
+            rear_server(psus, 2)
+            return l + 6, 54, "#e6e8eb"
+        if k == "unifi":
+            rc(l + 1, t + 1, r - 1, b - 1, "#dfe2e6", "#9aa0a6")
+            rc(l + 1, t + 1, l + 6, b - 1, "#b7bcc3")
+            rc(r - 6, t + 1, r - 1, b - 1, "#b7bcc3")
+            rc(l + 6, b - 4, r - 6, b - 2, "#c4c8ce")
+            if not rear:
+                ov(l + 143, t + h / 2, 4, "#ffffff", "#2a6fdb")
+                ov(l + 143, t + h / 2, 1.8, "#2a6fdb")
+                if p.get("lcd"):
+                    rc(l + 104, t + h / 2 - 7, l + 134, t + h / 2 + 7, "#0f1114", "#555a62")
+                    cv.create_line(S(l + 108), S(t + h / 2 - 2), S(l + 126), S(t + h / 2 - 2), fill="#2a6fdb", tags=tg)
+                    cv.create_line(S(l + 108), S(t + h / 2 + 3), S(l + 120), S(t + h / 2 + 3), fill="#5a6068", tags=tg)
+                return l + 10, (92 if p.get("lcd") else 128), "#23262b"
+            rc(l + 10, t + 4, r - 10, b - 4, "#cfd3d8", "#9aa0a6")
+            vents(l + 150, t + 6, r - 150, b - 6, "#a3a8af", 4)
+            rc(l + 14, t + 6, l + 50, b - 6, "#15171a", "#5b6068")
+            rc(l + 20, t + 10, l + 44, b - 10, "#0c0d0f")
+            tx(l + 56, t + h / 2, "AC", 7, "#23262b", True)
+            ov(l + 84, t + h / 2, 2.5, "#8b9097", "#555a62")
+            rc(l + 96, t + 9, l + 116, b - 9, "#15171a", "#5b6068")
+            for fx in (r - 130, r - 70):
+                ov(fx, t + h / 2, 10, "#b3b8bf", "#555a62")
+                ov(fx, t + h / 2, 3, "#555a62")
+            tx(r - 22, t + h / 2, "REAR", 6, "#23262b", True, "center")
+            return l + 10, 80, "#23262b"
+        if k == "syn_desk":
+            rc(l + 1, t + 1, r - 1, b - 1, "#202226", "#3a3d42")
+            bx, by, bw, bh = l + 112, t + 4, 84, h - 8
+            rc(bx, by, bx + bw, by + bh, "#2d2f33", "#6b717a")
+            if not rear:
+                tw = (bw - 12 - 6) / 4
+                for i in range(4):
+                    x0 = bx + 6 + i * (tw + 2)
+                    rc(x0, by + 7, x0 + tw, by + bh - 28, "#17181b", "#4a4e54")
+                    rc(x0 + 1, by + bh - 36, x0 + tw - 1, by + bh - 29, "#3a3d42")
+                    ov(x0 + tw / 2, by + bh - 22, 1.6, "#3ddc5b")
+                ov(bx + 11, by + bh - 9, 3.5, "#14151a", "#c9ced4")
+                ov(bx + 11, by + bh - 9, 1.2, "#3ddc5b")
+                tx(bx + 22, by + bh - 9, "Synology", 6.5, "#9aa0a6", True)
+            else:
+                ov(bx + bw / 2, by + bh * 0.33, 30, "#1b1c1f", "#6b717a")
+                ov(bx + bw / 2, by + bh * 0.33, 20, "#25272b", "#4a4e54")
+                ov(bx + bw / 2, by + bh * 0.33, 5, "#6b717a")
+                rc(bx + 6, by + bh - 24, bx + 36, by + bh - 6, "#111214", "#6b717a")
+                rc(bx + 42, by + bh - 24, bx + 56, by + bh - 6, "#111214", "#6b717a")
+                rc(bx + 60, by + bh - 24, bx + 78, by + bh - 6, "#111214", "#6b717a")
+                tx(bx + bw / 2, by + 5, "REAR", 6, "#9aa0a6", True, "center")
+            return l + 6, 104, "#e6e8eb"
+        return l + 7, min(150, (r - l) * 0.3), fg_for(d.get("color") or "#3b6ea8")
 
     def draw_cables(self):
         a, S, cv = self.app, self.S, self.cv
@@ -1145,9 +1349,13 @@ class App:
         rows = min(n, d.get("rows") or max(1, d["u_size"] * 2))
         cols = math.ceil(n / rows)
         labw = min(150, w * 0.3)
-        area = w - labw - 12
-        cell = min(area / cols, (h - 4) / rows, 22)
-        x0 = l + labw + 6 + (area - cols * cell) / 2
+        if (d.get("plate") or {}).get("k") in ("dell", "syn_rack", "syn_desk"):
+            cell = min((h - 4) / rows, 14)
+            x0 = r - 8 - cols * cell
+        else:
+            area = w - labw - 12
+            cell = min(area / cols, (h - 4) / rows, 22)
+            x0 = l + labw + 6 + (area - cols * cell) / 2
         y0 = t + (h - rows * cell) / 2
         s = max(4, cell - 3)
         return [(p, x0 + (i // rows) * cell + cell / 2, y0 + (i % rows) * cell + cell / 2, s)
@@ -1352,9 +1560,10 @@ class App:
         self.tmap = {}
         groups = {}
         for i, t in enumerate(self.templates()):
-            g = groups.get(t["type"])
+            gk = t.get("group") or t["type"]
+            g = groups.get(gk)
             if g is None:
-                g = groups[t["type"]] = self.lib.insert("", "end", text=t["type"], open=True)
+                g = groups[gk] = self.lib.insert("", "end", text=gk, open=False if t.get("group") else True)
             iid = self.lib.insert(g, "end", text="%s%s" % (t["name"], "  ★" if i >= len(BUILTIN) else ""))
             self.tmap[iid] = i
 
@@ -1413,7 +1622,7 @@ class App:
         from_d = Dialog(self.root, "Save as template", [("name", "Template name", "str", d["name"])])
         if not from_d.result:
             return
-        t = {k: copy.deepcopy(d.get(k)) for k in ("type", "u_size", "color", "half", "rows", "model", "ip")}
+        t = {k: copy.deepcopy(d.get(k)) for k in ("type", "u_size", "color", "half", "rows", "model", "ip", "plate", "group", "short")}
         t["name"] = from_d.result["name"]
         t["ports"] = [{"name": p["name"], "type": p["type"], "label": p.get("label", "")} for p in d["ports"]]
         self.settings.setdefault("templates", []).append(t)
@@ -1421,10 +1630,13 @@ class App:
         self.fill_lib()
 
     def from_tpl(self, t):
-        d = {"id": self.nid(), "name": t["name"], "model": t.get("model", ""), "type": t["type"],
+        d = {"id": self.nid(), "name": t.get("short") or t["name"], "model": t.get("model", ""), "type": t["type"],
              "u_size": t["u_size"], "rack": None, "u": 1, "side": 0, "half": t.get("half", False),
              "color": t["color"], "ip": t.get("ip", ""), "serial": "", "notes": "", "rows": t.get("rows", 0),
              "ports": [], "fx": 0, "fy": 0, "face": "front"}
+        if t.get("plate"):
+            d["plate"] = copy.deepcopy(t["plate"])
+            d["face"] = "both"
         for p in t["ports"]:
             d["ports"].append({"id": self.nid(), "name": p["name"], "type": p["type"], "label": p.get("label", "")})
         return d
@@ -2002,11 +2214,47 @@ class App:
                 racks.append({"name": line.strip().strip("-:* "), "items": []})
         return [r for r in racks if r["items"]]
 
+    def real_match(self, n, u):
+        pool = [t for t in BUILTIN if t.get("plate")]
+        pick = None
+        if re.search(r"poweredge|dell|\br\d{3,4}(xd|xs)?\b", n) and not re.search(r"\bdell\s+(switch|pdu)", n):
+            m = re.search(r"\br(\d{3,4})(xd|xs)?\b", n)
+            cands = [t for t in pool if t["plate"]["k"] == "dell"]
+            if m:
+                key = "r" + m.group(1) + (m.group(2) or "")
+                c2 = [t for t in cands if t["short"].lower() == "pe-" + key]
+                c2.sort(key=lambda t: t["plate"]["bays"])
+                pick = c2[0] if c2 else None
+            if not pick and ("poweredge" in n or "dell" in n or m):
+                pick = next((t for t in cands if t["short"] == ("PE-R650" if u == 1 else "PE-R750")), None)
+        elif re.search(r"unifi|usw|ubiquiti", n):
+            cands = [t for t in pool if t["plate"]["k"] == "unifi"]
+            pick = next((t for t in cands if t["model"] == ("UniFi Switch Pro 48" if "48" in n else
+                                                          "UniFi Switch Pro 24")), cands[0])
+        elif re.search(r"synology|\bds\d{3}|\brs\d{3,4}", n):
+            rack = re.search(r"\brs\d{3,4}", n) or u <= 2 and "synology" in n and u > 0 and "ds" not in n
+            cands = [t for t in pool if t["plate"]["k"] == ("syn_rack" if rack else "syn_desk")]
+            m = re.search(r"\b(ds|rs)(\d{3,4})(rp)?(\+)?", n)
+            if m:
+                key = (m.group(1) + m.group(2) + (m.group(3) or "") + (m.group(4) or "")).upper()
+                pick = next((t for t in cands if t["short"] == "NAS-" + key), None)
+            if not pick:
+                pick = next((t for t in cands if u == t["u_size"]), cands[0])
+        if not pick:
+            return None
+        t = copy.deepcopy(pick)
+        if not t.get("half"):
+            t["u_size"] = u
+        return t
+
     def smart_template(self, name, u):
         n = name.lower()
 
         def mk(typ, color, plist):
             return {"name": name, "type": typ, "u_size": u, "color": color, "ports": plist, "half": False, "rows": 0}
+        hit = self.real_match(n, u)
+        if hit:
+            return hit
         if re.search(r"cable\s*(mgmt|manage|mgr)|wire\s*manage|cbl", n):
             return mk("Cable manager", "#222428", [])
         if re.search(r"blank|filler", n):
@@ -2086,7 +2334,7 @@ class App:
                     top -= u
                     continue
                 d = self.from_tpl(self.smart_template(name, u))
-                d.update(rack=r["id"], u=top - u + 1, face=face, name=name)
+                d.update(rack=r["id"], u=top - u + 1, face="both" if d.get("plate") and face == "front" else face, name=name)
                 self.doc["devices"].append(d)
                 top -= u
             self.cur_rack = r["id"]

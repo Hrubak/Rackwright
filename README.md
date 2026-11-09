@@ -13,3 +13,8 @@ Run: double-click `Start Rackwright.bat` (or `python rackwright.py [file.rack.js
 - File > Import rack list: paste `Rack1 / - Panel A - (2U) / - Open - (12U)` style lists and get a laid-out rack
   (names are mapped to device types; Open/Empty/Free leave gaps; add `rear` to a line for rear mount).
 - Undo/redo, SVG export, device list CSV. Saves `.rack.json`.
+
+## Real equipment (front and rear faceplates)
+The library has Dell PowerEdge (R230-R760, 1U/2U with the right drive bays), Ubiquiti UniFi 24/48-port switches,
+and Synology 4-bay NAS (DS desktop and RS rack). Use "Flip front/rear" to see the back (PSUs, fans, slots).
+Imported lists match these by name (e.g. "Dell R650", "UniFi USW Pro 24", "Synology DS923+").
