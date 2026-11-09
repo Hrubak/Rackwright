@@ -541,6 +541,15 @@ class ViewBase(ttk.Frame):
         """RJ45 plug at world point (x,y); (ux,uy) is the unit vector pointing away from the device."""
         cv, S = self.cv, self.S
         hw = 4.5
+        if uy == 0 and getattr(self, "plug_face_on", False):
+            # straight-on view: boot seen end-on (rounded block) with the cable coming out of its centre
+            out = GOLD if sel else shade(color, -95)
+            cv.create_rectangle(S(x - 6), S(y - 6.5), S(x + 6), S(y + 6.5), fill=shade(color, -30), outline=out,
+                                width=max(1, S(1)), tags=tg)
+            cv.create_rectangle(S(x - 4), S(y - 4.5), S(x + 4), S(y + 4.5), fill=color, outline=shade(color, -60),
+                                tags=tg)
+            cv.create_oval(S(x - 2), S(y - 2), S(x + 2), S(y + 2), fill=shade(color, 70), outline="", tags=tg)
+            return
 
         def poly(pts, fill, out):
             flat = []
@@ -915,7 +924,9 @@ class RackView(ViewBase):
             self.cable_art(sp, c["color"], sel, dash, tg)
             for (px, py), (qx, qy) in ((pts[0:2], pts[2:4]), (pts[6:8], pts[4:6])):
                 ux = 1 if qx >= px else -1
+                self.plug_face_on = True
                 self.plug(px, py, ux, 0, c["color"], sel, tg)
+                self.plug_face_on = False
             if a.show_labels:
                 txt = c.get("label") or a.fmt_len(c)
                 if txt:
