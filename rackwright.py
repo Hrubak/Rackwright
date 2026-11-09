@@ -1462,6 +1462,10 @@ class App:
         if not A or not B:
             return None
         ca, cb = self.container(A[3]), self.container(B[3])
+        if ca == cb:
+            # same rack/shelf: shortest path, no detour out to the side
+            xm = (A[0] + B[0]) / 2
+            return [A[0], A[1], xm, A[1], xm, B[1], B[0], B[1]]
         ma, mb = (ca[0] + ca[2]) / 2, (cb[0] + cb[2]) / 2
         if ma < mb - 1:
             sa, sb = 1, -1
