@@ -1462,8 +1462,10 @@ class App:
         if not A or not B:
             return None
         ca, cb = self.container(A[3]), self.container(B[3])
-        if ca == cb:
-            # same rack/shelf: shortest path, no detour out to the side
+        gap = max(ca[1] - cb[3], cb[1] - ca[3])
+        overlap = min(ca[2], cb[2]) - max(ca[0], cb[0])
+        if ca == cb or (overlap > 0 and gap < 40):
+            # same rack/shelf, or stacked neighbours: shortest path, no detour out to the side
             xm = (A[0] + B[0]) / 2
             return [A[0], A[1], xm, A[1], xm, B[1], B[0], B[1]]
         ma, mb = (ca[0] + ca[2]) / 2, (cb[0] + cb[2]) / 2
