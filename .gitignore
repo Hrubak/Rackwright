@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.rack.json
+*.svg
+*.csv
+dist/
