@@ -187,9 +187,25 @@ def real_templates():
                        ports("LAN{n}", 4, "RJ45") + ports("PSU{n}", psu, "Power"), rows=2 if u == 1 else 4,
                        plate={"k": "syn_rack", "bays": n, "brows": rows, "size": "3.5"}, group="Synology",
                        short="NAS-" + m, model="Synology " + m))
+    for model, nm, lan, wan in UDR:
+        pl = ports("WAN", 1, "RJ45", 0)
+        if wan:
+            pl += ports("WAN2-SFP+", 1, "SFP+", 0)
+        pl += ports("LAN{n}", lan, "RJ45") + ports("Power", 1, "Power", 0)
+        out.append(tpl("%s (%s)" % (nm, model), "Router", 2, "#eceef1", pl, half=True, rows=3,
+                       plate={"k": "udr", "off": True}, group="Ubiquiti UniFi", short=model, model=nm))
+    for model, nm in UAP:
+        out.append(tpl("%s (%s)" % (nm, model), "Wireless", 1, "#eceef1", ports("Eth", 1, "RJ45", 0), half=True,
+                       rows=1, plate={"k": "uap", "off": True}, group="Ubiquiti UniFi", short=model, model=nm))
     return out
 
 
+UDR = [("UDR", "UniFi Dream Router", 4, False), ("UDR7", "UniFi Dream Router 7", 3, True)]
+UAP = [("U6-Lite", "UniFi Access Point U6 Lite"), ("U6+", "UniFi Access Point U6+"),
+       ("U6-Pro", "UniFi Access Point U6 Pro"), ("U6-Enterprise", "UniFi Access Point U6 Enterprise"),
+       ("U7-Lite", "UniFi Access Point U7 Lite"), ("U7-Pro", "UniFi Access Point U7 Pro"),
+       ("U7-Pro-Max", "UniFi Access Point U7 Pro Max"), ("UAP-AC-Pro", "UniFi Access Point AC Pro"),
+       ("nanoHD", "UniFi Access Point nanoHD")]
 BUILTIN += real_templates()
 
 
@@ -512,6 +528,34 @@ class ViewBase(ttk.Frame):
         bb = self.cv.bbox("all")
         self.scroll_world(bb[0] / self.z - 30 / self.z, bb[1] / self.z - 30 / self.z, 0, 0)
 
+    def cable_art(self, sp, color, sel, dash, tg):
+        """Ethernet-style cable: dark jacket, coloured sheath, thin highlight (sp = screen coords)."""
+        cv, S = self.cv, self.S
+        jacket = GOLD if sel else shade(color, -95)
+        cv.create_line(*sp, fill=jacket, width=S(7 if sel else 6), smooth=len(sp) > 4, capstyle="round", tags=tg)
+        cv.create_line(*sp, fill=color, width=S(4), smooth=len(sp) > 4, dash=dash, capstyle="round", tags=tg)
+        if not dash:
+            cv.create_line(*sp, fill=shade(color, 70), width=max(1, S(1)), smooth=len(sp) > 4, tags=tg)
+
+    def plug(self, x, y, ux, uy, color, sel, tg):
+        """RJ45 plug at world point (x,y); (ux,uy) is the unit vector pointing away from the device."""
+        cv, S = self.cv, self.S
+        hw = 4.5
+
+        def poly(pts, fill, out):
+            flat = []
+            for a_, n_ in pts:
+                flat += [S(x + ux * a_ - uy * n_), S(y + uy * a_ + ux * n_)]
+            cv.create_polygon(*flat, fill=fill, outline=out, tags=tg)
+
+        edge = GOLD if sel else "#4a4f56"
+        poly([(9, -hw + 0.5), (21, -2.2), (21, 2.2), (9, hw - 0.5)], color, GOLD if sel else shade(color, -95))
+        poly([(0, -hw), (9, -hw), (9, hw), (0, hw)], "#dfe3e8", edge)
+        for n_ in (-3, -1, 1, 3):
+            cv.create_line(S(x + ux * 0.5 - uy * n_), S(y + uy * 0.5 + ux * n_), S(x + ux * 3 - uy * n_),
+                           S(y + uy * 3 + ux * n_), fill="#c9961a", tags=tg)
+        poly([(4, -2.4), (8, -2.4), (8, 2.4), (4, 2.4)], "#c3c9d0", "#8b9097")
+
     def export_svg(self, path):
         z = self.z
         self.z = 1.0
@@ -564,6 +608,10 @@ class ViewBase(ttk.Frame):
                            'text-anchor="%s" dominant-baseline="central">%s</text>' % (
                                c[0], c[1], cv.itemcget(it, "fill"), f["family"], abs(int(f["size"])),
                                f["weight"], ta, html.escape(cv.itemcget(it, "text"))))
+            elif t == "polygon":
+                out.append('<polygon points="%s" fill="%s" stroke="%s"/>' % (
+                    " ".join("%.1f,%.1f" % p for p in zip(c[0::2], c[1::2])),
+                    col(cv.itemcget(it, "fill")), col(cv.itemcget(it, "outline"))))
             elif t == "oval":
                 out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s" stroke="%s"/>' % (
                     (c[0] + c[2]) / 2, (c[1] + c[3]) / 2, (c[2] - c[0]) / 2, (c[3] - c[1]) / 2,
@@ -824,6 +872,34 @@ class RackView(ViewBase):
                 rc(bx + 60, by + bh - 24, bx + 78, by + bh - 6, "#111214", "#6b717a")
                 tx(bx + bw / 2, by + 5, "REAR", 6, "#9aa0a6", True, "center")
             return l + 6, 104, "#e6e8eb"
+        if k == "udr":
+            rc(l + 1, t + 1, r - 1, b - 1, "#f2f4f6", "#aeb4bb")
+            rc(l + 1, b - 5, r - 1, b - 1, "#d9dde1")
+            cy = t + h / 2 - 1
+            if not rear:
+                ov(l + 20, cy, 15, "#ffffff", "#9aa0a6")
+                ov(l + 20, cy, 11, "#e7eaed", "#2a6fdb")
+                ov(l + 20, cy, 4, "#2a6fdb")
+                vents(l + 118, t + 8, l + 160, b - 9, "#c3c8ce", 4)
+                tx(l + 46, cy, "Dream Router", 7, "#6b717a", True)
+                return l + 46, 118, "#23262b"
+            rc(l + 6, t + 6, l + 44, b - 8, "#d5d9dd", "#aeb4bb")
+            ov(l + 25, cy, 9, "#c3c8ce", "#8b9097")
+            vents(l + 54, t + 8, l + 150, b - 9, "#c3c8ce", 4)
+            tx(l + 100, cy, "REAR", 6, "#6b717a", True, "center")
+            return l + 54, 100, "#23262b"
+        if k == "uap":
+            rc(l + 1, t + 1, r - 1, b - 1, "#f2f4f6", "#aeb4bb")
+            cy = t + h / 2
+            if not rear:
+                ov(l + 15, cy, 9.5, "#ffffff", "#9aa0a6")
+                ov(l + 15, cy, 6.5, "#f2f4f6", "#2a6fdb")
+                ov(l + 15, cy, 2, "#2a6fdb")
+                return l + 30, 150, "#23262b"
+            ov(l + 15, cy, 9.5, "#c3c8ce", "#8b9097")
+            for ax in (-4, 4):
+                ov(l + 15 + ax, cy, 1.4, "#6b717a")
+            return l + 30, 150, "#23262b"
         return l + 7, min(150, (r - l) * 0.3), fg_for(d.get("color") or "#3b6ea8")
 
     def draw_cables(self):
@@ -834,11 +910,12 @@ class RackView(ViewBase):
                 continue
             sel = a.sel == ("cable", c["id"])
             sp = [S(v) for v in pts]
-            casing = GOLD if sel else ("#cfcfcf" if lum(c["color"]) < 0.25 else "#2a2a2a")
             dash = (6, 4) if c.get("style") == "dashed" else None
             tg = ("cable:%d" % c["id"],)
-            cv.create_line(*sp, fill=casing, width=S(6 if sel else 5), smooth=True, tags=tg)
-            cv.create_line(*sp, fill=c["color"], width=S(3), smooth=True, dash=dash, tags=tg)
+            self.cable_art(sp, c["color"], sel, dash, tg)
+            for (px, py), (qx, qy) in ((pts[0:2], pts[2:4]), (pts[6:8], pts[4:6])):
+                ux = 1 if qx >= px else -1
+                self.plug(px, py, ux, 0, c["color"], sel, tg)
             if a.show_labels:
                 txt = c.get("label") or a.fmt_len(c)
                 if txt:
@@ -1160,11 +1237,14 @@ class LogicalView(ViewBase):
                 e = self.exit_t(bx, by, -dx, -dy, db)
                 sx, sy, ex, ey = ax + dx * s, ay + dy * s, bx - dx * e, by - dy * e
                 sel = a.sel == ("cable", c["id"])
-                casing = GOLD if sel else ("#999999" if lum(c["color"]) > 0.8 else "#333333")
                 tg = ("cable:%d" % c["id"],)
                 dash = (6, 4) if c.get("style") == "dashed" else None
-                cv.create_line(S(sx), S(sy), S(ex), S(ey), fill=casing, width=S(6 if sel else 5), tags=tg)
-                cv.create_line(S(sx), S(sy), S(ex), S(ey), fill=c["color"], width=S(3), dash=dash, tags=tg)
+                self.cable_art([S(sx), S(sy), S(ex), S(ey)], c["color"], sel, dash, tg)
+                ln2 = math.hypot(ex - sx, ey - sy) or 1
+                ux, uy = (ex - sx) / ln2, (ey - sy) / ln2
+                if ln2 > 50:
+                    self.plug(sx, sy, ux, uy, c["color"], sel, tg)
+                    self.plug(ex, ey, -ux, -uy, c["color"], sel, tg)
                 lines = []
                 if c.get("logical"):
                     lines.append(c["logical"])
@@ -1349,7 +1429,7 @@ class App:
         rows = min(n, d.get("rows") or max(1, d["u_size"] * 2))
         cols = math.ceil(n / rows)
         labw = min(150, w * 0.3)
-        if (d.get("plate") or {}).get("k") in ("dell", "syn_rack", "syn_desk"):
+        if (d.get("plate") or {}).get("k") in ("dell", "syn_rack", "syn_desk", "udr", "uap"):
             cell = min((h - 4) / rows, 14)
             x0 = r - 8 - cols * cell
         else:
@@ -1780,8 +1860,9 @@ class App:
                 return
         d["face"] = self.rv.face
         r = self.rack(self.cur_rack) or self.doc["racks"][0]
-        spot = self.find_free(r, d)
-        if not spot:
+        off = (d.get("plate") or {}).get("off")
+        spot = None if off else self.find_free(r, d)
+        if not spot and not off:
             for r2 in self.doc["racks"]:
                 spot = self.find_free(r2, d)
                 if spot:
@@ -1793,7 +1874,7 @@ class App:
             n = [x for x in self.doc["devices"] if not x.get("rack")]
             d.update(rack=None, fx=min(x["x"] for x in self.doc["racks"]) - RW - 160,
                      fy=sum(x["u_size"] * UH + 20 for x in n))
-            self.status("No free slot - placed off-rack")
+            self.status("Placed off-rack" if off else "No free slot - placed off-rack")
         self.add_device(d)
 
     def new_custom_device(self):
@@ -2227,6 +2308,13 @@ class App:
                 pick = c2[0] if c2 else None
             if not pick and ("poweredge" in n or "dell" in n or m):
                 pick = next((t for t in cands if t["short"] == ("PE-R650" if u == 1 else "PE-R750")), None)
+        elif re.search(r"dream\s*router|\budr7?\b", n):
+            pick = next(t for t in pool if t["short"] == ("UDR7" if "7" in n else "UDR"))
+        elif re.search(r"\bu[67]-?(lite|pro|\+|enterprise|max)|access\s*point|\buap\b|nanohd|\bap\d*\b", n):
+            key = re.sub(r"[^a-z0-9+]", "", n)
+            pick = next((t for t in pool if t["plate"]["k"] == "uap" and
+                         t["short"].lower().replace("-", "") in key), None) or \
+                next(t for t in pool if t["short"] == "U7-Pro")
         elif re.search(r"unifi|usw|ubiquiti", n):
             cands = [t for t in pool if t["plate"]["k"] == "unifi"]
             pick = next((t for t in cands if t["model"] == ("UniFi Switch Pro 48" if "48" in n else
