@@ -208,6 +208,168 @@ UAP = [("U6-Lite", "UniFi Access Point U6 Lite"), ("U6+", "UniFi Access Point U6
        ("nanoHD", "UniFi Access Point nanoHD")]
 BUILTIN += real_templates()
 
+# ---- more vendors: one generic faceplate ("gen") driven by style/body/brand colours
+# (group, brand text, brand colour, body colour, label colour, name prefix)
+VENDORS = [
+    ("Cisco", "CISCO", "#049fd9", "#cfd3d8", "#1b1e22", "Cisco"),
+    ("Cisco Meraki", "MERAKI", "#67b346", "#f1f3f4", "#1b1e22", "Meraki"),
+    ("Ruckus", "RUCKUS", "#f26b21", "#e4e6e9", "#1b1e22", "Ruckus"),
+    ("SonicWall", "SONICWALL", "#e4002b", "#1d1f23", "#e6e8eb", "SonicWall"),
+    ("APC by Schneider", "APC", "#3dae2b", "#23262a", "#e6e8eb", "APC"),
+    ("Fortinet", "FORTINET", "#ee3124", "#d9dcdf", "#1b1e22", ""),
+    ("Aruba / HPE", "ARUBA", "#ff8300", "#d4d7db", "#1b1e22", ""),
+    ("Juniper", "JUNIPER", "#84b135", "#dfe1e4", "#1b1e22", "Juniper"),
+    ("Palo Alto Networks", "PALO ALTO", "#fa582d", "#2a2d31", "#e6e8eb", "Palo Alto"),
+    ("Eaton", "EATON", "#005eb8", "#26292d", "#e6e8eb", "Eaton"),
+]
+VEND = {v[0]: v for v in VENDORS}
+# switches: (group, model, short, RJ45 ports, uplinks, uplink type)
+SWITCHES = [
+    ("Cisco", "Catalyst 1000-24T", "C1000-24T", 24, 4, "SFP"), ("Cisco", "Catalyst 1000-48P", "C1000-48P", 48, 4, "SFP"),
+    ("Cisco", "Catalyst 2960X-24TS", "WS-C2960X-24TS", 24, 2, "SFP"),
+    ("Cisco", "Catalyst 2960X-48TS", "WS-C2960X-48TS", 48, 2, "SFP"),
+    ("Cisco", "Catalyst 9200L-24T", "C9200L-24T", 24, 4, "SFP+"), ("Cisco", "Catalyst 9200L-48P", "C9200L-48P", 48, 4, "SFP+"),
+    ("Cisco", "Catalyst 9300-24T", "C9300-24T", 24, 4, "SFP+"), ("Cisco", "Catalyst 9300-24P", "C9300-24P", 24, 4, "SFP+"),
+    ("Cisco", "Catalyst 9300-48T", "C9300-48T", 48, 4, "SFP+"), ("Cisco", "Catalyst 9300-48P", "C9300-48P", 48, 4, "SFP+"),
+    ("Cisco", "Catalyst 3850-24T", "WS-C3850-24T", 24, 4, "SFP"), ("Cisco", "Catalyst 3850-48P", "WS-C3850-48P", 48, 4, "SFP"),
+    ("Cisco Meraki", "MS120-24", "MS120-24", 24, 4, "SFP"), ("Cisco Meraki", "MS120-24P", "MS120-24P", 24, 4, "SFP"),
+    ("Cisco Meraki", "MS120-48", "MS120-48", 48, 4, "SFP"), ("Cisco Meraki", "MS120-48LP", "MS120-48LP", 48, 4, "SFP"),
+    ("Cisco Meraki", "MS210-24P", "MS210-24P", 24, 4, "SFP"), ("Cisco Meraki", "MS210-48FP", "MS210-48FP", 48, 4, "SFP"),
+    ("Cisco Meraki", "MS225-24P", "MS225-24P", 24, 4, "SFP+"), ("Cisco Meraki", "MS225-48FP", "MS225-48FP", 48, 4, "SFP+"),
+    ("Cisco Meraki", "MS250-24P", "MS250-24P", 24, 4, "SFP+"), ("Cisco Meraki", "MS250-48FP", "MS250-48FP", 48, 4, "SFP+"),
+    ("Cisco Meraki", "MS350-24X", "MS350-24X", 24, 4, "SFP+"), ("Cisco Meraki", "MS350-48FP", "MS350-48FP", 48, 4, "SFP+"),
+    ("Cisco Meraki", "MS390-24P", "MS390-24P", 24, 4, "SFP+"), ("Cisco Meraki", "MS390-48UX", "MS390-48UX", 48, 4, "SFP+"),
+    ("Ruckus", "ICX 7150-24", "ICX7150-24", 24, 4, "SFP+"), ("Ruckus", "ICX 7150-24P", "ICX7150-24P", 24, 4, "SFP+"),
+    ("Ruckus", "ICX 7150-48", "ICX7150-48", 48, 4, "SFP+"), ("Ruckus", "ICX 7150-48P", "ICX7150-48P", 48, 4, "SFP+"),
+    ("Ruckus", "ICX 7250-24", "ICX7250-24", 24, 8, "SFP+"), ("Ruckus", "ICX 7250-24P", "ICX7250-24P", 24, 8, "SFP+"),
+    ("Ruckus", "ICX 7250-48", "ICX7250-48", 48, 8, "SFP+"), ("Ruckus", "ICX 7250-48P", "ICX7250-48P", 48, 8, "SFP+"),
+    ("Ruckus", "ICX 7450-24", "ICX7450-24", 24, 4, "SFP+"), ("Ruckus", "ICX 7450-48P", "ICX7450-48P", 48, 4, "SFP+"),
+    ("Ruckus", "ICX 7550-24", "ICX7550-24", 24, 6, "SFP+"), ("Ruckus", "ICX 7550-48P", "ICX7550-48P", 48, 6, "SFP+"),
+    ("Aruba / HPE", "Aruba 2930F 24G PoE+", "AR-2930F-24", 24, 4, "SFP+"),
+    ("Aruba / HPE", "Aruba 2930F 48G PoE+", "AR-2930F-48", 48, 4, "SFP+"),
+    ("Aruba / HPE", "Aruba CX 6100 24G", "AR-CX6100-24", 24, 4, "SFP+"),
+    ("Aruba / HPE", "Aruba CX 6100 48G", "AR-CX6100-48", 48, 4, "SFP+"),
+    ("Aruba / HPE", "Aruba CX 6300M 48G", "AR-CX6300M-48", 48, 4, "SFP+"),
+    ("Juniper", "EX2300-24T", "EX2300-24T", 24, 4, "SFP+"), ("Juniper", "EX2300-48P", "EX2300-48P", 48, 4, "SFP+"),
+    ("Juniper", "EX4300-48T", "EX4300-48T", 48, 4, "SFP+"),
+    ("Fortinet", "FortiSwitch 124F", "FS-124F", 24, 4, "SFP+"), ("Fortinet", "FortiSwitch 148F", "FS-148F", 48, 4, "SFP+"),
+]
+# firewalls / routers: (group, model, short, RJ45, SFP count, SFP type, U, desktop(half-width, off-rack), type)
+FIREWALLS = [
+    ("SonicWall", "TZ270", "TZ270", 8, 0, "", 1, True, "Firewall"), ("SonicWall", "TZ370", "TZ370", 8, 0, "", 1, True, "Firewall"),
+    ("SonicWall", "TZ470", "TZ470", 8, 0, "", 1, True, "Firewall"), ("SonicWall", "TZ570", "TZ570", 8, 2, "SFP+", 1, True, "Firewall"),
+    ("SonicWall", "TZ670", "TZ670", 8, 2, "SFP+", 1, True, "Firewall"),
+    ("SonicWall", "NSa 2700", "NSa-2700", 16, 4, "SFP+", 1, False, "Firewall"),
+    ("SonicWall", "NSa 3700", "NSa-3700", 16, 4, "SFP+", 1, False, "Firewall"),
+    ("SonicWall", "NSa 4700", "NSa-4700", 16, 4, "SFP+", 1, False, "Firewall"),
+    ("SonicWall", "NSa 5700", "NSa-5700", 16, 6, "SFP+", 1, False, "Firewall"),
+    ("SonicWall", "NSa 6700", "NSa-6700", 16, 6, "SFP+", 1, False, "Firewall"),
+    ("SonicWall", "NSsp 10700", "NSsp-10700", 8, 8, "SFP+", 1, False, "Firewall"),
+    ("Cisco Meraki", "MX64", "MX64", 5, 0, "", 1, True, "Firewall"), ("Cisco Meraki", "MX67", "MX67", 4, 0, "", 1, True, "Firewall"),
+    ("Cisco Meraki", "MX68", "MX68", 10, 0, "", 1, True, "Firewall"), ("Cisco Meraki", "MX75", "MX75", 8, 2, "SFP+", 1, True, "Firewall"),
+    ("Cisco Meraki", "MX85", "MX85", 8, 2, "SFP+", 1, False, "Firewall"),
+    ("Cisco Meraki", "MX95", "MX95", 8, 2, "SFP+", 1, False, "Firewall"),
+    ("Cisco Meraki", "MX105", "MX105", 8, 2, "SFP+", 1, False, "Firewall"),
+    ("Cisco Meraki", "MX250", "MX250", 8, 8, "SFP+", 1, False, "Firewall"),
+    ("Cisco Meraki", "MX450", "MX450", 8, 8, "SFP+", 1, False, "Firewall"),
+    ("Cisco", "ASA 5506-X", "ASA-5506", 8, 0, "", 1, True, "Firewall"),
+    ("Cisco", "Firepower 1010", "FPR-1010", 8, 0, "", 1, True, "Firewall"),
+    ("Cisco", "Firepower 1120", "FPR-1120", 8, 4, "SFP", 1, False, "Firewall"),
+    ("Cisco", "Firepower 2110", "FPR-2110", 12, 4, "SFP+", 1, False, "Firewall"),
+    ("Cisco", "ISR 4321", "ISR4321", 2, 2, "SFP", 1, False, "Router"),
+    ("Cisco", "ISR 4331", "ISR4331", 3, 1, "SFP", 1, False, "Router"),
+    ("Cisco", "ISR 4431", "ISR4431", 4, 0, "", 1, False, "Router"),
+    ("Cisco", "ISR 4451-X", "ISR4451", 4, 0, "", 2, False, "Router"),
+    ("Fortinet", "FortiGate 60F", "FG-60F", 10, 0, "", 1, True, "Firewall"),
+    ("Fortinet", "FortiGate 100F", "FG-100F", 20, 4, "SFP+", 1, False, "Firewall"),
+    ("Fortinet", "FortiGate 200F", "FG-200F", 16, 8, "SFP+", 1, False, "Firewall"),
+    ("Fortinet", "FortiGate 400F", "FG-400F", 18, 8, "SFP+", 1, False, "Firewall"),
+    ("Palo Alto Networks", "PA-440", "PA-440", 8, 0, "", 1, True, "Firewall"),
+    ("Palo Alto Networks", "PA-3220", "PA-3220", 12, 8, "SFP+", 1, False, "Firewall"),
+    ("Palo Alto Networks", "PA-3260", "PA-3260", 12, 8, "SFP+", 2, False, "Firewall"),
+    ("Juniper", "SRX300", "SRX300", 8, 2, "SFP", 1, True, "Firewall"),
+    ("Juniper", "SRX345", "SRX345", 16, 4, "SFP", 1, False, "Firewall"),
+]
+# wireless access points (off-rack): (group, model, short)
+APS = [("Cisco Meraki", "MR36", "MR36"), ("Cisco Meraki", "MR44", "MR44"), ("Cisco Meraki", "MR46", "MR46"),
+       ("Cisco Meraki", "MR56", "MR56"), ("Cisco Meraki", "MR57", "MR57"),
+       ("Ruckus", "R350", "R350"), ("Ruckus", "R550", "R550"), ("Ruckus", "R650", "R650"), ("Ruckus", "R750", "R750"),
+       ("Ruckus", "R770", "R770"), ("Cisco", "Catalyst 9120AXI", "C9120AXI"), ("Aruba / HPE", "AP-515", "AP-515"),
+       ("Aruba / HPE", "AP-535", "AP-535")]
+# UPS and battery packs: (group, model, short, U, outlets, is battery pack)
+UPSES = [
+    ("APC by Schneider", "Smart-UPS SMT750RM2U", "SMT750RM2U", 2, 4, False),
+    ("APC by Schneider", "Smart-UPS SMT1000RM2U", "SMT1000RM2U", 2, 6, False),
+    ("APC by Schneider", "Smart-UPS SMT1500RM2U", "SMT1500RM2U", 2, 6, False),
+    ("APC by Schneider", "Smart-UPS SMT2200RM2U", "SMT2200RM2U", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SMT3000RM2U", "SMT3000RM2U", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SMC1500-2U", "SMC1500-2U", 2, 6, False),
+    ("APC by Schneider", "Smart-UPS SMX1500RM2U", "SMX1500RM2U", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SMX3000RMHV2U", "SMX3000RMHV2U", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SRT1500RMXLI", "SRT1500RMXLI", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SRT3000RMXLI", "SRT3000RMXLI", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SRT5KRMXLI", "SRT5KRMXLI", 3, 10, False),
+    ("APC by Schneider", "Smart-UPS SRT6KRMXLI", "SRT6KRMXLI", 4, 10, False),
+    ("APC by Schneider", "Smart-UPS SRT10KRMXLI", "SRT10KRMXLI", 6, 12, False),
+    ("APC by Schneider", "Battery pack SMX48RMBP2U", "SMX48RMBP2U", 2, 0, True),
+    ("APC by Schneider", "Battery pack SMX120RMBP2U", "SMX120RMBP2U", 2, 0, True),
+    ("APC by Schneider", "Battery pack SRT48RMBP", "SRT48RMBP", 2, 0, True),
+    ("APC by Schneider", "Battery pack SRT96RMBP", "SRT96RMBP", 2, 0, True),
+    ("APC by Schneider", "Battery pack SRT192RMBP", "SRT192RMBP", 2, 0, True),
+    ("APC by Schneider", "Battery pack SRT96RMBP2", "SRT96RMBP2", 3, 0, True),
+    ("Eaton", "5PX 1500 RT 2U", "5PX1500RT", 2, 8, False), ("Eaton", "5PX 3000 RT 3U", "5PX3000RT", 3, 8, False),
+    ("Eaton", "9PX 3000 RT 3U", "9PX3000RT", 3, 8, False), ("Eaton", "Extended battery module EBM", "5PX-EBM", 2, 0, True),
+]
+# rack PDUs: (group, model, short, outlets)
+PDUS = [("APC by Schneider", "Basic Rack PDU AP7900B (1U, 8 outlets, switched)", "AP7900B", 8),
+        ("APC by Schneider", "Basic Rack PDU AP7820B (1U, 8 outlets)", "AP7820B", 8),
+        ("APC by Schneider", "Metered Rack PDU AP7821B (1U, 8 outlets)", "AP7821B", 8),
+        ("APC by Schneider", "Metered Rack PDU AP8841 (2U, 24 outlets)", "AP8841", 24),
+        ("Eaton", "ePDU G3 metered 1U", "EATON-ePDU", 8)]
+
+
+def gen_templates():
+    out = []
+
+    def add(group, model, typ, u, plist, half, rows, style, short, off=False, suffix="", **kw):
+        g, brand, bc, body, lab, pre = VEND[group]
+        pl = {"k": "gen", "style": style, "brand": brand, "bc": bc, "body": body, "lab": lab}
+        pl.update(kw)
+        if off:
+            pl["off"] = True
+        nm = model if (not pre or model.startswith(pre)) else pre + " " + model
+        out.append(tpl(nm + suffix, typ, u, body, plist, half=half, rows=rows, plate=pl, group=group, short=short,
+                       model=nm))
+    for g, model, short, n, nu, ut in SWITCHES:
+        poe = bool(re.search(r"\d(P|FP|LP|UX|X)$|PoE", model))
+        add(g, model, "Switch", 1, ports("{n}", n, "RJ45") + ports("SFP%s{n}" % ("+" if ut == "SFP+" else ""), nu, ut),
+            False, 2, "sw", short, poe=poe)
+    for g, model, short, n, ns, st, u, desk, typ in FIREWALLS:
+        pl = ports("{n}", n, "RJ45") + (ports("SFP%s{n}" % ("+" if st == "SFP+" else ""), ns, st) if ns else [])
+        pl += ports("Console", 1, "Console", 0)
+        if desk:
+            pl += ports("Power", 1, "Power", 0)
+        add(g, model, typ, u, pl, desk, 2 if n + ns > 8 else 1, "fw", short, off=desk,
+            suffix=" (desktop)" if desk else "", desk=desk)
+    for g, model, short in APS:
+        add(g, model, "Wireless", 1, ports("Eth", 1, "RJ45", 0), True, 1, "ap", short, off=True,
+            suffix=" access point")
+    for g, model, short, u, n, bp in UPSES:
+        if bp:
+            add(g, model, "UPS", u, ports("Battery", 1, "Other", 0), False, 1, "bp", short, suffix=" (%dU)" % u)
+        else:
+            add(g, model, "UPS", u, ports("Out{n}", n, "Power") + ports("Network", 1, "RJ45", 0) +
+                ports("Battery", 1, "Other", 0), False, 1 if u < 3 else 2, "ups", short, suffix=" (%dU)" % u)
+    for g, model, short, n in PDUS:
+        u = 2 if n > 12 else 1
+        add(g, model, "PDU", u, ports("Out{n}", n, "Power") + ports("Input", 1, "Power", 0), False,
+            1 if u == 1 else 2, "pdu", short)
+    return out
+
+
+BUILTIN += gen_templates()
+
+
 
 def new_doc():
     return {"v": 1, "nid": 1, "racks": [], "devices": [], "cables": []}
@@ -881,6 +1043,89 @@ class RackView(ViewBase):
                 rc(bx + 60, by + bh - 24, bx + 78, by + bh - 6, "#111214", "#6b717a")
                 tx(bx + bw / 2, by + 5, "REAR", 6, "#9aa0a6", True, "center")
             return l + 6, 104, "#e6e8eb"
+        if k == "gen":
+            st, bc, body, lab, brand = p["style"], p["bc"], p["body"], p["lab"], p["brand"]
+            dark = lum(body) < 110
+            edge = "#4a4e54" if dark else "#9aa0a6"
+            back = "#0b0c0e" if dark else "#14161a"
+            cy = t + h / 2
+            rc(l + 1, t + 1, r - 1, b - 1, body, edge)
+            rc(l + 1, b - 4, r - 1, b - 1, bc)
+            rc(l + 1, t + 1, l + 5, b - 1, shade(body, -25 if not dark else 25))
+            rc(r - 5, t + 1, r - 1, b - 1, shade(body, -25 if not dark else 25))
+            if st in ("sw", "fw"):
+                room = pl - l - 12
+                if not rear:
+                    rc(pl, t + 3, r - 3, b - 4, back, "#3a3d42")
+                    if room >= 150:
+                        tx(pl - 4, cy - 1, brand, 7, bc, True, "e")
+                    elif h >= 30:
+                        ov(l + 11, b - 8, 1.6, "#3ddc5b")
+                    if p.get("poe") and room >= 150 and h >= 30:
+                        tx(pl - 4, cy + 9, "PoE", 6, lab, False, "e")
+                    return l + 10, max(50, room - (52 if room >= 150 else 0)), lab
+                rc(l + 10, t + 4, l + 54, b - 4, "#15171a", "#5b6068")
+                rc(l + 15, t + 8, l + 49, b - 8, "#0c0d0f")
+                ov(l + 32, cy, 2.4, "#3ddc5b")
+                vents(l + 64, t + 6, max(l + 66, pl - 40), b - 8, shade(body, -35 if not dark else 30), 4)
+                for fx in (pl - 28, pl - 10):
+                    if fx - 7 > l + 66:
+                        ov(fx, cy, 6.5, shade(body, -25 if not dark else 20), "#555a62")
+                        ov(fx, cy, 2, "#555a62")
+                rc(pl, t + 3, r - 3, b - 4, back, "#3a3d42")
+                return l + 10, max(50, room - 10), lab
+            if st == "ap":
+                if not rear:
+                    ov(l + 15, cy, 9.5, "#ffffff", "#9aa0a6")
+                    ov(l + 15, cy, 6.5, body, bc)
+                    ov(l + 15, cy, 2, bc)
+                    return l + 30, 150, lab
+                ov(l + 15, cy, 9.5, shade(body, -20), "#8b9097")
+                for ax in (-4, 4):
+                    ov(l + 15 + ax, cy, 1.4, "#6b717a")
+                return l + 30, 150, lab
+            if st in ("ups", "bp"):
+                if not rear:
+                    tx(l + 10, b - 9, brand, 8, bc, True)
+                    x1 = pl - 6
+                    if st == "ups":
+                        lx0 = l + 118
+                        rc(lx0, t + 8, lx0 + 62, t + min(h - 22, 36), "#0b1a14", "#6b717a")
+                        cv.create_line(S(lx0 + 5), S(t + 15), S(lx0 + 40), S(t + 15), fill=bc, tags=tg)
+                        cv.create_line(S(lx0 + 5), S(t + 21), S(lx0 + 28), S(t + 21), fill="#4a5a52", tags=tg)
+                        for i in range(4):
+                            ov(lx0 + 8 + i * 15, b - 11, 3, "#17181b", "#6b717a")
+                        vents(lx0 + 72, t + 8, x1, b - 8, "#33363b", 4)
+                    else:
+                        bx0 = l + 118
+                        rc(bx0, cy - 11, bx0 + 34, cy + 11, "#17181b", "#6b717a")
+                        rc(bx0 + 34, cy - 4, bx0 + 38, cy + 4, "#6b717a")
+                        rc(bx0 + 4, cy - 7, bx0 + 24, cy + 7, bc)
+                        tx(bx0 + 48, cy, "BATTERY PACK", 6.5, "#9aa0a6", True)
+                        vents(bx0 + 130, t + 8, x1, b - 8, "#33363b", 4)
+                    ov(l + 11, t + 9, 2, "#3ddc5b")
+                    return l + 10, 100, lab
+                x = l + 62
+                for i in range(2):
+                    ov(x + 12 + i * 30, cy, 11 if h > 40 else 9, "#1a1b1e", "#555a62")
+                    ov(x + 12 + i * 30, cy, 3, "#555a62")
+                rc(l + 130, t + 8, l + 160, t + 8 + min(20, h - 16), "#15171a", "#6b717a")
+                tx(l + 145, t + 8 + min(20, h - 16) + 7 if h > 40 else b - 5, "BKR", 5.5, "#9aa0a6", True, "center")
+                rc(l + 168, t + 8, l + 202, b - 8, "#15171a", "#6b717a")
+                tx(l + 133, cy, "SMART\nSLOT" if h > 40 else "SLOT", 5.5, "#9aa0a6", True, "center")
+                tx(l + 222, cy, "REAR", 6, "#9aa0a6", True, "center")
+                return l + 8, 50, lab
+            if st == "pdu":
+                if not rear:
+                    tx(l + 10, b - 8, brand, 7, bc, True)
+                    rc(l + 130, cy - 7, l + 168, cy + 7, "#0b1a14", "#6b717a")
+                    cv.create_line(S(l + 135), S(cy), S(l + 160), S(cy), fill=bc, tags=tg)
+                    vents(l + 178, t + 7, pl - 8, b - 7, "#33363b", 4)
+                    return l + 10, 110, lab
+                rc(pl, t + 3, r - 3, b - 4, back, "#3a3d42")
+                rc(l + 10, cy - 7, l + 56, cy + 7, "#111214", "#6b717a")
+                tx(l + 33, cy, "INPUT", 5.5, "#9aa0a6", True, "center")
+                return l + 10, 100, lab
         if k == "udr":
             rc(l + 1, t + 1, r - 1, b - 1, "#f2f4f6", "#aeb4bb")
             rc(l + 1, b - 5, r - 1, b - 1, "#d9dde1")
@@ -1440,7 +1685,7 @@ class App:
         rows = min(n, d.get("rows") or max(1, d["u_size"] * 2))
         cols = math.ceil(n / rows)
         labw = min(150, w * 0.3)
-        if (d.get("plate") or {}).get("k") in ("dell", "syn_rack", "syn_desk", "udr", "uap"):
+        if (d.get("plate") or {}).get("k") in ("dell", "syn_rack", "syn_desk", "udr", "uap", "gen"):
             cell = min((h - 4) / rows, 14)
             x0 = r - 8 - cols * cell
         else:
@@ -2312,8 +2557,71 @@ class App:
                 racks.append({"name": line.strip().strip("-:* "), "items": []})
         return [r for r in racks if r["items"]]
 
+    def vendor_match(self, n, u, pool):
+        gen = [t for t in pool if t["plate"]["k"] == "gen"]
+        key = re.sub(r"[^a-z0-9+]", "", n)
+
+        def by_short(sh):
+            return next((t for t in gen if t["short"].lower().replace("-", "") == sh.lower().replace("-", "")), None)
+
+        def exact(styles, skip_ap=False):
+            c = [t for t in gen if t["plate"]["style"] in styles and len(t["short"]) >= 5 and
+                 t["short"].lower().replace("-", "") in key.replace("-", "")]
+            c.sort(key=lambda t: -len(t["short"]))
+            return c[0] if c else None
+        m = re.search(r"\b(smx|srt)\d+\w*bp\w*|battery\s*(pack|module)|\bxlbp|\bebm\b|\bbp\d", n)
+        if m:
+            c = [t for t in gen if t["plate"]["style"] == "bp"]
+            return exact(("bp",)) or next((t for t in c if t["u_size"] == u), c[0])
+        hit = exact(("ups", "pdu", "sw", "fw"))
+        if hit:
+            return hit
+        if re.search(r"\bapc\b|smart-?ups|\bups\b|\bsm[tcx]\d|\bsrt\d|eaton|\b[59]px", n) and                 not re.search(r"pdu|power strip", n):
+            c = [t for t in gen if t["plate"]["style"] == "ups" and (t["plate"]["brand"] == "EATON") == ("eaton" in n)]
+            return next((t for t in c if t["u_size"] == u and ("SMT1500" in t["short"] or "5PX1500" in t["short"])),
+                        None) or next((t for t in c if t["u_size"] == u), c[0])
+        if re.search(r"\bapc\b.*pdu|ap7\d{3}|ap8\d{3}|eaton.*pdu", n):
+            return next((t for t in gen if t["plate"]["style"] == "pdu" and
+                         (t["u_size"] == u or u > 2)), None)
+        n48 = "48" in n
+        if re.search(r"sonic\s*wall|\bnsa\b|\btz\d{3}", n):
+            return by_short("NSa-2700" if u >= 1 and not re.search(r"tz", n) else "TZ570")
+        if re.search(r"meraki|\bms\d{3}|\bmx\d{2,3}|\bmr\d{2}", n):
+            if re.search(r"\bmr\d{2}|access\s*point|\bap\b", n):
+                return by_short("MR46")
+            if re.search(r"\bmx|firewall|appliance|security", n):
+                return by_short("MX85")
+            return by_short("MS225-48FP" if n48 else "MS225-24P")
+        if re.search(r"ruckus|\bicx", n):
+            if re.search(r"\br[3-7]\d0\b|access\s*point|\bap\b", n):
+                return by_short("R650")
+            return by_short("ICX7150-48" if n48 else "ICX7150-24")
+        if re.search(r"fortigate|\bfg-?\d|\bfgt", n):
+            return by_short("FG-100F")
+        if re.search(r"fortiswitch", n):
+            return by_short("FS-148F" if n48 else "FS-124F")
+        if re.search(r"palo\s*alto|\bpa-?\d{3,4}", n):
+            return by_short("PA-3220")
+        if re.search(r"aruba|\bhpe\b", n) and re.search(r"switch|\bcx\b|\b[23]\d{3}", n):
+            return by_short("AR-CX6100-48" if n48 else "AR-CX6100-24")
+        if re.search(r"juniper|\bex\d{4}", n):
+            return by_short("EX2300-48P" if n48 else "EX2300-24T")
+        if re.search(r"cisco|catalyst|\bc9\d{3}|\bws-c|\bisr\d|\basa", n):
+            if re.search(r"isr|router", n):
+                return by_short("ISR4451" if u >= 2 else "ISR4331")
+            if re.search(r"asa|firepower|\bftd", n):
+                return by_short("FPR-1120")
+            return by_short("C9300-48P" if n48 else "C9300-24T")
+        return None
+
     def real_match(self, n, u):
         pool = [t for t in BUILTIN if t.get("plate")]
+        pick = self.vendor_match(n, u, pool)
+        if pick:
+            t = copy.deepcopy(pick)
+            if not t.get("half") and t["plate"].get("style") not in ("ups", "bp"):
+                t["u_size"] = u
+            return t
         pick = None
         if re.search(r"poweredge|dell|\br\d{3,4}(xd|xs)?\b", n) and not re.search(r"\bdell\s+(switch|pdu)", n):
             m = re.search(r"\br(\d{3,4})(xd|xs)?\b", n)

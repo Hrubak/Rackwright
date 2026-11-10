@@ -18,3 +18,7 @@ Run: double-click `Start Rackwright.bat` (or `python rackwright.py [file.rack.js
 The library has Dell PowerEdge (R230-R760, 1U/2U with the right drive bays), Ubiquiti UniFi 24/48-port switches,
 and Synology 4-bay NAS (DS desktop and RS rack). Use "Flip front/rear" to see the back (PSUs, fans, slots).
 Imported lists match these by name (e.g. "Dell R650", "UniFi USW Pro 24", "Synology DS923+").
+
+Also included (generic branded faceplates, front and rear): APC Smart-UPS SMT/SMC/SMX/SRT and their battery packs, APC/Eaton PDUs, Eaton 5PX/9PX,
+Cisco Catalyst/ASA/Firepower/ISR, Meraki MS/MX/MR, Ruckus ICX, SonicWall TZ/NSa/NSsp, Fortinet, Aruba, Juniper and Palo Alto.
+Imports match by model (e.g. "SonicWall NSa 2700", "Catalyst 9300-48P", "ICX7150-48P", "SRT3000RMXLI", "SRT96RMBP").
