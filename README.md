@@ -22,3 +22,10 @@ Imported lists match these by name (e.g. "Dell R650", "UniFi USW Pro 24", "Synol
 Also included (generic branded faceplates, front and rear): APC Smart-UPS SMT/SMC/SMX/SRT and their battery packs, APC/Eaton PDUs, Eaton 5PX/9PX,
 Cisco Catalyst/ASA/Firepower/ISR, Meraki MS/MX/MR, Ruckus ICX, SonicWall TZ/NSa/NSsp, Fortinet, Aruba, Juniper and Palo Alto.
 Imports match by model (e.g. "SonicWall NSa 2700", "Catalyst 9300-48P", "ICX7150-48P", "SRT3000RMXLI", "SRT96RMBP").
+
+## Recent changes
+- Cabling rewritten: thin cables with small plugs, routed along device edges, down rack-side cable managers and across an overhead tray in parallel lanes with rounded corners and Velcro ties. Power cords are dark.
+- Rack-side finger ducts (per rack: both / left / right / none) and rack-mount organizers (Cable manager 1U/2U, Brush panel, D-ring manager).
+- Power chains: connect UPS outlet → PDU input → device (power-to-power cables default to a black power cord).
+- Multi-select: Shift/Ctrl-click or drag a marquee, then drag to move the group.
+- Modern dark UI theme.

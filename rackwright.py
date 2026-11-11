@@ -137,6 +137,9 @@ BUILTIN = [
         ports("LAN", 1, "RJ45", 0), half=True),
     tpl("Shelf 1U", "Shelf", 1, "#4b5563", []),
     tpl("Cable manager 1U", "Cable manager", 1, "#222428", []),
+    tpl("Cable manager 2U", "Cable manager", 2, "#222428", []),
+    tpl("Brush panel 1U", "Cable manager", 1, "#222428", []),
+    tpl("D-ring manager 1U", "Cable manager", 1, "#222428", []),
     tpl("Blank panel 1U", "Blank", 1, "#33363b", []),
 ]
 
@@ -865,12 +868,25 @@ class RackView(ViewBase):
                 for cx in (x0 + RAIL / 2, x1 - RAIL / 2):
                     cv.create_text(S(cx), S(y + UH / 2), text=str(n), fill="#9aa0a6", font=font(10 * self.z),
                                    tags=(tg,))
+        # vertical cable managers (finger ducts) down both sides of the rack
+        sm = r.get("side_mgr", "both")
+        for side, on in ((-1, sm in ("both", "left")), (1, sm in ("both", "right"))):
+            if not on:
+                continue
+            dx0, dx1 = (x0 - 40, x0 - 3) if side < 0 else (x1 + 3, x1 + 40)
+            cv.create_rectangle(S(dx0), S(y0 + HDR - 8), S(dx1), S(y1), fill="#17191c", outline="#0b0c0e", tags=(tg,))
+            cv.create_rectangle(S(dx0 + 3), S(y0 + HDR - 4), S(dx1 - 3), S(y1 - 4), fill="#0e0f11", outline="#2c2f34",
+                                tags=(tg,))
+            yy = y0 + HDR
+            while yy < y1 - 8:
+                cv.create_rectangle(S(dx0 + 3), S(yy), S(dx1 - 3), S(yy + 4), fill="#2a2d33", outline="", tags=(tg,))
+                yy += UH / 2
 
     def draw_device(self, d):
         S, cv, a = self.S, self.cv, self.app
         l, t, r, b = a.dev_rect(d)
         col = d.get("color") or "#3b6ea8"
-        sel = a.sel == ("dev", d["id"])
+        sel = a.sel == ("dev", d["id"]) or d["id"] in a.msel
         cv.create_rectangle(S(l) + 1, S(t) + 1, S(r) - 1, S(b) - 1, fill=col,
                             outline=GOLD if sel else shade(col, -70), width=3 if sel else 1,
                             tags=("dev:%d" % d["id"],))
@@ -883,6 +899,9 @@ class RackView(ViewBase):
         lx = l + 7
         if plate:
             lx, labw, fg = self.draw_plate(d, l, t, r, b, pg, self.face == "rear")
+        if d.get("type") == "Cable manager" and not plate:
+            self.draw_manager(d, l, t, r, b)
+            return
         two = (b - t) * self.z >= 22
         f1 = font(11 * self.z, True)
         cv.create_text(S(lx), S(t + (9 if two else (b - t) / 2)),
@@ -906,6 +925,39 @@ class RackView(ViewBase):
             if s * self.z >= 15 and p["name"]:
                 cv.create_text(S(cx), S(cy), text=p["name"][-3:], font=font(7 * self.z), fill=fg_for(fill),
                                tags=("port:%d" % p["id"],))
+
+    def draw_manager(self, d, l, t, r, b):
+        """Rack-mount cable organizers: finger duct, brush panel or D-ring bar, picked from the name."""
+        S, cv = self.S, self.cv
+        tg = ("dev:%d" % d["id"],)
+        nm = d.get("name", "").lower()
+        sel = self.app.sel == ("dev", d["id"]) or d["id"] in self.app.msel
+        out = GOLD if sel else "#0b0c0e"
+        cv.create_rectangle(S(l) + 1, S(t) + 1, S(r) - 1, S(b) - 1, fill="#1d2024", outline=out,
+                            width=3 if sel else 1, tags=tg)
+        if "brush" in nm:
+            cv.create_rectangle(S(l + 30), S(t + 4), S(r - 30), S(b - 4), fill="#0c0d0f", outline="#2c2f34", tags=tg)
+            x = l + 34
+            while x < r - 34:
+                cv.create_line(S(x), S(t + 6), S(x), S(b - 6), fill="#444851", tags=tg)
+                x += 3
+        elif "ring" in nm:
+            x = l + 40
+            while x < r - 40:
+                cv.create_oval(S(x - 7), S(t + 4), S(x + 7), S(b - 4), fill="", outline="#9aa0a6", width=max(1, S(2)),
+                               tags=tg)
+                x += 70
+        else:
+            x = l + 26
+            while x < r - 26:
+                cv.create_rectangle(S(x), S(t + 3), S(x + 9), S(b - 3), fill="#2f333a", outline="#454a52", tags=tg)
+                x += 22
+        for ex in (l + 6, r - 6):
+            cv.create_oval(S(ex - 3), S((t + b) / 2 - 3), S(ex + 3), S((t + b) / 2 + 3), fill="#0c0d0f", outline="#9aa0a6",
+                           tags=tg)
+        if self.z >= 0.7:
+            cv.create_text(S((l + r) / 2), S((t + b) / 2), text=d["name"], fill="#c9ced4", font=font(8 * self.z),
+                           tags=tg)
 
     # ---- faceplates: front and rear art for real equipment (rect/oval/line/text only, so SVG export works)
     def draw_plate(self, d, l, t, r, b, pg, rear):
@@ -1156,37 +1208,196 @@ class RackView(ViewBase):
             return l + 30, 150, "#23262b"
         return l + 7, min(150, (r - l) * 0.3), fg_for(d.get("color") or "#3b6ea8")
 
+    # ---- cabling: thin cables run along device edges, down rack-side ducts, and across an overhead tray
+    @staticmethod
+    def _levels(items):
+        """items: [(key, lo, hi)] -> level per item (greedy interval colouring, so overlapping runs get parallel lanes)."""
+        out = [0] * len(items)
+        by = {}
+        for n, (k, lo, hi) in enumerate(items):
+            by.setdefault(k, []).append((lo, hi, n))
+        for lst in by.values():
+            ends = []
+            for lo, hi, n in sorted(lst):
+                for lv, e in enumerate(ends):
+                    if lo > e + 1:
+                        ends[lv] = hi
+                        out[n] = lv
+                        break
+                else:
+                    ends.append(hi)
+                    out[n] = len(ends) - 1
+        return out
+
+    @staticmethod
+    def _round(pts, rad=5.0):
+        """Rounded corners for an orthogonal polyline (flat list) -> flat list of dense points."""
+        p = [(pts[i], pts[i + 1]) for i in range(0, len(pts), 2)]
+        q = [p[0]]
+        for pt in p[1:]:
+            if abs(pt[0] - q[-1][0]) > 0.01 or abs(pt[1] - q[-1][1]) > 0.01:
+                q.append(pt)
+        if len(q) < 3:
+            return [v for pt in q for v in pt]
+        out = [q[0]]
+        for n in range(1, len(q) - 1):
+            a, b, c = q[n - 1], q[n], q[n + 1]
+            l1 = math.hypot(b[0] - a[0], b[1] - a[1])
+            l2 = math.hypot(c[0] - b[0], c[1] - b[1])
+            r = min(rad, l1 / 2, l2 / 2)
+            p1 = (b[0] + (a[0] - b[0]) * r / l1, b[1] + (a[1] - b[1]) * r / l1)
+            p2 = (b[0] + (c[0] - b[0]) * r / l2, b[1] + (c[1] - b[1]) * r / l2)
+            for k in range(5):
+                t = k / 4
+                out.append(((1 - t) ** 2 * p1[0] + 2 * t * (1 - t) * b[0] + t * t * p2[0],
+                            (1 - t) ** 2 * p1[1] + 2 * t * (1 - t) * b[1] + t * t * p2[1]))
+        out.append(q[-1])
+        return [v for pt in out for v in pt]
+
+    def plan_routes(self):
+        """-> [(cable, flat_points, info)] with every cable routed through shared tracks."""
+        a = self.app
+        top = min([a.rack_rect(r)[1] for r in a.doc["racks"]], default=0)
+        mgrs = {}
+        for d in a.doc["devices"]:
+            if d.get("rack") and d.get("type") == "Cable manager" and self.visible(d):
+                l, t, r, b = a.dev_rect(d)
+                mgrs.setdefault(d["rack"], []).append((t + b) / 2)
+        jobs = []
+        for c in a.doc["cables"]:
+            A, B = a.pcache.get(c["a"]), a.pcache.get(c["b"])
+            if not A or not B or not (self.visible(A[3]) and self.visible(B[3])):
+                continue
+            j = {"c": c, "ax": A[0], "ay": A[1], "bx": B[0], "by": B[1], "ends": {}}
+            for k, (px, py, d) in (("a", (A[0], A[1], A[3])), ("b", (B[0], B[1], B[3]))):
+                l, t, r, b = a.dev_rect(d)
+                near = [m for m in mgrs.get(d.get("rack"), []) if abs(m - py) <= 3 * UH and not (t < m < b)]
+                if near:
+                    m = min(near, key=lambda v: abs(v - py))
+                    j["s" + k], j["d" + k] = m, 0
+                else:
+                    up = (py - t) <= (b - py)
+                    j["s" + k], j["d" + k] = (t, -1) if up else (b, 1)
+                j["c" + k] = a.container(d)
+            same = j["ca"] == j["cb"]
+            if same and abs(j["sa"] - j["sb"]) < 2.5:
+                j["mode"] = "direct"
+            else:
+                j["mode"] = "gutter" if same else "tray"
+            cxa = (j["ca"][0] + j["ca"][2]) / 2
+            cxb = (j["cb"][0] + j["cb"][2]) / 2
+            if j["mode"] == "gutter":
+                j["ra"] = j["rb"] = (j["ax"] + j["bx"]) / 2 >= cxa
+            else:
+                j["ra"], j["rb"] = cxb >= cxa, cxa > cxb
+            jobs.append(j)
+        # duct lanes (vertical runs beside the racks)
+        gi = []
+        for j in jobs:
+            if j["mode"] == "direct":
+                continue
+            far = top if j["mode"] == "tray" else j["sb"]
+            j["ga"] = len(gi)
+            gi.append(((j["ca"], j["ra"]), min(j["sa"], far), max(j["sa"], far)))
+            if j["mode"] == "tray":
+                j["gb"] = len(gi)
+                gi.append(((j["cb"], j["rb"]), min(j["sb"], top), max(j["sb"], top)))
+        glv = self._levels(gi)
+        ti = [("t", min(j["ax"], j["bx"]), max(j["ax"], j["bx"])) for j in jobs if j["mode"] == "tray"]
+        tlv = iter(self._levels(ti))
+
+        def gx(cont, right, lv):
+            lv = lv % 9
+            return cont[2] + 7 + lv * 3.4 if right else cont[0] - 7 - lv * 3.4
+        for j in jobs:
+            if j["mode"] == "direct":
+                continue
+            j["xa"] = gx(j["ca"], j["ra"], glv[j["ga"]])
+            if j["mode"] == "tray":
+                j["xb"] = gx(j["cb"], j["rb"], glv[j["gb"]])
+                j["ty"] = top - 18 - (next(tlv) % 12) * 4.2
+            else:
+                j["xb"] = j["xa"]
+        # seam rows (horizontal runs along device edges)
+        hi = []
+        for j in jobs:
+            if j["mode"] == "direct":
+                hi.append((("s", j["ca"], round(j["sa"])), min(j["ax"], j["bx"]), max(j["ax"], j["bx"])))
+                j["ha"] = len(hi) - 1
+            else:
+                hi.append((("s", j["ca"], round(j["sa"])), min(j["ax"], j["xa"]), max(j["ax"], j["xa"])))
+                j["ha"] = len(hi) - 1
+                hi.append((("s", j["cb"], round(j["sb"])), min(j["bx"], j["xb"]), max(j["bx"], j["xb"])))
+                j["hb"] = len(hi) - 1
+        hlv = self._levels(hi)
+
+        def off(level, d):
+            if d == 0:
+                return ((level + 1) // 2) * 3.2 * (1 if level % 2 else -1)
+            return d * (3 + 3.2 * (level % 6))
+        out = []
+        for j in jobs:
+            ax, ay, bx, by = j["ax"], j["ay"], j["bx"], j["by"]
+            sa = j["sa"] + off(hlv[j["ha"]], j["da"])
+            if j["mode"] == "direct":
+                pts = [ax, ay, ax, sa, bx, sa, bx, by]
+            else:
+                sb = j["sb"] + off(hlv[j["hb"]], j["db"])
+                if j["mode"] == "gutter":
+                    pts = [ax, ay, ax, sa, j["xa"], sa, j["xa"], sb, bx, sb, bx, by]
+                else:
+                    pts = [ax, ay, ax, sa, j["xa"], sa, j["xa"], j["ty"], j["xb"], j["ty"], j["xb"], sb, bx, sb,
+                           bx, by]
+            out.append((j["c"], pts, j))
+        return out
+
     def draw_cables(self):
         a, S, cv = self.app, self.S, self.cv
-        for lane, c in enumerate(a.doc["cables"]):
-            pts = a.route(c, lane % 12)
-            if not pts or not (self.visible(a.pcache[c["a"]][3]) and self.visible(a.pcache[c["b"]][3])):
-                continue
+        for c, pts, j in self.plan_routes():
             sel = a.sel == ("cable", c["id"])
-            sp = [S(v) for v in pts]
+            sp = [S(v) for v in self._round(pts)]
             dash = (6, 4) if c.get("style") == "dashed" else None
             tg = ("cable:%d" % c["id"],)
-            self.cable_art(sp, c["color"], sel, dash, tg)
-            for (px, py), (qx, qy) in ((pts[0:2], pts[2:4]), (pts[6:8], pts[4:6])):
-                ux = 1 if qx >= px else -1
-                self.plug_face_on = True
-                self.plug(px, py, ux, 0, c["color"], sel, tg)
-                self.plug_face_on = False
+            pwr = c.get("type") == "Power"
+            col = c["color"]
+            cv.create_line(*sp, fill=GOLD if sel else shade(col, -110), width=max(2, S(5 if sel else 3.6)),
+                           capstyle="round", joinstyle="round", tags=tg)
+            cv.create_line(*sp, fill=col, width=max(1, S(2.8 if pwr else 2.2)), dash=dash, capstyle="round",
+                           joinstyle="round", tags=tg)
+            for (px, py), qy in (((pts[0], pts[1]), pts[3]), ((pts[-2], pts[-1]), pts[-3])):
+                uy = 1 if qy >= py else -1
+                w = 4.2 if pwr else 3.2
+                cv.create_rectangle(S(px - w), S(py), S(px + w), S(py + uy * 7),
+                                    fill="#2a2c30" if pwr else "#d7dbe0", outline=GOLD if sel else "#40454c", tags=tg)
+                cv.create_rectangle(S(px - w + 1), S(py + uy * 7), S(px + w - 1), S(py + uy * 11), fill=col,
+                                    outline=GOLD if sel else shade(col, -110), tags=tg)
             if a.show_labels:
                 txt = c.get("label") or a.fmt_len(c)
                 if txt:
-                    mx, my = (pts[2] + pts[4]) / 2, (pts[3] + pts[5]) / 2
-                    if abs(pts[2] - pts[4]) < 1:
-                        mx = pts[2] + (10 if pts[2] > pts[0] else -10) + 0
-                    f = font(9 * self.z)
-                    tid = cv.create_text(S(mx), S(my), text=txt, font=f, fill="#111111", tags=tg,
-                                         anchor="w" if abs(pts[2] - pts[4]) < 1 and pts[2] > pts[0] else
-                                         ("e" if abs(pts[2] - pts[4]) < 1 else "center"))
+                    best = None
+                    for n in range(0, len(pts) - 2, 2):
+                        ln = abs(pts[n + 2] - pts[n])
+                        if abs(pts[n + 3] - pts[n + 1]) < 0.5 and (best is None or ln > best[0]):
+                            best = (ln, (pts[n] + pts[n + 2]) / 2, pts[n + 1])
+                    if best is None:
+                        best = (0, pts[2], (pts[3] + pts[5]) / 2)
+                    tid = cv.create_text(S(best[1]), S(best[2]), text=txt, font=font(8 * self.z), fill="#111111",
+                                         tags=tg)
                     bb = cv.bbox(tid)
-                    rid = cv.create_rectangle(bb[0] - 2, bb[1] - 1, bb[2] + 2, bb[3] + 1, fill=c["color"],
-                                              outline="#000000", tags=tg)
-                    cv.itemconfigure(tid, fill=fg_for(c["color"]))
+                    rid = cv.create_rectangle(bb[0] - 2, bb[1], bb[2] + 2, bb[3], fill=col, outline=shade(col, -110),
+                                              tags=tg)
+                    cv.itemconfigure(tid, fill=fg_for(col))
                     cv.tag_lower(rid, tid)
+            # velcro tie marks on long vertical duct runs
+            if self.z > 0.4:
+                for n in range(0, len(pts) - 2, 2):
+                    if abs(pts[n + 2] - pts[n]) < 0.5 and abs(pts[n + 3] - pts[n + 1]) > 120:
+                        y0, y1 = sorted((pts[n + 1], pts[n + 3]))
+                        yy = y0 + 60
+                        while yy < y1 - 30:
+                            cv.create_line(S(pts[n] - 2.5), S(yy), S(pts[n] + 2.5), S(yy), fill="#e8a33d",
+                                           width=max(1, S(1.6)), tags=tg)
+                            yy += 130
 
     # ---- events
     def xy(self, e):
@@ -1224,7 +1435,14 @@ class RackView(ViewBase):
             a.select(("cable", i))
         elif kind == "dev":
             d = a.dev(i)
-            a.select(("dev", i))
+            if e.state & 0x5:  # shift / ctrl: toggle in the selection
+                a.select(("dev", i), add=True)
+                self.mode = None
+                return
+            if i not in a.msel:
+                a.select(("dev", i))
+            else:
+                a.sel = ("dev", i)
             l, t = a.dev_rect(d)[:2]
             self.mode = "dev"
             self.dd, self.gdx, self.gdy = d, wx - l, wy - t
@@ -1233,15 +1451,13 @@ class RackView(ViewBase):
             a.select(("rack", i))
             self.mode = "rack"
             self.rr, self.lw, self.cp = a.rack(i), (wx, wy), False
-        elif kind == "rack":
-            a.select(("rack", i))
-            a.cur_rack = i
-            self.mode = "pan"
-            cv.scan_mark(e.x, e.y)
         else:
-            a.select(None)
-            self.mode = "pan"
-            cv.scan_mark(e.x, e.y)
+            if kind == "rack":
+                a.cur_rack = i
+            if not (e.state & 0x5):
+                a.select(("rack", i) if kind == "rack" else None)
+            self.mode = "marquee"
+            self.m0 = (x, y)
 
     def drag(self, e):
         a, cv = self.app, self.cv
@@ -1255,6 +1471,9 @@ class RackView(ViewBase):
             cv.create_line(self.S(px), self.S(py), x, y, fill="#00e5ff", width=2, dash=(4, 3), tags=("ghost",))
         elif self.mode == "pan":
             cv.scan_dragto(e.x, e.y, gain=1)
+        elif self.mode == "marquee" and self.moved:
+            cv.create_rectangle(self.m0[0], self.m0[1], x, y, outline="#4f8cff", fill="#4f8cff", stipple="gray25",
+                                width=1, tags=("ghost",))
         elif self.mode == "rack" and self.moved:
             if not self.cp:
                 a.checkpoint()
@@ -1264,17 +1483,11 @@ class RackView(ViewBase):
             self.lw = (wx, wy)
             self.refresh()
         elif self.mode == "dev" and self.moved:
-            loc = self.locate(wx, wy)
-            d = self.dd
-            if loc:
-                tmp = dict(d, rack=loc[0]["id"], u=loc[1], side=loc[2])
-                ok = a.fits(loc[0], tmp, ignore=d["id"])
-            else:
-                tmp = dict(d, rack=None, fx=wx - self.gdx, fy=wy - self.gdy)
-                ok = True
-            l, t, r, b = a.dev_rect(tmp)
-            cv.create_rectangle(self.S(l), self.S(t), self.S(r), self.S(b), fill="", width=3,
-                                outline="#2ea043" if ok else "#e5372b", dash=(6, 3), tags=("ghost",))
+            plan, ok = self.group_plan(wx, wy)
+            for m, tmp in plan:
+                l, t, r, b = a.dev_rect(tmp)
+                cv.create_rectangle(self.S(l), self.S(t), self.S(r), self.S(b), fill="", width=3,
+                                    outline="#2ea043" if ok else "#e5372b", dash=(6, 3), tags=("ghost",))
 
     def release(self, e):
         a, cv = self.app, self.cv
@@ -1294,23 +1507,72 @@ class RackView(ViewBase):
         elif m == "portcancel" and not self.moved:
             self.pend = None
             self.refresh()
+        elif m == "marquee":
+            if self.moved:
+                x0, y0 = self.m0[0] / self.z, self.m0[1] / self.z
+                lo_x, hi_x, lo_y, hi_y = min(x0, wx), max(x0, wx), min(y0, wy), max(y0, wy)
+                ids = []
+                for d in a.doc["devices"]:
+                    if not self.visible(d):
+                        continue
+                    l, t, r, b = a.dev_rect(d)
+                    if r >= lo_x and l <= hi_x and b >= lo_y and t <= hi_y:
+                        ids.append(d["id"])
+                if e.state & 0x5:
+                    ids = list(a.msel | set(ids))
+                a.msel = set(ids)
+                a.sel = ("dev", ids[0]) if ids else a.sel
+                if ids:
+                    a.status("%d selected - drag to move, Delete removes, Ctrl+D duplicates" % len(ids))
+                a.redraw()
         elif m == "dev" and self.moved:
-            d = self.dd
-            loc = self.locate(wx, wy)
-            if loc:
-                tmp = dict(d, rack=loc[0]["id"], u=loc[1], side=loc[2])
-                if a.fits(loc[0], tmp, ignore=d["id"]):
-                    a.checkpoint()
-                    d.update(rack=loc[0]["id"], u=loc[1], side=loc[2])
-                    a.cur_rack = loc[0]["id"]
-                else:
-                    a.status("That slot is taken - device stays where it was")
-            else:
+            plan, ok = self.group_plan(wx, wy)
+            if ok:
                 a.checkpoint()
-                d.update(rack=None, fx=wx - self.gdx, fy=wy - self.gdy)
+                for d, tmp in plan:
+                    d.update(rack=tmp.get("rack"), u=tmp.get("u", d["u"]), side=tmp.get("side", 0),
+                             fx=tmp.get("fx", d.get("fx", 0)), fy=tmp.get("fy", d.get("fy", 0)))
+                if plan[0][1].get("rack"):
+                    a.cur_rack = plan[0][1]["rack"]
+            else:
+                a.status("That slot is taken - nothing moved")
             a.redraw()
         elif m == "rack" and self.moved:
             a.redraw()
+
+    def group_plan(self, wx, wy):
+        """Where each selected device would land if dropped at world (wx, wy). Returns ([(dev, tmp)], ok)."""
+        a = self.app
+        d = self.dd
+        ids = a.msel if d["id"] in a.msel else {d["id"]}
+        group = [d] + [m for m in a.doc["devices"] if m["id"] in ids and m is not d]
+        loc = self.locate(wx, wy)
+        l0, t0 = a.dev_rect(d)[:2]
+        plan = []
+        if loc:
+            du = loc[1] - d["u"]
+            old = d.get("rack")
+            for m in group:
+                if m is d:
+                    plan.append((m, dict(m, rack=loc[0]["id"], u=loc[1], side=loc[2])))
+                elif m.get("rack"):
+                    nr = loc[0]["id"] if m["rack"] == old else m["rack"]
+                    plan.append((m, dict(m, rack=nr, u=m["u"] + du)))
+                else:
+                    plan.append((m, dict(m, fx=m.get("fx", 0) + (wx - self.gdx - l0),
+                                         fy=m.get("fy", 0) + (wy - self.gdy - t0))))
+        else:
+            dx, dy = wx - self.gdx - l0, wy - self.gdy - t0
+            for m in group:
+                ml, mt = a.dev_rect(m)[:2]
+                plan.append((m, dict(m, rack=None, fx=ml + dx, fy=mt + dy)))
+        ok = True
+        for m, tmp in plan:
+            if tmp.get("rack"):
+                r = a.rack(tmp["rack"])
+                if not r or not a.fits(r, tmp, ignore=ids):
+                    ok = False
+        return plan, ok
 
     def locate(self, wx, wy):
         a = self.app
@@ -1614,6 +1876,7 @@ class App:
         self.dirty = False
         self.undo_s, self.redo_s = [], []
         self.sel = None
+        self.msel = set()
         self.cur_rack = None
         self.show_labels = True
         self.show_groups = True
@@ -1772,8 +2035,39 @@ class App:
     pinned = False
 
     # ---- ui
+    def apply_theme(self):
+        BG, PN, FG, AC, LN = "#14161a", "#1b1e24", "#e6e8eb", "#4f8cff", "#2c3038"
+        root = self.root
+        st = ttk.Style(root)
+        try:
+            st.theme_use("clam")
+        except tk.TclError:
+            return
+        root.configure(bg=BG)
+        st.configure(".", background=BG, foreground=FG, fieldbackground=PN, bordercolor=LN, lightcolor=BG,
+                     darkcolor=BG, troughcolor=BG, focuscolor=AC, font=(FONT, 9))
+        st.configure("TFrame", background=BG)
+        st.configure("TLabel", background=BG, foreground=FG)
+        st.configure("TButton", background=PN, foreground=FG, padding=(10, 5), borderwidth=0, relief="flat")
+        st.map("TButton", background=[("active", "#2a2f38"), ("pressed", AC)])
+        st.configure("TCheckbutton", background=BG, foreground=FG)
+        st.map("TCheckbutton", background=[("active", BG)])
+        st.configure("TEntry", fieldbackground=PN, foreground=FG, insertcolor=FG, padding=4)
+        st.configure("TCombobox", fieldbackground=PN, foreground=FG, background=PN, arrowcolor=FG)
+        st.configure("Treeview", background=PN, fieldbackground=PN, foreground=FG, borderwidth=0, rowheight=24)
+        st.map("Treeview", background=[("selected", AC)], foreground=[("selected", "#ffffff")])
+        st.configure("Treeview.Heading", background=BG, foreground=FG)
+        st.configure("TNotebook", background=BG, borderwidth=0)
+        st.configure("TNotebook.Tab", background=BG, foreground="#9aa0a6", padding=(14, 6), borderwidth=0)
+        st.map("TNotebook.Tab", background=[("selected", PN)], foreground=[("selected", FG)])
+        st.configure("TSeparator", background=LN)
+        st.configure("TPanedwindow", background=BG)
+        st.configure("Vertical.TScrollbar", background=PN, arrowcolor=FG, bordercolor=BG)
+        st.configure("Horizontal.TScrollbar", background=PN, arrowcolor=FG, bordercolor=BG)
+
     def build_ui(self):
         root = self.root
+        self.apply_theme()
         self.build_menu()
         tb = ttk.Frame(root, padding=(6, 4))
         tb.pack(fill="x")
@@ -1794,14 +2088,14 @@ class App:
             ttk.Checkbutton(tb, text=text, variable=v,
                             command=lambda v=v, a=attr: (setattr(self, a, v.get()), self.redraw())).pack(
                 side="left", padx=6)
-        self.sb = ttk.Label(root, text="", relief="sunken", anchor="w", padding=(6, 2))
+        self.sb = ttk.Label(root, text="", anchor="w", padding=(8, 3))
         self.sb.pack(side="bottom", fill="x")
         pw = ttk.PanedWindow(root, orient="horizontal")
         pw.pack(fill="both", expand=True)
         left = ttk.Frame(pw, padding=4)
         pw.add(left, weight=0)
         ttk.Label(left, text="Device library", font=(FONT, 10, "bold")).pack(anchor="w")
-        ttk.Label(left, text="Double-click or drag onto a rack", foreground="#666").pack(anchor="w")
+        ttk.Label(left, text="Double-click or drag onto a rack", foreground="#8a919a").pack(anchor="w")
         self.lib = ttk.Treeview(left, show="tree", selectmode="browse", height=24)
         self.lib.pack(fill="both", expand=True, pady=4)
         self.lib.column("#0", width=230)
@@ -1823,7 +2117,8 @@ class App:
         r.bind("<Control-s>", lambda e: self.save())
         r.bind("<Control-o>", lambda e: self.open())
         r.bind("<Control-n>", lambda e: self.new())
-        r.bind("<Control-d>", lambda e: self.sel and self.sel[0] == "dev" and self.duplicate_device(self.dev(self.sel[1])))
+        r.bind("<Control-d>", lambda e=None: self.duplicate_selected())
+        r.bind("<Control-a>", lambda e: self.select_all())
         r.bind("<Delete>", self.key_delete)
         r.bind("<Escape>", self.key_esc)
         r.bind("<Up>", lambda e: self.nudge(1))
@@ -2006,6 +2301,7 @@ class App:
 
     def after_restore(self):
         self.sel = None
+        self.msel = set()
         self.rv.pend = None
         self.dirty = True
         self.title()
@@ -2023,7 +2319,19 @@ class App:
         except tk.TclError:
             pass
 
-    def select(self, s):
+    def select(self, s, add=False):
+        if add and s and s[0] == "dev":
+            ms = set(self.msel)
+            if self.sel and self.sel[0] == "dev":
+                ms.add(self.sel[1])
+            if s[1] in ms and len(ms) > 1:
+                ms.discard(s[1])
+                s = ("dev", next(iter(ms)))
+            else:
+                ms.add(s[1])
+            self.msel = ms
+        else:
+            self.msel = {s[1]} if s and s[0] == "dev" else set()
         self.sel = s
         if s and s[0] == "rack":
             self.cur_rack = s[1]
@@ -2039,6 +2347,7 @@ class App:
         res = Dialog(self.root, "Add rack", [
             ("name", "Name", "str", "Rack %d" % n), ("u", "Height (U)", "int", 42),
             ("numbering", "U numbering", "choice", "up", ["up", "down"]),
+            ("side_mgr", "Side cable managers", "choice", "both", ["both", "left", "right", "none"]),
             ("color", "Rack colour", "color", "#3a3d42", [("", "#3a3d42"), ("", "#2b3a55"), ("", "#4a2f2f"),
                                                           ("", "#2f4a35")]),
             ("notes", "Note (shown in header)", "str", "")]).result
@@ -2048,9 +2357,10 @@ class App:
             messagebox.showerror(APP, "Height must be 1-100 U")
             return
         self.checkpoint()
-        x = max([self.rack_rect(r)[2] for r in self.doc["racks"]], default=-170) + 170
+        x = max([self.rack_rect(r)[2] for r in self.doc["racks"]], default=-200) + 200
         r = {"id": self.nid(), "name": res["name"], "u": res["u"], "x": x, "y": 0,
-             "numbering": res["numbering"], "color": res["color"], "notes": res["notes"]}
+             "numbering": res["numbering"], "side_mgr": res["side_mgr"], "color": res["color"],
+             "notes": res["notes"]}
         self.doc["racks"].append(r)
         self.cur_rack = r["id"]
         self.redraw()
@@ -2060,6 +2370,7 @@ class App:
         res = Dialog(self.root, "Edit rack", [
             ("name", "Name", "str", r["name"]), ("u", "Height (U)", "int", r["u"]),
             ("numbering", "U numbering", "choice", r.get("numbering", "up"), ["up", "down"]),
+            ("side_mgr", "Side cable managers", "choice", r.get("side_mgr", "both"), ["both", "left", "right", "none"]),
             ("color", "Rack colour", "color", r.get("color", "#3a3d42"),
              [("", "#3a3d42"), ("", "#2b3a55"), ("", "#4a2f2f"), ("", "#2f4a35")]),
             ("notes", "Note", "str", r.get("notes", ""))]).result
@@ -2090,7 +2401,7 @@ class App:
         if lo < 1 or hi > r["u"]:
             return False
         for o in self.doc["devices"]:
-            if o.get("rack") != r["id"] or o["id"] == ignore or o["id"] == d.get("id") and ignore is None and False:
+            if o.get("rack") != r["id"] or o["id"] == ignore or (isinstance(ignore, (set, frozenset)) and o["id"] in ignore):
                 continue
             if o["id"] == d.get("id"):
                 continue
@@ -2195,7 +2506,30 @@ class App:
         self.sel = None
         self.redraw()
 
-    def duplicate_device(self, d):
+    def duplicate_selected(self):
+        if not self.sel or self.sel[0] != "dev":
+            return
+        ds = [x for x in self.doc["devices"] if x["id"] in self.msel] or [self.dev(self.sel[1])]
+        if len(ds) == 1:
+            self.duplicate_device(ds[0])
+            return
+        self.checkpoint()
+        new = set()
+        for d in ds:
+            n = self.duplicate_device(d, quiet=True)
+            if n:
+                new.add(n["id"])
+        self.msel = new
+        self.sel = ("dev", next(iter(new))) if new else None
+        self.redraw()
+
+    def select_all(self):
+        self.msel = {d["id"] for d in self.doc["devices"] if self.rv.visible(d)}
+        self.sel = ("dev", next(iter(self.msel))) if self.msel else None
+        self.redraw()
+        self.status("%d devices selected" % len(self.msel))
+
+    def duplicate_device(self, d, quiet=False):
         n = copy.deepcopy(d)
         n["id"] = self.nid()
         n["name"] = d["name"] + " (copy)"
@@ -2211,6 +2545,9 @@ class App:
         else:
             n["fx"], n["fy"] = d["fx"] + 30, d["fy"] + 30
         n.pop("lx", None)
+        if quiet:
+            self.doc["devices"].append(n)
+            return n
         self.add_device(n)
 
     def move_to_u(self, d):
@@ -2251,14 +2588,14 @@ class App:
     def nudge(self, delta):
         if not self.sel or self.sel[0] != "dev" or self.nb.index("current") != 0:
             return
-        d = self.dev(self.sel[1])
-        r = self.rack(d["rack"]) if d.get("rack") else None
-        if not r:
+        ds = [x for x in self.doc["devices"] if x["id"] in (self.msel or {self.sel[1]}) and x.get("rack")]
+        if not ds:
             return
-        t = dict(d, u=d["u"] + delta)
-        if self.fits(r, t, ignore=d["id"]):
+        ids = {x["id"] for x in ds}
+        if all(self.fits(self.rack(x["rack"]), dict(x, u=x["u"] + delta), ignore=ids) for x in ds):
             self.checkpoint()
-            d["u"] = t["u"]
+            for x in ds:
+                x["u"] += delta
             self.redraw()
         else:
             self.status("Can't move there (rack edge or occupied)")
@@ -2285,6 +2622,8 @@ class App:
                                                     "unit": "ft", "style": "solid"})
         c = {"id": 0, "a": pa, "b": pb, "color": dflt["color"], "style": dflt["style"], "type": dflt["type"],
              "length": dflt["length"], "unit": dflt["unit"], "label": "", "logical": "", "notes": ""}
+        if self._pidx[pa][0]["type"] == "Power" and self._pidx[pb][0]["type"] == "Power":
+            c.update(color="#2b2b2b", type="Power", style="solid", length=2.0, unit="ft")
         if self.cable_dialog(c, "New cable"):
             self.checkpoint()
             c["id"] = self.nid()
@@ -2336,7 +2675,13 @@ class App:
         if not self.sel:
             return
         k, i = self.sel
-        if k == "dev":
+        if k == "dev" and len(self.msel) > 1:
+            self.checkpoint()
+            for d in [x for x in self.doc["devices"] if x["id"] in self.msel]:
+                self.remove_device(d)
+            self.sel, self.msel = None, set()
+            self.redraw()
+        elif k == "dev":
             self.delete_device(self.dev(i))
         elif k == "cable":
             self.delete_cable(self.cable(i))
