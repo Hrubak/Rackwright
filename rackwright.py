@@ -882,6 +882,62 @@ class RackView(ViewBase):
                 cv.create_rectangle(S(dx0 + 3), S(yy), S(dx1 - 3), S(yy + 4), fill="#2a2d33", outline="", tags=(tg,))
                 yy += UH / 2
 
+    def draw_port(self, p, cx, cy, s, c, plate, pend, oc, ow):
+        """Port faceplate art by type: RJ45 socket with contacts and link LEDs, SFP cage, LC duplex, IEC power."""
+        cv, S = self.cv, self.S
+        tg = ("port:%d" % p["id"],)
+        typ = p.get("type", "")
+        h = s / 2
+        cab = c["color"] if c else None
+        if not plate:
+            fill = cab or PORT_TYPES.get(typ, "#cccccc")
+            cv.create_rectangle(S(cx - h), S(cy - h), S(cx + h), S(cy + h), fill=fill, outline=oc, width=ow, tags=tg)
+            return
+        # port-type accent outline only when selected/pending; otherwise a neutral bezel
+        bez = oc if (pend or ow > 1) else "#5a5f67"
+        if typ == "RJ45" or typ == "Mgmt":
+            cv.create_rectangle(S(cx - h), S(cy - h * 0.9), S(cx + h), S(cy + h * 0.95), fill="#2b2e33", outline=bez,
+                                width=max(1, ow), tags=tg)
+            cv.create_rectangle(S(cx - h * 0.72), S(cy - h * 0.55), S(cx + h * 0.72), S(cy + h * 0.75),
+                                fill=cab or "#08090a", outline="#000000", tags=tg)
+            cv.create_rectangle(S(cx - h * 0.35), S(cy + h * 0.45), S(cx + h * 0.35), S(cy + h * 0.95),
+                                fill="#2b2e33", outline="", tags=tg)  # latch notch
+            if self.z * s >= 11:
+                for i in range(-3, 4, 2):  # gold contacts
+                    x = cx + i * h * 0.17
+                    cv.create_line(S(x), S(cy - h * 0.5), S(x), S(cy - h * 0.1), fill="#c9a227", tags=tg)
+            if self.z * s >= 14:  # link / activity LEDs
+                lit = bool(c)
+                for dx, on, off in ((-h * 0.62, "#3ddc61", "#1d3a25"), (h * 0.62, "#ffb21e", "#3d2f12")):
+                    cv.create_rectangle(S(cx + dx - 1.4), S(cy - h * 0.86), S(cx + dx + 1.4), S(cy - h * 0.64),
+                                        fill=on if lit else off, outline="", tags=tg)
+        elif typ in ("SFP", "SFP+", "QSFP"):
+            cv.create_rectangle(S(cx - h), S(cy - h * 0.8), S(cx + h), S(cy + h * 0.8), fill="#a9afb7", outline=bez,
+                                width=max(1, ow), tags=tg)
+            cv.create_rectangle(S(cx - h * 0.75), S(cy - h * 0.5), S(cx + h * 0.75), S(cy + h * 0.5),
+                                fill=cab or "#050506", outline="#43474d", tags=tg)
+            cv.create_line(S(cx - h * 0.5), S(cy + h * 0.8), S(cx + h * 0.5), S(cy + h * 0.8), fill="#e8ebee", tags=tg)
+        elif typ == "Fiber LC":
+            cv.create_rectangle(S(cx - h), S(cy - h * 0.7), S(cx + h), S(cy + h * 0.7), fill="#2b2e33", outline=bez,
+                                width=max(1, ow), tags=tg)
+            for dx in (-h * 0.42, h * 0.42):
+                cv.create_oval(S(cx + dx - h * 0.28), S(cy - h * 0.28), S(cx + dx + h * 0.28), S(cy + h * 0.28),
+                               fill=cab or "#d9dde2", outline="#000000", tags=tg)
+        elif typ == "Power":
+            cv.create_rectangle(S(cx - h), S(cy - h * 0.75), S(cx + h), S(cy + h * 0.75), fill="#d7d9dc", outline=bez,
+                                width=max(1, ow), tags=tg)
+            cv.create_polygon(S(cx - h * 0.8), S(cy - h * 0.5), S(cx + h * 0.8), S(cy - h * 0.5), S(cx + h * 0.6),
+                              S(cy + h * 0.55), S(cx - h * 0.6), S(cy + h * 0.55), fill=cab or "#111214",
+                              outline="#000000", tags=tg)
+            for dx in (-h * 0.35, 0, h * 0.35):
+                cv.create_rectangle(S(cx + dx - 0.9), S(cy - h * 0.2), S(cx + dx + 0.9), S(cy + h * 0.25),
+                                    fill="#b0b4ba", outline="", tags=tg)
+        else:  # Console, USB, Serial, HDMI, Other
+            cv.create_rectangle(S(cx - h), S(cy - h * 0.7), S(cx + h), S(cy + h * 0.7), fill="#c4c8ce", outline=bez,
+                                width=max(1, ow), tags=tg)
+            cv.create_rectangle(S(cx - h * 0.65), S(cy - h * 0.35), S(cx + h * 0.65), S(cy + h * 0.35),
+                                fill=cab or "#101113", outline=PORT_TYPES.get(typ, "#cccccc"), tags=tg)
+
     def draw_device(self, d):
         S, cv, a = self.S, self.cv, self.app
         l, t, r, b = a.dev_rect(d)
@@ -920,8 +976,7 @@ class RackView(ViewBase):
                 oc, ow = PORT_TYPES.get(p["type"], "#cccccc"), 1
             else:
                 oc, ow = "#000000", 1
-            cv.create_rectangle(S(cx - s / 2), S(cy - s / 2), S(cx + s / 2), S(cy + s / 2), fill=fill,
-                                outline=oc, width=ow, tags=("port:%d" % p["id"],))
+            self.draw_port(p, cx, cy, s, c, plate, pend, oc, ow)
             if s * self.z >= 15 and p["name"]:
                 cv.create_text(S(cx), S(cy), text=p["name"][-3:], font=font(7 * self.z), fill=fg_for(fill),
                                tags=("port:%d" % p["id"],))
