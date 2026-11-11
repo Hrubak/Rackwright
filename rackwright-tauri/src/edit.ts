@@ -140,8 +140,8 @@ function catalogMatch(name: string, u: number): Tpl | null {
   };
   const byShort = (sh: string) => pool.find((t) => t.short === sh);
   let m: RegExpExecArray | null;
-  if (/poweredge|dell|r\d{3,4}(xd|xs)?/.test(n) && !/dell\s+(switch|pdu)/.test(n)) {
-    m = /r(\d{3,4})(xd|xs)?/.exec(n);
+  if (/poweredge|dell|\br\d{3,4}(xd|xs)?\b/.test(n) && !/\bdell\s+(switch|pdu)/.test(n)) {
+    m = /\br(\d{3,4})(xd|xs)?\b/.exec(n);
     const cands = pool.filter((t) => t.plate.k === "dell");
     let pick: Tpl | undefined;
     if (m) {
@@ -150,15 +150,15 @@ function catalogMatch(name: string, u: number): Tpl | null {
     }
     return sized(pick || byShort(u === 1 ? "PE-R650" : "PE-R750"));
   }
-  if (/dream\s*router|udr7?/.test(n)) return sized(byShort(n.includes("7") ? "UDR7" : "UDR"));
+  if (/dream\s*router|\budr7?\b/.test(n)) return sized(byShort(n.includes("7") ? "UDR7" : "UDR"));
   if (/unifi|usw|ubiquiti/.test(n)) {
     const cands = pool.filter((t) => t.plate.k === "unifi");
     return sized(cands.find((t) => t.model === (n.includes("48") ? "UniFi Switch Pro 48" : "UniFi Switch Pro 24")) || cands[0]);
   }
-  if (/synology|ds\d{3}|rs\d{3,4}/.test(n)) {
-    const rack = /rs\d{3,4}/.test(n);
+  if (/synology|\bds\d{3}|\brs\d{3,4}/.test(n)) {
+    const rack = /\brs\d{3,4}/.test(n);
     const cands = pool.filter((t) => t.plate.k === (rack ? "syn_rack" : "syn_desk"));
-    m = /(ds|rs)(\d{3,4})(rp)?(\+)?/.exec(n);
+    m = /\b(ds|rs)(\d{3,4})(rp)?(\+)?/.exec(n);
     const pick = m ? byShort("NAS-" + (m[1] + m[2] + (m[3] || "") + (m[4] || "")).toUpperCase()) : undefined;
     return sized(pick || cands.find((t) => t.u_size === u) || cands[0]);
   }
