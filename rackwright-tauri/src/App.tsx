@@ -7,7 +7,7 @@ import { CATALOG, addRack, buildFromText, clone, deleteDevice, deleteRack, fits,
 
 const empty: Doc = { v: 1, nid: 1, racks: [], devices: [], cables: [] };
 const none: RouteResult = { routes: [], hints: [] };
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 6, cursor: "pointer" } as const;
+const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
 
 export default function App() {
@@ -150,7 +150,7 @@ export default function App() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: "#e6e8eb", fontFamily: "Segoe UI, sans-serif" }}>
-      <div style={{ height: 40, padding: "5px 8px", background: "#1b1d21", borderBottom: "1px solid #2c2f35", boxSizing: "border-box", whiteSpace: "nowrap", overflow: "hidden" }}>
+      <div style={{ height: 42, padding: "6px 10px", background: "#1b1d21", borderBottom: "1px solid #2c2f35", boxSizing: "border-box", whiteSpace: "nowrap", overflow: "hidden" }}>
         <button style={btn} onClick={doNew}>New</button>
         <button style={btn} onClick={doOpen}>Open</button>
         <button style={btn} onClick={() => doSave()}>Save{dirty ? " *" : ""}</button>
@@ -160,7 +160,7 @@ export default function App() {
         <button style={btn} onClick={() => edit((d) => { const r = addRack(d); setSel({ kind: "rack", id: r.id }); })}>+ Rack</button>
         <button style={btn} onClick={() => setImportOpen(true)}>Import list</button>
         <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>
-        <span style={{ opacity: 0.7, fontSize: 12 }}>
+        <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8 }}>
           {path ?? "no file"} | {doc.racks.length}R {doc.devices.length}D {doc.cables.length}C {msg}
         </span>
       </div>
@@ -169,7 +169,7 @@ export default function App() {
           <input style={{ ...inp, margin: 6 }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
           <div style={{ flex: 1, overflow: "auto" }}>
             {list.map(({ c, i }) => (
-              <div key={i} onClick={() => addFromCatalog(i)} title="Click to add to the rack"
+              <div className="cat" key={i} onClick={() => addFromCatalog(i)} title="Click to add to the rack"
                 style={{ padding: "4px 8px", borderBottom: "1px solid #24272c", cursor: "pointer" }}>
                 {c.name} <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}</span>
               </div>

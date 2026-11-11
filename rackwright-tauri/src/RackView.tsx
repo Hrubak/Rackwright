@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { fits } from "./edit";
+import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
 
 const LANE_W = 2.2;
@@ -13,6 +14,23 @@ function devRect(doc: Doc, d: Device) {
     return { l, t, w, h };
   }
   return { l: d.fx, t: d.fy, w, h };
+}
+
+const clip = (s: string, w: number, cw: number) => { const n = Math.max(3, Math.floor(w / cw)); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+
+function drawManager(d: Device, l: number, t: number, r: number, b: number) {
+  const nm = d.name.toLowerCase(), out: React.ReactNode[] = [];
+  if (nm.includes("brush")) {
+    out.push(<rect key="b" x={l + 30} y={t + 4} width={r - l - 60} height={b - t - 8} fill="#0c0d0f" stroke="#2c2f34" />);
+    for (let x = l + 34; x < r - 34; x += 3) out.push(<line key={"v" + x} x1={x} y1={t + 6} x2={x} y2={b - 6} stroke="#444851" />);
+  } else if (nm.includes("ring")) {
+    for (let x = l + 40; x < r - 40; x += 70) out.push(<ellipse key={x} cx={x} cy={(t + b) / 2} rx={7} ry={(b - t) / 2 - 4} fill="none" stroke="#9aa0a6" strokeWidth={2} />);
+  } else {
+    for (let x = l + 26; x < r - 26; x += 22) out.push(<rect key={x} x={x} y={t + 3} width={9} height={b - t - 6} fill="#2f333a" stroke="#454a52" />);
+  }
+  for (const ex of [l + 6, r - 6]) out.push(<circle key={"e" + ex} cx={ex} cy={(t + b) / 2} r={3} fill="#0c0d0f" stroke="#9aa0a6" />);
+  out.push(<text key="n" x={(l + r) / 2} y={(t + b) / 2} textAnchor="middle" dominantBaseline="central" fontSize={10} fill="#c9ced4" style={{ pointerEvents: "none" }}>{d.name}</text>);
+  return out;
 }
 
 export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
@@ -86,30 +104,56 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
           <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }}>
             <rect stroke={selected?.kind === "rack" && selected.id === r.id ? "#ffd33d" : "#3a3d42"} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill="#1d2025" />
             <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 28} textAnchor="middle" fill="#e6e8eb" fontSize={16} fontWeight={600}>{r.name}</text>
-            {Array.from({ length: r.u }, (_, i) => (
-              <text key={i} x={r.x + 12} y={r.y + HDR + (r.u - i - 0.5) * UH + 4} textAnchor="middle" fill="#6b717a" fontSize={10}>{i + 1}</text>
-            ))}
+            <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill="#0b0c0e" stroke="#2c2f35" />
+            {Array.from({ length: r.u }, (_, i) => {
+              const y = r.y + HDR + (r.u - i - 1) * UH;
+              return (
+                <g key={i}>
+                  {i % 2 === 0 && <rect x={r.x + RAIL} y={y} width={RW} height={UH} fill="#111317" />}
+                  <rect x={r.x + 3} y={y + UH / 2 - 2} width={4} height={4} rx={1} fill="#2a2d33" />
+                  <rect x={r.x + RW + 2 * RAIL - 7} y={y + UH / 2 - 2} width={4} height={4} rx={1} fill="#2a2d33" />
+                  <text x={r.x + 17} y={y + UH / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fill="#6b717a" fontSize={9}>{i + 1}</text>
+                </g>
+              );
+            })}
           </g>
         ))}
         {doc.devices.filter(vis).map((d) => {
           const q = devRect(doc, d);
+          const l = q.l, t = q.t, r = q.l + q.w, b = q.t + q.h;
+          const isSel = selected?.kind === "dev" && selected.id === d.id;
+          const col = d.color || "#3b6ea8";
+          const pg = d.ports.map((p) => pp.get(p.id)).filter((g): g is PortPos => !!g).map((g) => [g[1], g[2], g[3]] as [number, number, number]);
+          const plate = d.plate ? drawPlate(d, l, t, r, b, pg, face === "rear", view.z) : null;
+          const mgr = !plate && d.type === "Cable manager";
+          const fg = plate ? plate.fg : fgFor(col);
+          const lx = plate ? plate.lx : l + 7, labw = plate ? plate.labw : Math.min(150, q.w * 0.3);
+          const two = q.h >= 22;
+          const sub = d.ip || d.model || d.type;
+          const cableOn = (pid: number) => { const c = doc.cables.find((x) => x.a === pid || x.b === pid); return c ? (c.color || "#1f6feb") : null; };
           return (
             <g key={d.id} onMouseDown={(e) => {
                 e.stopPropagation(); onSelect({ kind: "dev", id: d.id });
                 const w = world(e, view); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, moved: false };
               }}>
-              <rect stroke={selected?.kind === "dev" && selected.id === d.id ? "#ffd33d" : "#00000066"} strokeWidth={selected?.kind === "dev" && selected.id === d.id ? 2 : 1} x={q.l + 1} y={q.t + 1} width={q.w - 2} height={q.h - 2} rx={2} fill={d.color || "#3b6ea8"} />
-              <text x={q.l + 8} y={q.t + q.h / 2 + 4} fill="#f2f4f7" fontSize={11}>{d.name}</text>
+              <rect stroke={isSel ? "#ffd33d" : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={2} fill={mgr ? "#1d2024" : col} />
+              {plate ? plate.nodes : null}
+              {mgr ? drawManager(d, l, t, r, b) : (
+                <>
+                  <text x={lx} y={t + (two ? 9 : q.h / 2)} fill={fg} fontSize={13} fontWeight={700} dominantBaseline="central" style={{ pointerEvents: "none" }}>{clip(d.name, labw - 8, 7.4)}</text>
+                  {two && <text x={lx} y={t + 21} fill={fg} fontSize={10.5} opacity={0.85} dominantBaseline="central" style={{ pointerEvents: "none" }}>{clip(sub, labw - 8, 5.8)}</text>}
+                </>
+              )}
               {d.ports.map((p) => {
                 const g = pp.get(p.id); if (!g) return null;
-                const s = g[3];
-                return (
-                  <rect key={p.id} x={g[1] - s / 2} y={g[2] - s / 2} width={s} height={s} rx={1.5}
-                    fill={PORT_COLORS[p.type] ?? "#888"} stroke={pendingPort === p.id ? "#ffd33d" : "#0008"} strokeWidth={pendingPort === p.id ? 2 : 1}
-                    style={{ cursor: "crosshair" }} onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); onPort(p.id); }}><title>{d.name} {p.name}</title></rect>
-                );
+                const c = cableOn(p.id);
+                const node = drawPort(p.id, p, g[1], g[2], g[3], c, !!plate, pendingPort === p.id, view.z, PORT_COLORS[p.type] ?? "#888", (e) => { e.stopPropagation(); onPort(p.id); });
+                const lab = g[3] * view.z >= 15 && p.name ? (
+                  <text key={"l" + p.id} x={g[1]} y={g[2]} textAnchor="middle" dominantBaseline="central" fontSize={8.5} fill={fgFor(c || (plate ? "#101113" : PORT_COLORS[p.type] ?? "#cccccc"))} style={{ pointerEvents: "none" }}>{p.name.slice(-3)}</text>
+                ) : null;
+                return <g key={p.id}>{node}{lab}</g>;
               })}
+              <title>{d.name}</title>
             </g>
           );
         })}
