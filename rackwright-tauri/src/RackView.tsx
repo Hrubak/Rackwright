@@ -1,12 +1,12 @@
-import React, { useMemo, useRef, useState } from "react";
-import { fits } from "./edit";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Target, devDims, rackUsage, resolveTarget, shapeOf } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
 
 const LANE_W = 2.2;
 
 function devRect(doc: Doc, d: Device) {
-  const w = d.half ? RW / 2 : RW, h = Math.max(1, d.u_size) * UH;
+  const { w, h } = devDims(d);
   const r = d.rack != null ? doc.racks.find((x) => x.id === d.rack) : undefined;
   if (r) {
     const t = r.y + HDR + (r.u - (d.u + d.u_size - 1)) * UH;
@@ -14,6 +14,21 @@ function devRect(doc: Doc, d: Device) {
     return { l, t, w, h };
   }
   return { l: d.fx, t: d.fy, w, h };
+}
+
+function drawBlob(d: Device, l: number, t: number, rear: boolean, sel: boolean) {
+  const p = d.plate || {}, cx = l + 32, cy = t + 32, sq = shapeOf(d) === "squircle";
+  const body = rear ? "#c3c8ce" : p.body || "#f2f4f6", ring = p.k === "uap" ? "#2a6fdb" : p.bc || "#2a6fdb";
+  const out = sel ? "#ffd33d" : "#8b9097";
+  const shape = (inset: number, fill: string, stroke: string, sw: number) => sq
+    ? <rect x={cx - 29 + inset} y={cy - 29 + inset} width={58 - 2 * inset} height={58 - 2 * inset} rx={16 - inset} fill={fill} stroke={stroke} strokeWidth={sw} />
+    : <circle cx={cx} cy={cy} r={29 - inset} fill={fill} stroke={stroke} strokeWidth={sw} />;
+  return <>
+    {shape(0, body, out, sel ? 2.5 : 1.2)}
+    {shape(5, "none", rear ? "#8b9097" : "#ffffff", 3)}
+    {rear ? [-12, 12].map((x) => <circle key={x} cx={cx + x} cy={cy - 4} r={2.2} fill="#6b717a" />)
+      : <>{shape(9, "none", ring, 2)}<circle cx={cx} cy={cy - 7} r={2.2} fill={ring} /></>}
+  </>;
 }
 
 const clip = (s: string, w: number, cw: number) => { const n = Math.max(3, Math.floor(w / cw)); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
@@ -35,75 +50,89 @@ function drawManager(d: Device, l: number, t: number, r: number, b: number) {
 
 export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
-export default function RackView({ doc, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice }: {
+export type Resolver = (dev: Device, clientX: number, clientY: number) => Target;
+
+export default function RackView({ doc, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick }: {
   doc: Doc; face: "front" | "rear"; routes: RouteResult; ports: PortPos[];
   selected: Sel; onSelect: (s: Sel) => void; pendingPort: number | null; onPort: (pid: number) => void;
   onMoveDevice: (id: number, rack: number | null, u: number, side: number, fx: number, fy: number) => void;
+  onReject: (why: string) => void;
+  drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const mv = useRef<{ id: number; ox: number; oy: number; moved: boolean } | null>(null);
-  const [ghost, setGhost] = useState<{ x: number; y: number; w: number; h: number; ok: boolean } | null>(null);
-  const world = (e: { clientX: number; clientY: number }, v: { x: number; y: number; z: number }) => {
+  const mv = useRef<{ id: number; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
+  const [mvGhost, setMvGhost] = useState<{ dev: Device; t: Target } | null>(null);
+  const [view, setView] = useState({ x: 120, y: 60, z: 1 });
+  const panning = useRef<{ sx: number; sy: number; vx: number; vy: number } | null>(null);
+  const world = (e: { clientX: number; clientY: number }) => {
     const b = svgRef.current!.getBoundingClientRect();
-    return { x: (e.clientX - b.left - v.x) / v.z, y: (e.clientY - b.top - v.y) / v.z };
+    return { x: (e.clientX - b.left - view.x) / view.z, y: (e.clientY - b.top - view.y) / view.z };
   };
-  const slotAt = (d: Device, wx: number, wy: number) => {
-    const w = d.half ? RW / 2 : RW;
-    for (const r of doc.racks) {
-      const l = r.x + RAIL;
-      if (wx < l - 40 || wx > l + RW + 40 || wy < r.y + HDR - 20 || wy > r.y + HDR + r.u * UH + 20) continue;
-      const topU = Math.round((r.y + HDR + r.u * UH - wy) / UH - 0.5);
-      const u = Math.min(Math.max(1, topU + 1 - (d.u_size - 1)), Math.max(1, r.u - d.u_size + 1));
-      const side = d.half && wx > l + RW / 2 ? 1 : 0;
-      return { r, u, side, w };
-    }
-    return null;
+  resolveRef.current = (dev, cx, cy) => {
+    const el = svgRef.current; if (!el) return { kind: "none" };
+    const b = el.getBoundingClientRect();
+    if (cx < b.left || cx > b.right || cy < b.top || cy > b.bottom) return { kind: "none" };
+    const w = world({ clientX: cx, clientY: cy });
+    return resolveTarget(doc, dev, w.x, w.y);
   };
-  const [view, setView] = useState({ x: 120, y: 360, z: 1 });
-  const drag = useRef<{ sx: number; sy: number; vx: number; vy: number } | null>(null);
+  useEffect(() => {
+    const el = svgRef.current; if (!el) return;
+    const bb = el.getBoundingClientRect();
+    const boxes = [
+      ...doc.racks.map((r) => ({ l: r.x, t: r.y, r: r.x + RW + 2 * RAIL, b: r.y + HDR + r.u * UH + PADB })),
+      ...doc.devices.filter((d) => d.rack == null).map((d) => { const q = devRect(doc, d); return { l: q.l, t: q.t, r: q.l + q.w, b: q.t + q.h + 24 }; }),
+    ];
+    if (!boxes.length) { setView({ x: 120, y: 60, z: 1 }); return; }
+    const l = Math.min(...boxes.map((x) => x.l)), t = Math.min(...boxes.map((x) => x.t));
+    const r = Math.max(...boxes.map((x) => x.r)), bt = Math.max(...boxes.map((x) => x.b));
+    const z = Math.max(0.2, Math.min(1.2, (bb.width - 60) / (r - l), (bb.height - 60) / (bt - t)));
+    setView({ z, x: (bb.width - (r - l) * z) / 2 - l * z, y: 30 - t * z });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitTick]);
+  const dragT = drag ? resolveRef.current(drag.dev, drag.x, drag.y) : null;
+  const gh = mvGhost ?? (drag && dragT && dragT.kind !== "none" ? { dev: drag.dev, t: dragT } : null);
   const pp = useMemo(() => new Map(ports.map((p) => [p[0], p])), [ports]);
   const vis = (d: Device) => d.rack == null || d.face === face || d.face === "both";
   const cab = (id: number) => doc.cables.find((c) => c.id === id);
 
   return (
-    <svg ref={svgRef} style={{ width: "100%", height: "100%", background: "#14161a" }}
+    <svg ref={svgRef} style={{ width: "100%", height: "100%", background: "#14161a", cursor: drag ? "copy" : undefined }}
       onWheel={(e) => {
-        const f = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-        setView((v) => ({ z: v.z * f, x: e.clientX - (e.clientX - v.x) * f, y: e.clientY - 40 - (e.clientY - 40 - v.y) * f }));
+        const f = e.deltaY < 0 ? 1.1 : 1 / 1.1, bb = svgRef.current!.getBoundingClientRect();
+        const mx = e.clientX - bb.left, my = e.clientY - bb.top;
+        setView((v) => { const z = Math.min(4, Math.max(0.1, v.z * f)), g = z / v.z; return { z, x: mx - (mx - v.x) * g, y: my - (my - v.y) * g }; });
       }}
-      onMouseDown={(e) => { if (e.target !== e.currentTarget) return; drag.current = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }; }}
+      onMouseDown={(e) => { if (e.target !== e.currentTarget) return; panning.current = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }; }}
       onMouseMove={(e) => {
         const m = mv.current;
         if (m) {
+          if (!m.moved && Math.hypot(e.clientX - m.sx, e.clientY - m.sy) < 4) return;
+          m.moved = true;
           const dev = doc.devices.find((x) => x.id === m.id)!;
-          const w = world(e, view); m.moved = true;
-          const s = slotAt(dev, w.x - m.ox + 0, w.y - m.oy + UH / 2);
-          if (s) {
-            const t = { ...dev, rack: s.r.id, u: s.u, side: s.side };
-            const q = devRect(doc, t);
-            setGhost({ x: q.l, y: q.t, w: q.w, h: q.h, ok: fits(doc, s.r, t) });
-          } else setGhost(null);
+          const w = world(e);
+          setMvGhost({ dev, t: resolveTarget(doc, dev, w.x, w.y, { ox: m.ox, oy: m.oy }) });
           return;
         }
-        const d = drag.current; if (d) setView((v) => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy })); }}
+        const d = panning.current; if (d) setView((v) => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy })); }}
       onMouseUp={(e) => {
-        drag.current = null;
+        panning.current = null;
         const m = mv.current; mv.current = null;
         if (!m) return;
-        setGhost(null);
+        setMvGhost(null);
         if (!m.moved) return;
         const dev = doc.devices.find((x) => x.id === m.id)!;
-        const w = world(e, view);
-        const s = slotAt(dev, w.x - m.ox, w.y - m.oy + UH / 2);
-        if (s && fits(doc, s.r, { ...dev, rack: s.r.id, u: s.u, side: s.side })) onMoveDevice(dev.id, s.r.id, s.u, s.side, 0, 0);
-        else if (!s) onMoveDevice(dev.id, null, 1, 0, w.x - m.ox - 40, w.y - m.oy - UH / 2);
-      }} onMouseLeave={() => { drag.current = null; mv.current = null; setGhost(null); }}
+        const w = world(e);
+        const t = resolveTarget(doc, dev, w.x, w.y, { ox: m.ox, oy: m.oy });
+        if (t.kind === "rack") { if (t.p.ok) onMoveDevice(dev.id, t.r.id, t.u, t.side, 0, 0); else onReject(t.p.why || "Can't place it there"); }
+        else if (t.kind === "float") onMoveDevice(dev.id, null, 1, 0, t.fx, t.fy);
+      }} onMouseLeave={() => { panning.current = null; mv.current = null; setMvGhost(null); }}
       onClick={(e) => { if (e.target === e.currentTarget) onSelect(null); }}>
       <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
         {doc.racks.map((r) => (
           <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }}>
             <rect stroke={selected?.kind === "rack" && selected.id === r.id ? "#ffd33d" : "#3a3d42"} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill="#1d2025" />
-            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 28} textAnchor="middle" fill="#e6e8eb" fontSize={16} fontWeight={600}>{r.name}</text>
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill="#e6e8eb" fontSize={16} fontWeight={600}>{r.name}</text>
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill="#7d838c" fontSize={10.5}>{`${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
             <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill="#0b0c0e" stroke="#2c2f35" />
             {Array.from({ length: r.u }, (_, i) => {
               const y = r.y + HDR + (r.u - i - 1) * UH;
@@ -124,7 +153,8 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
           const isSel = selected?.kind === "dev" && selected.id === d.id;
           const col = d.color || "#3b6ea8";
           const pg = d.ports.map((p) => pp.get(p.id)).filter((g): g is PortPos => !!g).map((g) => [g[1], g[2], g[3]] as [number, number, number]);
-          const plate = d.plate ? drawPlate(d, l, t, r, b, pg, face === "rear", view.z) : null;
+          const blob = shapeOf(d) !== "rect";
+          const plate = d.plate && !blob ? drawPlate(d, l, t, r, b, pg, face === "rear", view.z) : null;
           const mgr = !plate && d.type === "Cable manager";
           const fg = plate ? plate.fg : fgFor(col);
           const lx = plate ? plate.lx : l + 7, labw = plate ? plate.labw : Math.min(150, q.w * 0.3);
@@ -134,11 +164,17 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
           return (
             <g key={d.id} onMouseDown={(e) => {
                 e.stopPropagation(); onSelect({ kind: "dev", id: d.id });
-                const w = world(e, view); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, moved: false };
+                const w = world(e); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, sx: e.clientX, sy: e.clientY, moved: false };
               }}>
-              <rect stroke={isSel ? "#ffd33d" : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={2} fill={mgr ? "#1d2024" : col} />
+              {blob ? drawBlob(d, l, t, face === "rear", isSel)
+                : <rect stroke={isSel ? "#ffd33d" : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={2} fill={mgr ? "#1d2024" : col} />}
               {plate ? plate.nodes : null}
-              {mgr ? drawManager(d, l, t, r, b) : (
+              {blob ? (
+                <>
+                  <text x={l + 32} y={b + 11} textAnchor="middle" fill="#e6e8eb" fontSize={11} fontWeight={600} style={{ pointerEvents: "none" }}>{clip(d.name, 130, 6.2)}</text>
+                  {d.ip && <text x={l + 32} y={b + 23} textAnchor="middle" fill="#8b9097" fontSize={9.5} style={{ pointerEvents: "none" }}>{d.ip}</text>}
+                </>
+              ) : mgr ? drawManager(d, l, t, r, b) : (
                 <>
                   <text x={lx} y={t + (two ? 9 : q.h / 2)} fill={fg} fontSize={13} fontWeight={700} dominantBaseline="central" style={{ pointerEvents: "none" }}>{clip(d.name, labw - 8, 7.4)}</text>
                   {two && <text x={lx} y={t + 21} fill={fg} fontSize={10.5} opacity={0.85} dominantBaseline="central" style={{ pointerEvents: "none" }}>{clip(sub, labw - 8, 5.8)}</text>}
@@ -147,7 +183,7 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
               {d.ports.map((p) => {
                 const g = pp.get(p.id); if (!g) return null;
                 const c = cableOn(p.id);
-                const node = drawPort(p.id, p, g[1], g[2], g[3], c, !!plate, pendingPort === p.id, view.z, PORT_COLORS[p.type] ?? "#888", (e) => { e.stopPropagation(); onPort(p.id); });
+                const node = drawPort(p.id, p, g[1], g[2], g[3], c, !!plate || blob, pendingPort === p.id, view.z, PORT_COLORS[p.type] ?? "#888", (e) => { e.stopPropagation(); onPort(p.id); });
                 const lab = g[3] * view.z >= 15 && p.name ? (
                   <text key={"l" + p.id} x={g[1]} y={g[2]} textAnchor="middle" dominantBaseline="central" fontSize={8.5} fill={fgFor(c || (plate ? "#101113" : PORT_COLORS[p.type] ?? "#cccccc"))} style={{ pointerEvents: "none" }}>{p.name.slice(-3)}</text>
                 ) : null;
@@ -157,7 +193,23 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
             </g>
           );
         })}
-        {ghost && <rect x={ghost.x} y={ghost.y} width={ghost.w} height={ghost.h} fill={ghost.ok ? "#2ea04355" : "#f8514955"} stroke={ghost.ok ? "#2ea043" : "#f85149"} />}
+        {gh && (() => {
+          const { dev, t } = gh;
+          let x = 0, y = 0, ok = true, why = "", warn = false, dm = devDims({ ...dev, rack: null });
+          if (t.kind === "rack") {
+            dm = devDims({ ...dev, rack: t.r.id });
+            const q = devRect(doc, { ...dev, rack: t.r.id, u: t.u, side: t.side }); x = q.l; y = q.t; ok = t.p.ok; why = t.p.why || t.p.warn || ""; warn = !!t.p.warn;
+          } else if (t.kind === "float") { x = t.fx; y = t.fy; why = "Off-rack"; warn = true; }
+          else return null;
+          const col = !ok ? "#f85149" : warn ? "#d29922" : "#2ea043";
+          const round = shapeOf({ ...dev, rack: null });
+          return <g style={{ pointerEvents: "none" }}>
+            {round === "disc" ? <circle cx={x + 32} cy={y + 32} r={29} fill={col + "55"} stroke={col} strokeWidth={2} />
+              : <rect x={x + 1} y={y + 1} width={dm.w - 2} height={dm.h - 2} rx={round === "squircle" ? 16 : 2} fill={col + "55"} stroke={col} strokeWidth={2} />}
+            {why && <g><rect x={x} y={y - 18} width={Math.max(60, why.length * 6.2 + 12)} height={16} rx={3} fill="#000d" stroke={col} />
+              <text x={x + 6} y={y - 10} fill="#fff" fontSize={10.5} dominantBaseline="central">{why}</text></g>}
+          </g>;
+        })()}
         {routes.routes.map((r) => {
           const c = cab(r.cable), sel = selected?.kind === "cable" && selected.id === r.cable, color = c?.color || "#999";
           const d = r.pts.map((p, i) => `${i ? "L" : "M"}${p[0]} ${p[1]}`).join(" ");

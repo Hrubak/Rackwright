@@ -25,6 +25,18 @@ pub fn rack_rect(r: &Rack) -> Rect {
     Rect { l: r.x, t: r.y, r: r.x + RW + 2.0 * RAIL, b: r.y + HDR + r.u as f64 * UH + PADB }
 }
 
+/// Diameter of a free-standing access point (drawn as a disc / rounded square).
+pub const AP_D: f64 = 64.0;
+
+/// Off-rack access points are square-bounded blobs, not wide rectangles.
+pub fn is_blob(d: &Device) -> bool {
+    d.rack.is_none()
+        && d.dtype == "Wireless"
+        && d.plate.as_ref().map_or(false, |p| {
+            p.get("k").and_then(|k| k.as_str()) == Some("uap") || p.get("style").and_then(|s| s.as_str()) == Some("ap")
+        })
+}
+
 pub fn dev_rect(doc: &Doc, d: &Device) -> Rect {
     let w = if d.half { RW / 2.0 } else { RW };
     let size = d.u_size.max(1) as f64;
@@ -32,6 +44,8 @@ pub fn dev_rect(doc: &Doc, d: &Device) -> Rect {
         let top = r.y + HDR + (r.u - (d.u + d.u_size - 1)) as f64 * UH;
         let left = r.x + RAIL + if d.half && d.side == 1 { RW / 2.0 } else { 0.0 };
         Rect { l: left, t: top, r: left + w, b: top + size * UH }
+    } else if is_blob(d) {
+        Rect { l: d.fx, t: d.fy, r: d.fx + AP_D, b: d.fy + AP_D }
     } else {
         Rect { l: d.fx, t: d.fy, r: d.fx + w, b: d.fy + size * UH }
     }
@@ -62,6 +76,15 @@ pub fn port_geom(doc: &Doc, d: &Device) -> Vec<(i64, PortPos)> {
         return vec![];
     }
     let rc = dev_rect(doc, d);
+    if is_blob(d) {
+        let cx = rc.cx();
+        return d
+            .ports
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.id, PortPos { x: cx + (i as f64 - (n as f64 - 1.0) / 2.0) * 12.0, y: rc.b - 17.0, s: 10.0 }))
+            .collect();
+    }
     let (w, h) = (rc.r - rc.l, rc.b - rc.t);
     let rows = (n as i64).min(if d.rows > 0 { d.rows } else { (d.u_size * 2).max(1) }) as usize;
     let cols = (n + rows - 1) / rows;

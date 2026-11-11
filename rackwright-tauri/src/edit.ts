@@ -1,4 +1,4 @@
-import { Doc, Device, Rack, Cable, RW, RAIL, UH } from "./types";
+import { Doc, Device, Rack, Cable, RW, RAIL, UH, HDR } from "./types";
 import catalog from "./catalog.json";
 
 export interface Tpl {
@@ -37,11 +37,115 @@ export function fits(doc: Doc, r: Rack, d: Device, ignore?: Set<number>): boolea
   return true;
 }
 
+/** Heavy gear belongs low in the rack; everything else is filled from the top down. */
+export const isHeavy = (d: { type: string; plate?: any }) => d.type === "UPS" || d.type === "Storage" || d.plate?.style === "bp";
+
 export function findFree(doc: Doc, r: Rack, d: Device): [number, number] | null {
-  for (const side of d.half ? [0, 1] : [0])
-    for (let u = 1; u <= r.u - d.u_size + 1; u++)
-      if (fits(doc, r, { ...d, rack: r.id, u, side })) return [u, side];
+  const maxU = r.u - d.u_size + 1, fromTop = !isHeavy(d);
+  for (let i = 0; i < maxU; i++) {
+    const u = fromTop ? maxU - i : i + 1;
+    for (const side of d.half ? [0, 1] : [0])
+      if (checkPlace(doc, d, r, u, side).ok) return [u, side];
+  }
   return null;
+}
+
+export type Shape = "disc" | "squircle" | "rect";
+export const BLOB = 64; // diameter of a free-standing AP (mirrors AP_D in geom.rs)
+
+/** Free-standing (off-rack) access points are drawn as discs/squircles, everything else as a rectangle. */
+export function shapeOf(d: Pick<Device, "type" | "rack" | "plate" | "model" | "name">): Shape {
+  if (d.rack != null || d.type !== "Wireless" || !d.plate) return "rect";
+  const isAp = d.plate.k === "uap" || d.plate.style === "ap";
+  if (!isAp) return "rect";
+  return /nanohd|mr4|mr5|ruckus|r[3-7]\d0|9120|ap-5/i.test(`${d.model} ${d.name}`) ? "squircle" : "disc";
+}
+export function devDims(d: Pick<Device, "type" | "rack" | "plate" | "model" | "name" | "half" | "u_size">) {
+  if (shapeOf(d) !== "rect") return { w: BLOB, h: BLOB };
+  return { w: d.half ? RW / 2 : RW, h: Math.max(1, d.u_size) * UH };
+}
+
+export interface Placement { ok: boolean; why?: string; warn?: string }
+const no = (why: string): Placement => ({ ok: false, why });
+
+/** Full sanity check for putting `d` at (`u`, `side`) in rack `r`. `d` itself is ignored when it is already in the rack. */
+export function checkPlace(doc: Doc, d: Device, r: Rack, u: number, side: number): Placement {
+  const off = !!d.plate?.off;
+  if (off && d.type === "Wireless") return no("Access points are wall/ceiling mounted, not rack mounted");
+  if (d.u_size > r.u) return no(`${d.name} is ${d.u_size}U but ${r.name} is only ${r.u}U`);
+  const lo = u, hi = u + d.u_size - 1;
+  if (lo < 1) return no("Doesn't fit: runs below the bottom of the rack");
+  if (hi > r.u) return no("Doesn't fit: runs past the top of the rack");
+  let shelf = false;
+  for (const o of doc.devices) {
+    if (o.rack !== r.id || o.id === d.id) continue;
+    const fa = o.face || "front", fb = d.face || "front";
+    if (!(fa === fb || fa === "both" || fb === "both")) continue;
+    if (o.u > hi || o.u + o.u_size - 1 < lo) continue;
+    if (off && o.type === "Shelf" && o.u <= lo && o.u + o.u_size - 1 >= hi) { shelf = true; continue; }
+    if (o.half && d.half && o.side !== side) continue;
+    return no(`U${Math.max(lo, o.u)} is taken by ${o.name}`);
+  }
+  if (off && !shelf) return no(`${d.name} is a desktop unit: put it on a Shelf or leave it off-rack`);
+  let warn: string | undefined;
+  if (isHeavy(d) && lo > r.u / 2) warn = `${d.name} is heavy: normally mounted in the lower half`;
+  return { ok: true, warn };
+}
+
+export type Target =
+  | { kind: "rack"; r: Rack; u: number; side: number; p: Placement }
+  | { kind: "float"; fx: number; fy: number }
+  | { kind: "none" };
+
+/**
+ * Where would `d` land if dropped with the cursor at world (wx, wy)? In a rack the U under the cursor
+ * is the TOP row of the device (clamped to the rack), otherwise it floats free.
+ * `grab` = cursor offset inside the device when moving an existing one.
+ */
+export function resolveTarget(doc: Doc, d: Device, wx: number, wy: number, grab?: { ox: number; oy: number }): Target {
+  const { w, h } = devDims({ ...d, rack: null });
+  const cx = grab ? wx - grab.ox + w / 2 : wx;
+  const rowY = grab ? wy - grab.oy + UH / 2 : wy;
+  for (const r of doc.racks) {
+    const l = r.x + RAIL;
+    if (cx < l - 40 || cx > l + RW + 40 || rowY < r.y + HDR - 20 || rowY > r.y + HDR + r.u * UH + 20) continue;
+    const row = Math.floor((r.y + HDR + r.u * UH - rowY) / UH); // 0 = bottom U
+    const u = Math.min(Math.max(1, row + 1 - (d.u_size - 1)), Math.max(1, r.u - d.u_size + 1));
+    const side = d.half && cx > l + RW / 2 ? 1 : 0;
+    return { kind: "rack", r, u, side, p: checkPlace(doc, d, r, u, side) };
+  }
+  return grab ? { kind: "float", fx: wx - grab.ox, fy: wy - grab.oy } : { kind: "float", fx: wx - w / 2, fy: wy - h / 2 };
+}
+
+/** Light stand-in for a catalog item (used for the drag ghost and palette filtering). */
+export function protoOf(t: Tpl): Device {
+  return fromTpl({ v: 1, nid: 1_000_000_000, racks: [], devices: [], cables: [] }, t);
+}
+export function tplRackStatus(doc: Doc, rack: Rack | undefined, t: Tpl): "ok" | "off" | "full" | "none" {
+  if (t.plate?.off) return "off";
+  if (!rack) return "none";
+  const d = { ...protoOf(t), face: t.plate ? "both" : "front" } as Device;
+  return findFree(doc, rack, d) ? "ok" : "full";
+}
+
+export function rackUsage(doc: Doc, r: Rack) {
+  const used = new Set<number>();
+  for (const d of doc.devices) if (d.rack === r.id) for (let i = 0; i < d.u_size; i++) used.add(d.u + i);
+  return { used: used.size, free: r.u - used.size };
+}
+
+export function duplicateDevice(doc: Doc, id: number): Device | null {
+  const src = doc.devices.find((x) => x.id === id); if (!src) return null;
+  const d = clone(src);
+  d.id = nid(doc); d.name = src.name + " copy";
+  for (const p of d.ports) p.id = nid(doc);
+  const r = doc.racks.find((x) => x.id === src.rack);
+  if (r) {
+    const s = findFree(doc, r, d);
+    if (s) { d.u = s[0]; d.side = s[1]; } else { d.rack = null; d.fx = (src.fx || 0) + 40; d.fy = (src.fy || 0) + 40; }
+  } else { d.fx = src.fx + 30; d.fy = src.fy + 30; }
+  doc.devices.push(d);
+  return d;
 }
 
 export function addRack(doc: Doc, name?: string, u = 42): Rack {
@@ -55,7 +159,7 @@ export function addRack(doc: Doc, name?: string, u = 42): Rack {
 export function placeNew(doc: Doc, d: Device, face: string, rackId?: number | null): string {
   if (!doc.racks.length) addRack(doc);
   d.face = d.plate ? "both" : face;
-  const off = d.plate?.off;
+  const off = !!d.plate?.off && !doc.devices.some((x) => x.type === "Shelf");
   const order = [...doc.racks].sort((a, b) => (a.id === rackId ? -1 : b.id === rackId ? 1 : 0));
   if (!off) for (const r of order) {
     const s = findFree(doc, r, d);
@@ -64,7 +168,7 @@ export function placeNew(doc: Doc, d: Device, face: string, rackId?: number | nu
   const offs = doc.devices.filter((x) => x.rack == null);
   d.rack = null;
   d.fx = Math.min(...doc.racks.map((x) => x.x)) - RW - 160;
-  d.fy = offs.reduce((s, x) => s + x.u_size * UH + 20, 0);
+  d.fy = offs.reduce((s, x) => s + devDims({ ...x, rack: null }).h + 20, 0);
   doc.devices.push(d);
   return off ? "Placed off-rack" : "No free slot - placed off-rack";
 }
