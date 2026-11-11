@@ -105,6 +105,15 @@ def ports(prefix, n, typ, start=1):
              "type": typ, "label": ""} for i in range(n)]
 
 
+def pwr_in(n=1):
+    """Power inlet(s) for a device: a single 'Power' or PSU1..PSUn (outlets are named Out1..)."""
+    return ports("Power", 1, "Power", 0) if n == 1 else ports("PSU{n}", n, "Power")
+
+
+def is_outlet(p):
+    return p.get("type") == "Power" and p.get("name", "").lower().startswith("out")
+
+
 def tpl(name, typ, u, color, plist, half=False, rows=0, plate=None, group="", short="", model=""):
     t = {"name": name, "type": typ, "u_size": u, "color": color, "ports": plist, "half": half, "rows": rows,
          "model": model, "ip": ""}
@@ -116,12 +125,12 @@ def tpl(name, typ, u, color, plist, half=False, rows=0, plate=None, group="", sh
 
 
 BUILTIN = [
-    tpl("Switch 24-port 1U", "Switch", 1, "#3b6ea8", ports("{n}", 24, "RJ45") + ports("SFP{n}", 4, "SFP+")),
-    tpl("Switch 48-port 1U", "Switch", 1, "#3b6ea8", ports("{n}", 48, "RJ45") + ports("SFP{n}", 4, "SFP+")),
-    tpl("Switch 8-port half-width", "Switch", 1, "#3b6ea8", ports("{n}", 8, "RJ45"), half=True),
-    tpl("Router 1U", "Router", 1, "#2f8f8f", ports("Gi0/{n}", 4, "RJ45", 0) + ports("Console", 1, "Console", 0)),
+    tpl("Switch 24-port 1U", "Switch", 1, "#3b6ea8", ports("{n}", 24, "RJ45") + ports("SFP{n}", 4, "SFP+") + pwr_in()),
+    tpl("Switch 48-port 1U", "Switch", 1, "#3b6ea8", ports("{n}", 48, "RJ45") + ports("SFP{n}", 4, "SFP+") + pwr_in()),
+    tpl("Switch 8-port half-width", "Switch", 1, "#3b6ea8", ports("{n}", 8, "RJ45") + pwr_in(), half=True),
+    tpl("Router 1U", "Router", 1, "#2f8f8f", ports("Gi0/{n}", 4, "RJ45", 0) + ports("Console", 1, "Console", 0) + pwr_in()),
     tpl("Firewall 1U", "Firewall", 1, "#b24040", ports("{n}", 8, "RJ45") + ports("SFP+{n}", 2, "SFP+") +
-        ports("Console", 1, "Console", 0)),
+        ports("Console", 1, "Console", 0) + pwr_in()),
     tpl("Server 1U", "Server", 1, "#4b5563", ports("NIC{n}", 4, "RJ45") + ports("iDRAC", 1, "Mgmt", 0) +
         ports("PSU{n}", 2, "Power")),
     tpl("Server 2U", "Server", 2, "#4b5563", ports("NIC{n}", 4, "RJ45") + ports("iDRAC", 1, "Mgmt", 0) +
@@ -130,11 +139,11 @@ BUILTIN = [
     tpl("Patch panel 24 1U", "Patch panel", 1, "#9aa3ad", ports("{n}", 24, "RJ45")),
     tpl("Patch panel 48 2U", "Patch panel", 2, "#9aa3ad", ports("{n}", 48, "RJ45")),
     tpl("Fiber panel 12 LC 1U", "Patch panel", 1, "#a8925a", ports("{n}", 12, "Fiber LC")),
-    tpl("UPS 2U", "UPS", 2, "#222428", ports("Out{n}", 6, "Power")),
-    tpl("PDU 1U", "PDU", 1, "#222428", ports("Out{n}", 8, "Power")),
-    tpl("Wireless controller 1U", "Wireless", 1, "#2f8f8f", ports("{n}", 4, "RJ45")),
+    tpl("UPS 2U", "UPS", 2, "#222428", ports("Out{n}", 6, "Power") + pwr_in()),
+    tpl("PDU 1U", "PDU", 1, "#222428", ports("Out{n}", 8, "Power") + ports("Input", 1, "Power", 0)),
+    tpl("Wireless controller 1U", "Wireless", 1, "#2f8f8f", ports("{n}", 4, "RJ45") + pwr_in()),
     tpl("Modem / ISP demarc (half)", "Modem/ISP", 1, "#c9772b", ports("WAN", 1, "RJ45", 0) +
-        ports("LAN", 1, "RJ45", 0), half=True),
+        ports("LAN", 1, "RJ45", 0) + pwr_in(), half=True),
     tpl("Shelf 1U", "Shelf", 1, "#4b5563", []),
     tpl("Cable manager 1U", "Cable manager", 1, "#222428", []),
     tpl("Cable manager 2U", "Cable manager", 2, "#222428", []),
@@ -179,7 +188,7 @@ def real_templates():
                        short="PE-" + base, model="PowerEdge " + base))
     for model, nm, lcd, n, nsfp, st in UNIFI:
         out.append(tpl("%s (%s)" % (nm, model), "Switch", 1, "#dfe2e6",
-                       ports("{n}", n, "RJ45") + ports("SFP%s{n}" % ("+" if st == "SFP+" else ""), nsfp, st), rows=2,
+                       ports("{n}", n, "RJ45") + ports("SFP%s{n}" % ("+" if st == "SFP+" else ""), nsfp, st) + pwr_in(), rows=2,
                        plate={"k": "unifi", "lcd": lcd}, group="Ubiquiti UniFi", short=model, model=nm))
     for m in SYN_DESK:
         out.append(tpl("Synology %s (4-bay desktop, 4U half)" % m, "Storage", 4, "#2a2c30",
@@ -304,13 +313,13 @@ UPSES = [
     ("APC by Schneider", "Smart-UPS SMT750RM2U", "SMT750RM2U", 2, 4, False),
     ("APC by Schneider", "Smart-UPS SMT1000RM2U", "SMT1000RM2U", 2, 6, False),
     ("APC by Schneider", "Smart-UPS SMT1500RM2U", "SMT1500RM2U", 2, 6, False),
-    ("APC by Schneider", "Smart-UPS SMT2200RM2U", "SMT2200RM2U", 2, 8, False),
-    ("APC by Schneider", "Smart-UPS SMT3000RM2U", "SMT3000RM2U", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SMT2200RM2U", "SMT2200RM2U", 2, 9, False),
+    ("APC by Schneider", "Smart-UPS SMT3000RM2U", "SMT3000RM2U", 2, 9, False),
     ("APC by Schneider", "Smart-UPS SMC1500-2U", "SMC1500-2U", 2, 6, False),
     ("APC by Schneider", "Smart-UPS SMX1500RM2U", "SMX1500RM2U", 2, 8, False),
     ("APC by Schneider", "Smart-UPS SMX3000RMHV2U", "SMX3000RMHV2U", 2, 8, False),
     ("APC by Schneider", "Smart-UPS SRT1500RMXLI", "SRT1500RMXLI", 2, 8, False),
-    ("APC by Schneider", "Smart-UPS SRT3000RMXLI", "SRT3000RMXLI", 2, 8, False),
+    ("APC by Schneider", "Smart-UPS SRT3000RMXLI", "SRT3000RMXLI", 2, 10, False),
     ("APC by Schneider", "Smart-UPS SRT5KRMXLI", "SRT5KRMXLI", 3, 10, False),
     ("APC by Schneider", "Smart-UPS SRT6KRMXLI", "SRT6KRMXLI", 4, 10, False),
     ("APC by Schneider", "Smart-UPS SRT10KRMXLI", "SRT10KRMXLI", 6, 12, False),
@@ -345,13 +354,12 @@ def gen_templates():
                        model=nm))
     for g, model, short, n, nu, ut in SWITCHES:
         poe = bool(re.search(r"\d(P|FP|LP|UX|X)$|PoE", model))
-        add(g, model, "Switch", 1, ports("{n}", n, "RJ45") + ports("SFP%s{n}" % ("+" if ut == "SFP+" else ""), nu, ut),
+        add(g, model, "Switch", 1, ports("{n}", n, "RJ45") + ports("SFP%s{n}" % ("+" if ut == "SFP+" else ""), nu, ut) + pwr_in(),
             False, 2, "sw", short, poe=poe)
     for g, model, short, n, ns, st, u, desk, typ in FIREWALLS:
         pl = ports("{n}", n, "RJ45") + (ports("SFP%s{n}" % ("+" if st == "SFP+" else ""), ns, st) if ns else [])
         pl += ports("Console", 1, "Console", 0)
-        if desk:
-            pl += ports("Power", 1, "Power", 0)
+        pl += pwr_in()
         add(g, model, typ, u, pl, desk, 2 if n + ns > 8 else 1, "fw", short, off=desk,
             suffix=" (desktop)" if desk else "", desk=desk)
     for g, model, short in APS:
@@ -361,8 +369,8 @@ def gen_templates():
         if bp:
             add(g, model, "UPS", u, ports("Battery", 1, "Other", 0), False, 1, "bp", short, suffix=" (%dU)" % u)
         else:
-            add(g, model, "UPS", u, ports("Out{n}", n, "Power") + ports("Network", 1, "RJ45", 0) +
-                ports("Battery", 1, "Other", 0), False, 1 if u < 3 else 2, "ups", short, suffix=" (%dU)" % u)
+            add(g, model, "UPS", u, ports("Out{n}", n, "Power") + ports("Input", 1, "Power", 0) +
+                ports("Network", 1, "RJ45", 0) + ports("Battery", 1, "Other", 0), False, 1 if u < 3 else 2, "ups", short, suffix=" (%dU)" % u)
     for g, model, short, n in PDUS:
         u = 2 if n > 12 else 1
         add(g, model, "PDU", u, ports("Out{n}", n, "Power") + ports("Input", 1, "Power", 0), False,
@@ -2678,6 +2686,11 @@ class App:
         c = {"id": 0, "a": pa, "b": pb, "color": dflt["color"], "style": dflt["style"], "type": dflt["type"],
              "length": dflt["length"], "unit": dflt["unit"], "label": "", "logical": "", "notes": ""}
         if self._pidx[pa][0]["type"] == "Power" and self._pidx[pb][0]["type"] == "Power":
+            oa, ob = is_outlet(self._pidx[pa][0]), is_outlet(self._pidx[pb][0])
+            if oa == ob and not messagebox.askyesno(
+                    "Power cable", "This joins two power %s. A power cord normally runs from an outlet (UPS/PDU "
+                    "Out) to a device's power inlet.\n\nConnect anyway?" % ("outlets" if oa else "inlets")):
+                return
             c.update(color="#2b2b2b", type="Power", style="solid", length=2.0, unit="ft")
         if self.cable_dialog(c, "New cable"):
             self.checkpoint()
@@ -2774,6 +2787,15 @@ class App:
         f1, f2 = ttk.Frame(nb), ttk.Frame(nb)
         nb.add(f1, text=" Cables ")
         nb.add(f2, text=" Shopping list ")
+        f3 = ttk.Frame(nb)
+        nb.add(f3, text=" Power ")
+        self.pw = ttk.Treeview(f3, columns=("what", "where", "status"), show="headings")
+        for c, wd in zip(("what", "where", "status"), (320, 260, 420)):
+            self.pw.heading(c, text=c.title())
+            self.pw.column(c, width=wd)
+        self.pw.tag_configure("bad", foreground="#c0392b")
+        self.pw.tag_configure("head", font=("Segoe UI", 9, "bold"))
+        self.pw.pack(fill="both", expand=True)
         cols = ("id", "from", "to", "color", "type", "length", "label", "logical")
         self.st = ttk.Treeview(f1, columns=cols, show="headings")
         for c, wd in zip(cols, (50, 250, 250, 70, 80, 70, 120, 180)):
@@ -2809,9 +2831,48 @@ class App:
                                                                 c.get("logical", "")))
             k = (c.get("type", ""), color_name(c["color"]), self.fmt_len(c))
             tally[k] = tally.get(k, 0) + 1
+        self.fill_power()
         self.sl.delete(*self.sl.get_children())
         for (t, col, ln), n in sorted(tally.items()):
             self.sl.insert("", "end", values=(n, t, col, ln))
+
+    def power_report(self):
+        """Rows (kind, device, where, status): outlet usage per UPS/PDU and inlet coverage per device."""
+        used = set()
+        for c in self.doc["cables"]:
+            used.add(c["a"])
+            used.add(c["b"])
+        rows = []
+        for d in self.doc["devices"]:
+            pw = [p for p in d["ports"] if p["type"] == "Power"]
+            if not pw:
+                continue
+            outs = [p for p in pw if is_outlet(p)]
+            ins = [p for p in pw if not is_outlet(p)]
+            r = self.rack(d["rack"]) if d.get("rack") else None
+            loc = ("%s %s" % (r["name"], self.u_label(r, d))) if r else "(off-rack)"
+            if outs:
+                n = sum(1 for p in outs if p["id"] in used)
+                rows.append(("src", d["name"], loc, "%d of %d outlets used, %d free" % (n, len(outs), len(outs) - n)))
+            if ins:
+                n = sum(1 for p in ins if p["id"] in used)
+                if n == 0:
+                    st = "NOT POWERED (%d inlet%s unplugged)" % (len(ins), "" if len(ins) == 1 else "s")
+                elif n < len(ins):
+                    st = "%d of %d inlets plugged (no redundancy)" % (n, len(ins))
+                else:
+                    st = "%d of %d inlets plugged" % (n, len(ins))
+                rows.append(("dev" if n else "bad", d["name"], loc, st))
+        return rows
+
+    def fill_power(self):
+        self.pw.delete(*self.pw.get_children())
+        rows = self.power_report()
+        for title, kinds in (("Power sources (UPS / PDU outlets)", ("src",)), ("Devices (power inlets)", ("dev", "bad"))):
+            self.pw.insert("", "end", values=(title, "", ""), tags=("head",))
+            for k, nm, loc, st in rows:
+                if k in kinds:
+                    self.pw.insert("", "end", values=(nm, loc, st), tags=("bad",) if k == "bad" else ())
 
     # ---- files
     def confirm_discard(self):
@@ -3077,19 +3138,19 @@ class App:
         if re.search(r"panel|\bpp\b|^pp-", n):
             return mk("Patch panel", "#9aa3ad", ports("{n}", 24 * u, "RJ45"))
         if re.search(r"apc|ups|battery", n):
-            return mk("UPS", "#222428", ports("Out{n}", 6, "Power"))
+            return mk("UPS", "#222428", ports("Out{n}", 6, "Power") + ports("Input", 1, "Power", 0))
         if "pdu" in n or "power strip" in n:
-            return mk("PDU", "#222428", ports("Out{n}", 8, "Power"))
+            return mk("PDU", "#222428", ports("Out{n}", 8, "Power") + ports("Input", 1, "Power", 0))
         if re.search(r"firewall|\bfw\b|fortigate|palo|sonicwall", n):
-            return mk("Firewall", "#b24040", ports("{n}", 8, "RJ45") + ports("SFP+{n}", 2, "SFP+"))
+            return mk("Firewall", "#b24040", ports("{n}", 8, "RJ45") + ports("SFP+{n}", 2, "SFP+") + pwr_in())
         if re.search(r"router|\brtr\b", n):
-            return mk("Router", "#2f8f8f", ports("Gi0/{n}", 4, "RJ45", 0))
+            return mk("Router", "#2f8f8f", ports("Gi0/{n}", 4, "RJ45", 0) + pwr_in())
         if re.search(r"\bnas\b|storage|\bsan\b", n):
             return mk("Storage", "#7456a8", ports("LAN{n}", 2, "RJ45") + ports("PSU{n}", 2, "Power"))
         if re.search(r"server|\bsrv\b|\bhv\b|esx|host", n):
             return mk("Server", "#4b5563", ports("NIC{n}", 4, "RJ45") + ports("PSU{n}", 2, "Power"))
         if re.search(r"stk|stack|switch|\bsw\d*\b|\bidf\b|\bmdf\b", n):
-            return mk("Switch", "#3b6ea8", ports("{n}", 48 if u >= 2 else 24, "RJ45") + ports("SFP{n}", 4, "SFP+"))
+            return mk("Switch", "#3b6ea8", ports("{n}", 48 if u >= 2 else 24, "RJ45") + ports("SFP{n}", 4, "SFP+") + pwr_in())
         if "shelf" in n:
             return mk("Shelf", "#4b5563", [])
         return mk("Other", "#4b5563", [])
