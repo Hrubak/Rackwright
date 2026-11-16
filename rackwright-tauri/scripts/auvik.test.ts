@@ -4,7 +4,7 @@ import { readXlsx, colIndex } from "../src/auvik/xlsx";
 import { parseAuvik, parseConnected } from "../src/auvik/parse";
 import { buildItems, resolvePlan, parsePort, classify } from "../src/auvik/plan";
 import { applyInPlace, findMissing } from "../src/auvik/apply";
-import { Doc } from "../src/types";
+import { Doc, RW } from "../src/types";
 import { portOf, clone } from "../src/edit";
 
 let fails = 0;
@@ -115,6 +115,8 @@ async function main() {
   t("stack becomes 3 unit devices", [1, 2, 3].every((n) => doc.devices.some((d) => d.name === `EX-SW-STACK unit ${n}`)));
   const u3 = dn("EX-SW-STACK unit 3"), u1 = dn("EX-SW-STACK unit 1"), u2 = dn("EX-SW-STACK unit 2");
   t("stack units adjacent", u1.rack === u2.rack && u2.rack === u3.rack && u1.u - u2.u === 1 && u2.u - u3.u === 1, `${u1.u},${u2.u},${u3.u}`);
+  const rx = Math.min(...doc.racks.map((r) => r.x));
+  t("off-rack items left of the racks", doc.devices.filter((d) => d.rack == null).every((d) => d.fx + RW <= rx), `rack x ${rx}`);
   const mgrs = doc.devices.filter((d) => d.type === "Cable manager");
   t("cable managers added", mgrs.length > 0 && res.managers === mgrs.length, `${mgrs.length}`);
   t("manager below the stack", mgrs.some((m) => m.rack === u3.rack && m.u === u3.u - 1));

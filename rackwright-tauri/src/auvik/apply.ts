@@ -82,19 +82,21 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   }
   const needRack = () => { if (!racks.length) mkRack(); };
 
-  // --- off-rack layout cursor: columns to the left of everything
+  // --- off-rack items: added now, laid out at the end, in columns to the left of every rack (racks may still be created)
   const offs = doc.devices.filter((d) => d.rack == null);
-  let colX = Math.min(...doc.racks.map((r) => r.x), ...offs.map((d) => d.fx), 0) - RW - 80;
-  if (!doc.racks.length && !offs.length) colX = 0;
-  let colY = 0;
-  const colH = Math.max(1100, ...doc.racks.map((r) => r.u * 26 + 60));
-  const putOff = (d: Device) => {
-    const h = Math.max(1, d.u_size) * 26 + 36;
-    const isBlob = d.type === "Wireless" && d.plate;
-    const hh = isBlob ? 100 : h;
-    if (colY + hh > colH && colY > 0) { colX -= RW + 60; colY = 0; }
-    d.rack = null; d.fx = colX; d.fy = colY; colY += hh;
-    doc.devices.push(d);
+  const pendingOff: Device[] = [];
+  const putOff = (d: Device) => { d.rack = null; doc.devices.push(d); pendingOff.push(d); };
+  const layoutOff = () => {
+    if (!pendingOff.length) return;
+    let colX = Math.min(...doc.racks.map((r) => r.x), ...offs.map((d) => d.fx), 0) - RW - 80;
+    if (!doc.racks.length && !offs.length) colX = 0;
+    let colY = 0;
+    const colH = Math.max(1100, ...doc.racks.map((r) => r.u * 26 + 60));
+    for (const d of pendingOff) {
+      const hh = d.type === "Wireless" && d.plate ? 100 : Math.max(1, d.u_size) * 26 + 36;
+      if (colY + hh > colH && colY > 0) { colX -= RW + 60; colY = 0; }
+      d.fx = colX; d.fy = colY; colY += hh;
+    }
   };
   const placeShelf = (d: Device): boolean => {
     for (const r of racks) {
@@ -211,6 +213,8 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     groupDev.set(g.key, d);
     res.groups++;
   }
+
+  layoutOff();
 
   // --- cables
   const dev = (t: PlanUnit | PlanGroup) => (t.isGroup ? groupDev.get(t.key)! : devOf.get(t.key)!);
