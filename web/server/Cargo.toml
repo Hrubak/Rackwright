@@ -9,6 +9,9 @@ edition = "2021"
 [lib]
 name = "rackwright_server"
 path = "src/lib.rs"
+# router.rs (shared with the desktop crate) has unit tests that read a sample file not in the repo.
+test = false
+doctest = false
 
 [[bin]]
 name = "rackwright-server"
