@@ -12,6 +12,7 @@
 # Or copy this folder to the host and:  bash proxmox/ct/rackwright.sh
 #
 # Re-run this same file inside the LXC to update (git pull, rebuild, restart).
+# Admins can also start it from the web app: Update server (see web/API.md).
 
 set -euo pipefail
 
@@ -45,7 +46,8 @@ CM="${GN}✓${CL}"
 CROSS="${RD}✗${CL}"
 
 header_info() {
-  clear
+  # No terminal when the web Update button runs this (RW_UPDATE_FROM_WEB=1).
+  if [[ -t 1 ]]; then clear; fi
   cat <<"EOF"
     ____                      __                      _              __     __
    / __ \  ____ _   _____    / /__ _      __  _____   (_)  ____ _    / /_   / /_
@@ -100,10 +102,8 @@ update_script() {
     msg_error "No ${APP} installation found in this container."
     exit 1
   fi
-  msg_info "Stopping ${APP}"
-  systemctl stop rackwright || true
-  msg_ok "Stopped"
-
+  # The server keeps running while the new version builds, and restarts at the end.
+  # If the build fails the old version keeps running.
   cd /opt/rackwright
   # Follow what this container was installed from. var_repo / var_branch override when set.
   local repo branch
@@ -141,9 +141,9 @@ update_script() {
   source /opt/rackwright/proxmox/install/rackwright-install.sh --functions-only
   build_app
 
-  msg_info "Starting ${APP}"
+  msg_info "Restarting ${APP}"
   systemctl daemon-reload
-  systemctl start rackwright
+  systemctl restart rackwright
   local ver
   ver="$(rw_version /opt/rackwright)"
   msg_ok "Updated successfully${ver:+ (version ${ver})}"

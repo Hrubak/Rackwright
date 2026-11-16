@@ -9,6 +9,8 @@ pub mod geom;
 #[path = "../../../rackwright-tauri/src-tauri/src/router.rs"]
 pub mod router;
 
+mod update;
+
 use std::path::Path as FsPath;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
@@ -39,6 +41,7 @@ const BODY_LIMIT: usize = 20 * 1024 * 1024;
 
 pub struct AppState {
     db: Mutex<Connection>,
+    update: update::UpdateCfg,
 }
 
 impl AppState {
@@ -643,7 +646,7 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
     conn.execute_batch("PRAGMA journal_mode = WAL;").map_err(|e| format!("database setup failed: {e}"))?;
     conn.execute_batch(SCHEMA).map_err(|e| format!("database setup failed: {e}"))?;
 
-    let state: Shared = Arc::new(AppState { db: Mutex::new(conn) });
+    let state: Shared = Arc::new(AppState { db: Mutex::new(conn), update: update::UpdateCfg::new(data_dir) });
     let spa = ServeDir::new(static_dir).fallback(ServeFile::new(static_dir.join("index.html")));
 
     let app = Router::new()
@@ -659,6 +662,8 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
         .route("/api/racks/:id", get(get_rack).put(put_rack).delete(delete_rack))
         .route("/api/route_cables", post(route_cables))
         .route("/api/port_positions", post(port_positions))
+        .route("/api/admin/update", get(update::get_update).post(update::post_update))
+        .route("/api/admin/update/check", post(update::post_check))
         .route("/api/*rest", any(api_not_found))
         .fallback_service(spa)
         .layer(DefaultBodyLimit::max(BODY_LIMIT))

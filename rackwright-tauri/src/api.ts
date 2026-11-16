@@ -41,6 +41,18 @@ export const addUser = (u: { email: string; name: string; password: string; is_a
 export const patchUser = (id: number, p: { name?: string; is_admin?: boolean; password?: string }) => api<User>("PATCH", `/api/users/${id}`, p);
 export const deleteUser = (id: number) => api("DELETE", `/api/users/${id}`);
 
+export interface UpdateStatus {
+  available: boolean; reason: string; version: string; commit: string; branch: string; repo: string;
+  state: "idle" | "running" | "ok" | "failed"; since: string; log: string;
+}
+export interface UpdateCheck {
+  version: string; commit: string; latest_version: string; latest_commit: string; latest_date: string;
+  latest_subject: string; update_available: boolean; changes: string;
+}
+export const getUpdate = () => api<UpdateStatus>("GET", "/api/admin/update");
+export const checkUpdate = () => api<UpdateCheck>("POST", "/api/admin/update/check");
+export const startUpdate = () => api("POST", "/api/admin/update");
+
 export const listRacks = () => api<RackMeta[]>("GET", "/api/racks");
 export const getRack = (id: number) => api<RackMeta & { doc: Doc }>("GET", `/api/racks/${id}`);
 export const createRack = (name: string, doc: Doc) => api<RackMeta>("POST", "/api/racks", { name, doc });

@@ -31,7 +31,7 @@ cargo run              # http://127.0.0.1:8080, data in ./data
 npm run dev:web        # (in rackwright-tauri) Vite dev server, proxies /api to :8080
 ```
 
-Server environment: `RW_DATA`, `RW_HOST`, `RW_PORT`, `RW_STATIC` (see `web/API.md`). On the LXC: app in `/opt/rackwright`, data in `/var/lib/rackwright`, service `rackwright.service`. `update` pulls the repository and branch the container was installed from and rebuilds.
+Server environment: `RW_DATA`, `RW_HOST`, `RW_PORT`, `RW_STATIC` (see `web/API.md`). On the LXC: app in `/opt/rackwright`, data in `/var/lib/rackwright`, service `rackwright.service`. `update` pulls the repository and branch the container was installed from and rebuilds. Admins can start the same update from the web app (Update server, `update.rs` in the server); it runs in the transient systemd unit `rackwright-update` and logs to `/var/lib/rackwright/update.log`.
 
 ## Keeping desktop and web together
 

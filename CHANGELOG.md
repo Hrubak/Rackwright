@@ -2,6 +2,12 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.8.0 — 2026-11-16
+Web only. The desktop app does not change.
+- **Update the server from the web.** Admins get an Update server button next to Users. Check for updates shows the running version, the newest version on the branch the container was installed from, and what changed. Update now runs the same steps as typing `update` in the container and shows the log while it works. When it finishes, click Reload page.
+- **Less downtime when updating.** `update` (from the console or the web) now builds the new version while the old one keeps running, then restarts. If the build fails, the old version keeps running instead of staying stopped.
+- Once only: this release adds the button, so run `update` inside the container one more time to get it. After that you can update from the web.
+
 ## 2.7.0 — 2026-11-16
 Desktop app 2.5.0 has the same changes.
 - **Change a device's height.** Select a device in a rack and set Height (U), for example to turn an imported 1U server into a 2U one. The top edge stays where it is when there is room, otherwise the bottom edge. If the new size does not fit, nothing changes and the message says what is in the way. Devices without a fixed faceplate also get a Half width box.

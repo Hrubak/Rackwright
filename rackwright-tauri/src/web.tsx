@@ -1,7 +1,7 @@
 // Web-only UI pieces: users panel, shared rack list, dialogs. Only rendered when VITE_TARGET === "web".
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import * as A from "./api";
-import { RackMeta, User } from "./api";
+import { RackMeta, UpdateCheck, UpdateStatus, User } from "./api";
 
 export const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 export const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
@@ -28,18 +28,21 @@ export const Field = ({ label, children }: { label: string; children: ReactNode 
 
 export interface WebProps { user: User; signOut: () => void; setUser: (u: User) => void }
 
-/** Header controls: user name, Change password, Users (admin), Sign out. */
+/** Header controls: user name, Change password, Users and Update server (admin), Sign out. */
 export function UserBar({ web }: { web: WebProps }) {
   const [pw, setPw] = useState(false);
   const [users, setUsers] = useState(false);
+  const [upd, setUpd] = useState(false);
   return (
     <span style={{ marginLeft: "auto", paddingLeft: 12, fontSize: 12, display: "inline-flex", alignItems: "center" }}>
       <span style={{ opacity: 0.8, marginRight: 8 }}>{web.user.name}{web.user.is_admin ? " (admin)" : ""}</span>
       <button style={btn} onClick={() => setPw(true)}>Change password</button>
       {web.user.is_admin && <button style={btn} onClick={() => setUsers(true)}>Users</button>}
+      {web.user.is_admin && <button style={btn} onClick={() => setUpd(true)} title="Update this server to the newest version">Update server</button>}
       <button style={{ ...btn, marginRight: 0 }} onClick={web.signOut}>Sign out</button>
       {pw && <ChangePassword onClose={() => setPw(false)} />}
       {users && <UsersPanel me={web.user} onMe={web.setUser} onClose={() => setUsers(false)} />}
+      {upd && <UpdatePanel onClose={() => setUpd(false)} />}
     </span>
   );
 }
@@ -111,6 +114,96 @@ function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; 
       </div>
       {err && <div style={errStyle}>{err}</div>}
       {note && <div style={{ color: "#2ea043", fontSize: 12, margin: "6px 0" }}>{note}</div>}
+    </Modal>
+  );
+}
+
+/** Admin: check for a newer version and update the LXC (runs the same script as `update`). */
+function UpdatePanel({ onClose }: { onClose: () => void }) {
+  const [st, setSt] = useState<UpdateStatus | null>(null);
+  const [chk, setChk] = useState<UpdateCheck | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [down, setDown] = useState(false); // server restarting, not answering
+  const [startedFrom, setStartedFrom] = useState(""); // version when this panel started an update
+  const logRef = useRef<HTMLPreElement>(null);
+
+  const load = useCallback(async () => {
+    try { setSt(await A.getUpdate()); setDown(false); setErr(""); }
+    catch (e) { if (e instanceof A.ApiError && (e.status === 0 || e.status >= 502)) setDown(true); else setErr(msgOf(e)); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const running = st?.state === "running" || down;
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [running, load]);
+  useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [st?.log]);
+
+  const check = async () => {
+    setBusy(true); setErr(""); setChk(null);
+    try { setChk(await A.checkUpdate()); } catch (e) { setErr(msgOf(e)); }
+    setBusy(false);
+  };
+  const start = async () => {
+    if (!confirm("Update the server now?\n\nIt downloads and builds the new version, which takes several minutes. Rackwright keeps working while it builds, then restarts. Save your racks first.")) return;
+    setBusy(true); setErr("");
+    try { await A.startUpdate(); setStartedFrom(st?.version ?? ""); setChk(null); await load(); } catch (e) { setErr(msgOf(e)); }
+    setBusy(false);
+  };
+
+  const ok = { color: "#2ea043", fontSize: 12, margin: "6px 0" } as const;
+  const when = st?.since ? new Date(st.since).toLocaleString() : "";
+  return (
+    <Modal title="Update server" onClose={onClose} width={680}>
+      {!st && !err && <div style={{ opacity: 0.7 }}>Loading...</div>}
+      {st && (
+        <div style={{ marginBottom: 10 }}>
+          Running version <b>{st.version}</b>{st.commit && <> (commit {st.commit}{st.branch && <>, branch {st.branch}</>})</>}.
+          {st.repo && <div style={{ opacity: 0.7, fontSize: 12 }}>Updates come from {st.repo}</div>}
+        </div>
+      )}
+      {st && !st.available && <div style={{ opacity: 0.85 }}>{st.reason}</div>}
+
+      {st?.available && !running && (
+        <>
+          <button style={btn} onClick={check} disabled={busy}>Check for updates</button>
+          {chk && !chk.update_available && <span style={{ ...ok, marginLeft: 6 }}>You have the newest version.</span>}
+          {chk && chk.update_available && (
+            <div style={{ marginTop: 10 }}>
+              <div>New version <b>{chk.latest_version || chk.latest_commit}</b> (commit {chk.latest_commit}{chk.latest_date && <>, {new Date(chk.latest_date).toLocaleString()}</>}).</div>
+              {chk.latest_subject && <div style={{ opacity: 0.7, fontSize: 12 }}>{chk.latest_subject}</div>}
+              {chk.changes && <pre style={{ whiteSpace: "pre-wrap", background: "#14161a", border: "1px solid #3a3d42", borderRadius: 4, padding: 8, maxHeight: 220, overflow: "auto", fontSize: 12, fontFamily: "inherit" }}>{chk.changes}</pre>}
+              <button style={{ ...btn, marginTop: 8 }} onClick={start} disabled={busy}>Update now</button>
+            </div>
+          )}
+        </>
+      )}
+
+      {running && (
+        <div style={{ margin: "8px 0", color: "#d29922" }}>
+          {down ? "The server is restarting. This page reconnects by itself." : "Updating. This takes several minutes. You can close this window; the update keeps going."}
+        </div>
+      )}
+      {st && !running && st.state === "ok" && (
+        <div style={ok}>
+          Last update finished{when && <> {when}</>}.
+          {startedFrom && startedFrom !== st.version && <> Now on version {st.version}.</>}
+          {" "}<button style={{ ...btn, padding: "2px 8px" }} onClick={() => location.reload()}>Reload page</button>
+        </div>
+      )}
+      {st && !running && st.state === "failed" && (
+        <div style={errStyle}>The last update failed{when && <> ({when})</>}. The previous version is still running. Read the log below, fix the cause, then try again.</div>
+      )}
+      {err && <div style={errStyle}>{err}</div>}
+
+      {st?.log && (
+        <>
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>Update log</div>
+          <pre ref={logRef} style={{ background: "#0e0f12", border: "1px solid #3a3d42", borderRadius: 4, padding: 8, maxHeight: 260, overflow: "auto", fontSize: 11, whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{st.log}</pre>
+        </>
+      )}
     </Modal>
   );
 }

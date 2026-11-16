@@ -26,6 +26,7 @@ proxmox/install/rackwright-install.sh    runs inside the LXC
 | `RW_HOST`   | `127.0.0.1`    | bind address (LXC uses `0.0.0.0`)        |
 | `RW_PORT`   | `8080`         | port                                     |
 | `RW_STATIC` | `./web/dist`   | front-end files; SPA fallback to index   |
+| `RW_APP_DIR`| `/opt/rackwright` | git checkout the admin Update server runs in |
 
 `GET /healthz` → `200 ok` (no auth).
 
@@ -65,6 +66,27 @@ There is no email delivery. An admin creates an account with a starting password
 | `DELETE /api/users/:id`    | —                                            | `{}`; 400 when deleting yourself or the last admin. Their sessions are removed |
 
 Demoting the last admin is also refused (400).
+
+## Server update (admin only)
+
+Updates the LXC from the browser. It runs the same script as the `update` command
+(`proxmox/ct/rackwright.sh`) in a transient systemd unit `rackwright-update`, so the script can
+restart `rackwright.service` at the end. The server keeps running while the new version builds;
+a failed build leaves the old version running. Output goes to `<RW_DATA>/update.log`, the result
+to `<RW_DATA>/update.state`.
+
+It only works where the app is a git checkout in `RW_APP_DIR` (default `/opt/rackwright`) and
+`systemd-run` exists. Anywhere else `available` is false and the POSTs return 503.
+
+`UpdateStatus` = `{"available": bool, "reason": str /* why not, when unavailable */, "version": str /* running server */,
+"commit": str, "branch": str, "repo": str, "state": "idle"|"running"|"ok"|"failed", "since": str /* RFC 3339 or "" */,
+"log": str /* last 200 lines, colour codes removed */}`
+
+| Method & path                  | Body | Result |
+|--------------------------------|------|--------|
+| `GET /api/admin/update`        | —    | `UpdateStatus` |
+| `POST /api/admin/update/check` | —    | fetches the branch, returns `{version, commit, latest_version, latest_commit, latest_date, latest_subject, update_available, changes}`. `changes` = CHANGELOG.md sections newer than `version`. 409 while an update runs, 502 when the repository can't be reached |
+| `POST /api/admin/update`       | —    | 202 `{}`; starts the update. 409 if one is already running |
 
 ## Racks (shared: every signed-in user sees and edits all of them)
 

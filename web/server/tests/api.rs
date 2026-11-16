@@ -286,3 +286,30 @@ async fn compute_endpoints() {
     assert_eq!(s, StatusCode::NOT_FOUND);
     assert!(v["error"].is_string());
 }
+
+#[tokio::test]
+async fn admin_update_outside_lxc() {
+    let (app, _d) = make_app();
+    let mut admin = Client::new(&app);
+    setup_admin(&mut admin).await;
+    let (s, _) = admin.post("/api/users", json!({"email": "u@example.com", "name": "U", "password": "password1", "is_admin": false})).await;
+    assert_eq!(s, StatusCode::OK);
+    let mut user = Client::new(&app);
+    assert_eq!(user.post("/api/login", json!({"email": "u@example.com", "password": "password1"})).await.0, StatusCode::OK);
+
+    // admin only
+    assert_eq!(user.get("/api/admin/update").await.0, StatusCode::FORBIDDEN);
+    assert_eq!(user.post("/api/admin/update", json!({})).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(user.post("/api/admin/update/check", json!({})).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(Client::new(&app).get("/api/admin/update").await.0, StatusCode::UNAUTHORIZED);
+
+    // CI and dev machines are not the LXC: status says so and nothing runs
+    let (s, v) = admin.get("/api/admin/update").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["available"], false);
+    assert_eq!(v["state"], "idle");
+    assert_eq!(v["version"], env!("CARGO_PKG_VERSION"));
+    assert!(v["reason"].as_str().unwrap().contains("LXC"));
+    assert_eq!(admin.post("/api/admin/update", json!({})).await.0, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(admin.post("/api/admin/update/check", json!({})).await.0, StatusCode::SERVICE_UNAVAILABLE);
+}
