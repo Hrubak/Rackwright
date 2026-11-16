@@ -2,7 +2,7 @@
 // kind, model and dimensions are descriptive extra fields saved in the .rack.json (older apps ignore them).
 //
 // Dimensions are the manufacturer's outer cabinet size where known. Entries with `approx: true` have
-// dimensions (or an exact part-number/height match) I could not confirm, so treat them as rough.
+// dimensions (or an exact part-number/height match) could not be fully confirmed from manufacturer or retailer spec sheets, so treat them as rough.
 
 export type RackKind = "cabinet" | "open4" | "twopost" | "wall" | "desktop";
 
@@ -37,33 +37,33 @@ export const RACK_MODELS: RackModel[] = [
   m("apc-ar3150", "cabinet", "APC NetShelter SX AR3150", 42, 750, 1070),
   m("apc-ar3300", "cabinet", "APC NetShelter SX AR3300", 42, 600, 1200),
   m("apc-ar3350", "cabinet", "APC NetShelter SX AR3350", 42, 750, 1200),
-  m("apc-ar3307", "cabinet", "APC NetShelter SX AR3307", 48, 600, 1200, true),
-  m("eaton-ra-42u", "cabinet", "Eaton RA Series 42U", 42, 600, 1070, true),
-  m("eaton-ra-45u", "cabinet", "Eaton RA Series 45U", 45, 600, 1070, true),
-  m("tl-sr42ub", "cabinet", "Tripp Lite SmartRack SR42UB", 42, 600, 1070, true),
-  m("tl-sr45ub", "cabinet", "Tripp Lite SmartRack SR45UB", 45, 600, 1070, true),
-  m("tl-sr48ub", "cabinet", "Tripp Lite SmartRack SR48UB", 48, 600, 1070, true),
+  m("apc-ar3307", "cabinet", "APC NetShelter SX AR3307", 48, 600, 1200),
+  m("eaton-raa42610psb13u", "cabinet", "Eaton RA Series RAA42610PSB13U", 42, 600, 1060),
+  m("eaton-raa48610psb13u", "cabinet", "Eaton RA Series RAA48610PSB13U", 48, 600, 1060, true),
+  m("eaton-raa42812psb13u", "cabinet", "Eaton RA Series RAA42812PSB13U", 42, 800, 1260),
+  m("tl-sr42ub", "cabinet", "Tripp Lite SmartRack SR42UB", 42, 600, 1092),
+  m("tl-sr45ub", "cabinet", "Tripp Lite SmartRack SR45UB", 45, 600, 1092),
+  m("tl-sr48ub", "cabinet", "Tripp Lite SmartRack SR48UB", 48, 600, 1092),
   // Open 4-post frames
-  m("st-4postrack42", "open4", "StarTech 4POSTRACK42", 42, 600, 900, true),
-  m("st-4postrack25", "open4", "StarTech 4POSTRACK25", 25, 600, 900, true),
-  m("tl-sr25ub", "open4", "Tripp Lite SmartRack SR25UB", 25, 600, 900, true),
+  m("st-4postrack42", "open4", "StarTech 4POSTRACK42", 42, 600, 1128),
+  m("st-4postrack25", "open4", "StarTech 4POSTRACK25", 25, 600, 1128, true),
+  m("tl-sr4post25", "open4", "Tripp Lite SmartRack SR4POST25", 25, 513, 998),
   // 2-post relay racks
-  m("tl-sr2post", "twopost", "Tripp Lite SmartRack SR2POST", 45, 560, 600, true),
-  m("st-2postrack12", "twopost", "StarTech 2POSTRACK12", 12, 560, 450, true),
-  m("st-2postrack25", "twopost", "StarTech 2POSTRACK25", 25, 560, 450, true),
+  m("tl-sr2post", "twopost", "Tripp Lite SmartRack SR2POST", 45, 516, 343),
+  m("tl-sr2post25", "twopost", "Tripp Lite SmartRack SR2POST25", 25, 516, 343),
+  m("st-2postrack12", "twopost", "StarTech 2POSTRACK12", 12, 518, 305),
   // Wall mount
-  m("apc-ar112", "wall", "APC NetShelter WX AR112", 12, 600, 600, true),
-  m("apc-ar100", "wall", "APC NetShelter WX AR100", 13, 600, 600, true),
-  m("tl-srw6u", "wall", "Tripp Lite SmartRack SRW6U", 6, 530, 500, true),
-  m("tl-srw12us", "wall", "Tripp Lite SmartRack SRW12US", 12, 530, 500, true),
-  m("tl-srw18usdp", "wall", "Tripp Lite SmartRack SRW18USDP", 18, 530, 700, true),
-  m("st-rk12walloa", "wall", "StarTech RK12WALLOA (open frame)", 12, 560, 400, true),
-  m("np-wall-9u", "wall", "NavePoint 9U wall-mount cabinet", 9, 600, 450, true),
-  m("np-wall-12u", "wall", "NavePoint 12U wall-mount cabinet", 12, 600, 450, true),
+  m("apc-ar112", "wall", "APC NetShelter WX AR112", 12, 600, 600),
+  m("apc-ar100", "wall", "APC NetShelter WX AR100", 13, 584, 631, true),
+  m("tl-srw6u", "wall", "Tripp Lite SmartRack SRW6U", 6, 600, 445),
+  m("tl-srw9u", "wall", "Tripp Lite SmartRack SRW9U", 9, 600, 449),
+  m("tl-srw12us", "wall", "Tripp Lite SmartRack SRW12US", 12, 623, 548, true),
+  m("tl-srw18usdp", "wall", "Tripp Lite SmartRack SRW18USDP", 18, 597, 660),
+  m("st-rk12walloa", "wall", "StarTech RK12WALLOA (open frame)", 12, 504, 305, true),
   // Desktop
-  m("st-rk4od", "desktop", "StarTech RK4OD", 4, 520, 400, true),
-  m("st-rk8od", "desktop", "StarTech RK8OD", 8, 520, 400, true),
-  m("st-rk12od", "desktop", "StarTech RK12OD", 12, 520, 400, true),
+  m("st-rk4od", "desktop", "StarTech RK4OD", 4, 500, 293),
+  m("st-rk8od", "desktop", "StarTech RK8OD", 8, 503, 292),
+  m("st-rk12od", "desktop", "StarTech RK12OD", 12, 504, 292),
   // Generic (U chosen by the user)
   ...KINDS.map((k): RackModel => ({ id: `generic-${k.id}`, kind: k.id, name: `Generic ${k.label.toLowerCase()}`, u: GENERIC_DEFAULT_U[k.id], generic: true })),
 ];
