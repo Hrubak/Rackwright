@@ -3,7 +3,7 @@
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
 ## 2.2.0 — 2026-11-16
-- `Homelab.rack.json` is a synthetic example rack (two racks, 21 devices, 25 network and power cables, front and rear, two off-rack access points). The desktop router's unit tests read it, so they run again in CI through the server's `cargo test`. Open it in either app to try things out.
+- `Homelab.rack.json` is a synthetic example rack, kept in git as the only exception to the `*.rack.json` ignore rule (two racks, 21 devices, 25 network and power cables, front and rear, two off-rack access points). The desktop router's unit tests read it, so they run again in CI through the server's `cargo test`. Open it in either app to try things out.
 - Known router issue, found while making the example: two cables that leave the same port column for the same cable manager sit 3 px apart, and the router's own test wants at least 4.5 px. The example avoids it. Denser real racks can show cables drawn on top of each other there.
 - `update` in the LXC follows the repository and branch the container was installed from, so the same scripts work for this fork and for hast3/Rackwright. `var_repo=... var_branch=... update` points a container somewhere else. Update and install print the version.
 - AGENTS.md describes the project for anyone working on it, with the fork-and-upstream rules in their own section. CI runs on `master` as well as `web`. Sync upstream does nothing in hast3/Rackwright itself.
