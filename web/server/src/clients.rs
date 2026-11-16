@@ -203,14 +203,16 @@ pub(crate) async fn get_client(State(st): State<Shared>, headers: HeaderMap, Pat
     let meta = client_meta(&conn, id)?.ok_or_else(client_not_found)?;
     let sites = {
         let mut stmt = conn.prepare(&format!("{SITE_SELECT} WHERE client_id = ?1 ORDER BY name COLLATE NOCASE, id"))?;
-        stmt.query_map(params![id], row_site)?.collect::<Result<Vec<Site>, _>>()?
+        let v = stmt.query_map(params![id], row_site)?.collect::<Result<Vec<Site>, _>>()?;
+        v
     };
     let mut out_sites: Vec<serde_json::Value> = Vec::with_capacity(sites.len());
     for s in sites {
         let racks = {
             let mut stmt =
                 conn.prepare(&format!("{RACK_SELECT} WHERE r.site_id = ?1 ORDER BY r.name COLLATE NOCASE, r.id"))?;
-            stmt.query_map(params![s.id], super::row_meta)?.collect::<Result<Vec<RackMeta>, _>>()?
+            let v = stmt.query_map(params![s.id], super::row_meta)?.collect::<Result<Vec<RackMeta>, _>>()?;
+            v
         };
         let mut v = serde_json::to_value(&s).map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Serialize error"))?;
         v["racks"] = serde_json::to_value(&racks)

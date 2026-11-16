@@ -2,6 +2,9 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.1.1 — 2026-11-16
+- Fixes the web server build in 3.1.0, which failed to compile, so `update` could not install it. Use this version for Clients and sites. The desktop app has no changes beyond the version number.
+
 ## 3.1.0 — 2026-11-16
 Web and desktop.
 - **Clients and sites.** A new Clients button opens a screen for MSP clients. Add a client, then its sites (name, address, notes), then put racks in each site. Each site shows small drawings of its racks with racks, U used, device and cable counts; the client header adds them up. Click a rack to open it.
