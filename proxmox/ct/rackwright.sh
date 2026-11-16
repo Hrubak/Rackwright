@@ -214,8 +214,10 @@ run_guest_install() {
     install_src="$script_dir/../install/rackwright-install.sh"
   else
     install_src="$(mktemp)"
+    local slug="${var_repo#https://github.com/}"
+    slug="${slug%.git}"
     curl -fsSL \
-      "https://raw.githubusercontent.com/Hrubak/Rackwright/${var_branch}/proxmox/install/rackwright-install.sh" \
+      "https://raw.githubusercontent.com/${slug}/${var_branch}/proxmox/install/rackwright-install.sh" \
       >"$install_src"
   fi
   pct push "$CTID" "$install_src" /root/rackwright-install.sh
