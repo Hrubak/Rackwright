@@ -4,6 +4,7 @@ import { kindLabel } from "./racks";
 import { Target, devDims, rackUsage, resolveTarget, shapeOf } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import Cables, { CableColorMode } from "./Cables";
+import VmLinks from "./VmLinks";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
 
 function devRect(doc: Doc, d: Device) {
@@ -53,13 +54,16 @@ export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
 export type Resolver = (dev: Device, clientX: number, clientY: number) => Target;
 
-export default function RackView({ doc, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own" }: {
-  doc: Doc; face: "front" | "rear"; routes: RouteResult; ports: PortPos[];
+export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own" }: {
+  doc: Doc; face: "front" | "rear"; routes: RouteResult;
+  /** Provisional document while an existing device is dragged (device drawn at its target; routes/ports props then belong to it). */
+  liveDoc?: Doc | null; onDragTarget?: (id: number, t: Target) => void; onDragEnd?: (committed: boolean) => void; ports: PortPos[];
   selected: Sel; onSelect: (s: Sel) => void; pendingPort: number | null; onPort: (pid: number) => void;
   onMoveDevice: (id: number, rack: number | null, u: number, side: number, fx: number, fy: number) => void;
   onReject: (why: string) => void;
   drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number; cableColor?: CableColorMode;
 }) {
+  const doc = liveDoc ?? committed; // what is drawn; hit-testing and edits use `committed`
   const [hovDev, setHovDev] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const mv = useRef<{ id: number; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
@@ -75,7 +79,7 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
     const b = el.getBoundingClientRect();
     if (cx < b.left || cx > b.right || cy < b.top || cy > b.bottom) return { kind: "none" };
     const w = world({ clientX: cx, clientY: cy });
-    return resolveTarget(doc, dev, w.x, w.y);
+    return resolveTarget(committed, dev, w.x, w.y);
   };
   useEffect(() => {
     const el = svgRef.current; if (!el) return;
@@ -91,6 +95,15 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
     setView({ z, x: (bb.width - (r - l) * z) / 2 - l * z, y: 30 - t * z });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTick]);
+  // Escape while moving a device puts it back and shows the saved cables again.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !mv.current?.moved) return;
+      e.stopPropagation(); mv.current = null; setMvGhost(null); onDragEnd?.(false);
+    };
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
+  });
   const dragT = drag ? resolveRef.current(drag.dev, drag.x, drag.y) : null;
   const gh = mvGhost ?? (drag && dragT && dragT.kind !== "none" ? { dev: drag.dev, t: dragT } : null);
   const pp = useMemo(() => new Map(ports.map((p) => [p[0], p])), [ports]);
@@ -109,9 +122,11 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
         if (m) {
           if (!m.moved && Math.hypot(e.clientX - m.sx, e.clientY - m.sy) < 4) return;
           m.moved = true;
-          const dev = doc.devices.find((x) => x.id === m.id)!;
+          const dev = committed.devices.find((x) => x.id === m.id)!;
           const w = world(e);
-          setMvGhost({ dev, t: resolveTarget(doc, dev, w.x, w.y, { ox: m.ox, oy: m.oy }) });
+          const t = resolveTarget(committed, dev, w.x, w.y, { ox: m.ox, oy: m.oy });
+          setMvGhost({ dev, t });
+          onDragTarget?.(dev.id, t);
           return;
         }
         const d = panning.current; if (d) setView((v) => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy })); }}
@@ -121,12 +136,14 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
         if (!m) return;
         setMvGhost(null);
         if (!m.moved) return;
-        const dev = doc.devices.find((x) => x.id === m.id)!;
+        const dev = committed.devices.find((x) => x.id === m.id)!;
         const w = world(e);
-        const t = resolveTarget(doc, dev, w.x, w.y, { ox: m.ox, oy: m.oy });
-        if (t.kind === "rack") { if (t.p.ok) onMoveDevice(dev.id, t.r.id, t.u, t.side, 0, 0); else onReject(t.p.why || "Can't place it there"); }
-        else if (t.kind === "float") onMoveDevice(dev.id, null, 1, 0, t.fx, t.fy);
-      }} onMouseLeave={() => { panning.current = null; mv.current = null; setMvGhost(null); }}
+        const t = resolveTarget(committed, dev, w.x, w.y, { ox: m.ox, oy: m.oy });
+        let ok = false;
+        if (t.kind === "rack") { if (t.p.ok) { onMoveDevice(dev.id, t.r.id, t.u, t.side, 0, 0); ok = true; } else onReject(t.p.why || "Can't place it there"); }
+        else if (t.kind === "float") { onMoveDevice(dev.id, null, 1, 0, t.fx, t.fy); ok = true; }
+        onDragEnd?.(ok);
+      }} onMouseLeave={() => { panning.current = null; if (mv.current?.moved) onDragEnd?.(false); mv.current = null; setMvGhost(null); }}
       onClick={(e) => { if (e.target === e.currentTarget) onSelect(null); }}>
       <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
         {doc.racks.map((r) => (
@@ -215,6 +232,7 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
               <text x={x + 6} y={y - 10} fill="#fff" fontSize={10.5} dominantBaseline="central">{why}</text></g>}
           </g>;
         })()}
+        <VmLinks doc={doc} rectOf={(d) => devRect(doc, d)} visible={vis} />
         <Cables doc={doc} routes={routes.routes} selected={selected} hoverDev={hovDev} onSelect={onSelect} colorMode={cableColor} zoom={view.z} />
       </g>
     </svg>

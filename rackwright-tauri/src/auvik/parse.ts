@@ -5,7 +5,7 @@ export interface Neighbor { name: string; iface: string }
 export interface AuvikDevice {
   name: string;          // display name (made unique when two different devices share one)
   rawName: string;       // name as exported (neighbours refer to this)
-  unnamed: boolean;      // "Device@10.1.10.104"
+  unnamed: boolean;      // "Device@192.0.2.10"
   org: string; status: string; type: string; model: string;
   macs: string[]; ips: string[]; networks: string;
   neighbors: Neighbor[]; // "<name> through <interface of that neighbour>"

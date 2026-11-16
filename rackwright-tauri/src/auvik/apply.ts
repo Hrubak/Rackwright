@@ -10,9 +10,9 @@ export interface ApplyOptions {
   spec?: RackSpec; rackU?: number;   // for "new": the rack model
   rackId?: number | null;            // for "current": preferred rack
 }
-export interface ApplyResult { managers: number; added: number; updated: number; groups: number; cablesAdded: number; cablesSkipped: number; racksAdded: number; missing: string[]; message: string }
+export interface ApplyResult { managers: number; added: number; updated: number; groups: number; vmBoxes: number; cablesAdded: number; cablesSkipped: number; racksAdded: number; missing: string[]; message: string }
 
-type X = Device & { auvik_id?: string; auvik_name?: string; auvik_macs?: string[]; auvik_model?: string; endpoints?: unknown[] };
+type X = Device & { auvik_id?: string; auvik_name?: string; auvik_macs?: string[]; auvik_model?: string; endpoints?: unknown[]; vm_host?: number };
 
 export const noteLine = (d: AuvikDevice) =>
   "Auvik: " + [d.type, `status ${d.status}`, d.software && `software ${d.software}`, d.firmware && `firmware ${d.firmware}`, d.macs[0] && `MAC ${d.macs[0]}`, d.description].filter(Boolean).join("; ");
@@ -26,6 +26,7 @@ export function findMissing(doc: Doc, items: PlanItem[]): Device[] {
   const ids = items.map((i) => identOf(i.dev, i.key));
   return doc.devices.filter((d: X) => {
     if (!d.auvik_id) return false;
+    if (d.auvik_id.startsWith("vm:")) return false;   // VM boxes are rebuilt from the export, never "missing"
     if (d.auvik_id.startsWith("g:")) { const base = d.auvik_id.slice(2).split("#")[0]; return !ids.some((i) => i.key === base); }
     return !ids.some((i) => matchesDevice(d, i) || d.auvik_id!.split("#")[0] === i.key);
   });
@@ -58,7 +59,7 @@ function rackSpecOf(r: Rack): RackSpec | undefined {
 }
 
 export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, items: PlanItem[] = []): ApplyResult {
-  const res: ApplyResult = { managers: 0, added: 0, updated: 0, groups: 0, cablesAdded: 0, cablesSkipped: 0, racksAdded: 0, missing: [], message: "" };
+  const res: ApplyResult = { managers: 0, added: 0, updated: 0, groups: 0, vmBoxes: 0, cablesAdded: 0, cablesSkipped: 0, racksAdded: 0, missing: [], message: "" };
   const devOf = new Map<string, Device>();
   const used = new Set<number>();
   const existing = doc.devices as X[];
@@ -169,7 +170,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   restU = order.filter((u) => u.mode === "rack").reduce((n, u) => n + u.tpl.u_size, 0);
   for (const u of order) {
     const id = identOf(u.item.dev, u.item.key);
-    const found = existing.find((d) => !used.has(d.id) && !d.auvik_id?.startsWith("g:") && (u.unit != null
+    const found = existing.find((d) => !used.has(d.id) && !d.auvik_id?.startsWith("g:") && !d.auvik_id?.startsWith("vm:") && (u.unit != null
       ? d.auvik_id === u.key || (d.auvik_name || "").toLowerCase() === u.name.toLowerCase()
       : matchesDevice(d, id)));
     if (found) {
@@ -208,27 +209,63 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     }
     d.name = g.name; d.model = g.summary; d.u_size = g.tpl.u_size; d.rows = g.tpl.rows || 0; d.half = false; d.type = "Endpoints";
     d.notes = `Auvik endpoint group on ${g.unit.name}`;
-    d.endpoints = g.members.map((m) => ({ name: m.name, type: m.type, model: m.model, ip: m.ip, mac: m.mac, port: m.port, status: m.status }));
+    d.endpoints = g.members.map((m) => ({ name: m.name, type: m.type, model: m.model, ip: m.ip, mac: m.mac, port: m.port, status: m.status, kind: m.kind }));
     for (const m of g.members) d.ports.push({ id: nid(doc), name: m.name.slice(0, 28), type: "RJ45", label: m.port });
     groupDev.set(g.key, d);
     res.groups++;
   }
 
+  // --- virtual machine boxes: off-rack, no ports, rebuilt in place; vm_host points at the host device
+  const vmIds = new Set(plan.vmBoxes.map((b) => `vm:${b.hostKey ?? "none"}`));
+  for (const b of plan.vmBoxes) {
+    const vid = `vm:${b.hostKey ?? "none"}`;
+    const host = b.hostUnit ? devOf.get(b.hostUnit.key) : undefined;
+    let d = existing.find((x) => x.auvik_id === vid) as X | undefined;
+    if (d) {
+      const old = new Set(d.ports.map((p) => p.id));
+      doc.cables = doc.cables.filter((c) => !old.has(c.a) && !old.has(c.b));
+      d.ports = [];
+    } else {
+      d = fromTpl(doc, { ...b.tpl, name: b.name }) as X;
+      d.auvik_id = vid; d.face = "front";
+      putOff(d);
+    }
+    d.name = b.name; d.model = b.summary; d.u_size = b.tpl.u_size; d.rows = 0; d.half = false; d.type = "Virtual machines"; d.color = b.tpl.color;
+    d.notes = host ? `Auvik virtual machines on ${host.name}` : "Auvik virtual machines with no known host";
+    d.endpoints = b.members.map((m) => ({ name: m.name, type: m.type, model: m.model, ip: m.ip, mac: m.mac, port: "", status: m.status, kind: "vm" as const }));
+    if (host) d.vm_host = host.id; else delete d.vm_host;
+    res.vmBoxes++;
+  }
+  // a box from an earlier import whose host (or VMs) changed is rebuilt under its new name, so drop the old one
+  if (items.length) doc.devices = doc.devices.filter((x: X) => !(x.auvik_id?.startsWith("vm:") && !vmIds.has(x.auvik_id)));
+
   layoutOff();
 
   // --- cables
   const dev = (t: PlanUnit | PlanGroup) => (t.isGroup ? groupDev.get(t.key)! : devOf.get(t.key)!);
+  // Existing cables between a pair of devices, counted before this import adds any. A link with no port names on either
+  // end (Auvik did not say) is only added when the pair has fewer cables than the export lists.
+  const pairKey = (x: Device, y: Device) => (x.id < y.id ? `${x.id}|${y.id}` : `${y.id}|${x.id}`);
+  const preCount = new Map<string, number>(), seenCount = new Map<string, number>();
+  for (const k of doc.cables) {
+    const pa = portOf(doc, k.a), pb = portOf(doc, k.b);
+    if (pa && pb) { const pk = pairKey(pa.d, pb.d); preCount.set(pk, (preCount.get(pk) ?? 0) + 1); }
+  }
   for (const c of plan.cables) {
     const da = dev(c.a.target), db = dev(c.b.target);
     if (!da || !db) continue;
-    const pairCabled = (c.a.target.isGroup ? false : doc.cables.some((k) => {
-      const pa = portOf(doc, k.a), pb = portOf(doc, k.b);
-      return pa && pb && ((pa.d.id === da.id && pb.d.id === db.id) || (pa.d.id === db.id && pb.d.id === da.id));
-    }));
-    if (pairCabled) { res.cablesSkipped++; continue; }
-    const pa = c.a.target.isGroup ? da.ports[c.a.member!] : resolvePort(doc, da, c.a, c.a.target);
-    const pb = c.b.target.isGroup ? db.ports[c.b.member!] : resolvePort(doc, db, c.b, c.b.target as PlanUnit);
-    if (!pa || !pb || cabled(doc, pa.id) || cabled(doc, pb.id)) { res.cablesSkipped++; continue; }
+    const pk = pairKey(da, db), nth = seenCount.get(pk) ?? 0;
+    seenCount.set(pk, nth + 1);
+    const named = !!(c.a.iface || c.b.iface) || c.a.target.isGroup || c.b.target.isGroup;
+    if (!named && nth < (preCount.get(pk) ?? 0)) { res.cablesSkipped++; continue; }   // already cabled by an earlier import
+    // find the named end first: if that port is taken the cable exists already, and no spare port gets made for the other end
+    const get = (r: PortRef, dv: Device) => (r.target.isGroup ? dv.ports[r.member!] : resolvePort(doc, dv, r, r.target as PlanUnit));
+    const aFirst = !!c.a.iface || !c.b.iface;
+    const p1 = aFirst ? get(c.a, da) : get(c.b, db);
+    if (!p1 || cabled(doc, p1.id)) { res.cablesSkipped++; continue; }
+    const p2 = aFirst ? get(c.b, db) : get(c.a, da);
+    if (!p2 || cabled(doc, p2.id)) { res.cablesSkipped++; continue; }
+    const pa = aFirst ? p1 : p2, pb = aFirst ? p2 : p1;
     const k = newCable(doc, pa.id, pb.id);
     if (typeof k === "string") { res.cablesSkipped++; continue; }
     k.label = c.label; k.type = "Cat6";
@@ -238,7 +275,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   // --- document-level info
   (doc as any).auvik = { site: plan.site, imported: new Date().toISOString().slice(0, 10), unplaced: plan.unplaced, virtual: plan.virtual };
   res.missing = items.length ? findMissing(doc, items).map((d) => d.name) : [];
-  res.message = `Imported from Auvik: ${res.added} added, ${res.updated} updated, ${res.groups} endpoint group(s), ${res.cablesAdded} cable(s)` +
+  res.message = `Imported from Auvik: ${res.added} added, ${res.updated} updated, ${res.groups} endpoint group(s), ${res.vmBoxes} VM box(es), ${res.cablesAdded} cable(s)` +
     (res.managers ? `, ${res.managers} cable manager(s)` : "") +
     (res.missing.length ? `, ${res.missing.length} missing from this export` : "");
   return res;

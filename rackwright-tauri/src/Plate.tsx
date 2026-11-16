@@ -150,6 +150,7 @@ export function drawPlate(d: Device, l: number, t: number, r: number, b: number,
         if (room >= 150) tx(pl - 4, cy - 1, brand, 7, bc, true, "e");
         else if (h >= 30) ov(l + 11, b - 8, 1.6, "#3ddc5b");
         if (p.poe && room >= 150 && h >= 30) tx(pl - 4, cy + 9, "PoE", 6, lab, false, "e");
+        if (p.kit) { rc(l + 6, t + 3, l + 9, b - 4, "#b7bcc3"); if (room >= 150) tx(l + 14, cy, "MOUNT KIT", 5.5, "#9aa0a6", true); }
         return done(l + 10, Math.max(50, room - (room >= 150 ? 52 : 0)), lab);
       }
       rc(l + 10, t + 4, l + 54, b - 4, "#15171a", "#5b6068"); rc(l + 15, t + 8, l + 49, b - 8, "#0c0d0f"); ov(l + 32, cy, 2.4, "#3ddc5b");

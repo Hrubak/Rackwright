@@ -2,13 +2,15 @@ import { useMemo, useState } from "react";
 import { Doc } from "../types";
 import { GENERIC_MAX_U, GENERIC_MIN_U, RACK_MODELS, modelById, specOf } from "../racks";
 import { applyInPlace, findMissing } from "./apply";
-import { Mode, PlanItem, resolvePlan } from "./plan";
+import { Mode, Mount, PlanItem, hostsOf, resolvePlan, retype, setMode as setItemMode } from "./plan";
 import type { ParsedAuvik } from "./parse";
 import { StatusChip, UnplacedDialog } from "./Panels";
 
 const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "3px 5px" } as const;
-const MODES: [Mode, string][] = [["rack", "Rack"], ["off", "Off-rack"], ["endpoint", "Endpoint"], ["skip", "Skip"]];
+const MODES: [Mode, string][] = [["rack", "Rack"], ["off", "Off-rack"], ["endpoint", "Endpoint"], ["phone", "Phone"], ["iot", "IoT"], ["vm", "Virtual machine"], ["skip", "Skip"]];
+const TYPES = ["Access Point", "Controller", "Firewall", "Generic Device", "Hypervisor", "Intelligent Platform Management Interface", "IP Phone", "Layer 3 Switch", "Printer",
+  "Router", "Server", "Storage", "Switch", "Telecommunications Device", "UPS", "PDU", "Virtual Machine", "Workstation", "Unknown"];
 
 export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
   doc: Doc; rackId: number | null; onApply: (fn: (d: Doc) => string | void) => boolean; onClose: () => void;
@@ -44,7 +46,11 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
   const model = modelById(modelId);
   const guN = parseInt(gu);
   const guOk = !model?.generic || (guN >= GENERIC_MIN_U && guN <= GENERIC_MAX_U);
-  const setMode = (key: string, mode: Mode) => setItems((l) => l.map((i) => (i.key === key ? { ...i, mode } : i)));
+  const setMode = (key: string, mode: Mode) => setItems((l) => setItemMode(l, key, mode));
+  const setType = (key: string, type: string) => parsed && setItems((l) => retype(parsed, l, key, type));
+  const setHost = (key: string, host: string) => setItems((l) => l.map((i) => (i.key === key ? { ...i, host } : i)));
+  const setMount = (key: string, mount: Mount) => setItems((l) => l.map((i) => (i.key === key ? { ...i, mount } : i)));
+  const hosts = useMemo(() => hostsOf(items), [items]);
 
   const doImport = () => {
     if (!parsed || !plan) return;
@@ -94,14 +100,14 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
                 </select></label>
               {model?.generic && <label>U: <input type="number" style={{ ...inp, width: 56, borderColor: guOk ? "#3a3d42" : "#f85149" }} value={gu} onChange={(e) => setGu(e.target.value)} /></label>}
             </>}
-            <span>{plan.groups.length} endpoint group(s), {plan.cables.length} cable(s)</span>
+            <span>{plan.groups.length} endpoint group(s), {plan.vmBoxes.length} VM box(es), {plan.cables.length} cable(s)</span>
             <button style={btn} onClick={() => setShowUnplaced(true)}>Unplaced endpoints ({plan.unplaced.length})</button>
             {plan.virtual.length > 0 && <span style={{ opacity: 0.7 }}>Not drawn (virtual): {plan.virtual.join(", ")}</span>}
           </div>
           <div style={{ overflow: "auto", border: "1px solid #2c2f35", borderRadius: 4, flex: 1, minHeight: 200 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead style={{ position: "sticky", top: 0, background: "#22252b" }}>
-                <tr style={{ textAlign: "left" }}><th style={{ padding: 4 }}>Include as</th><th>Name</th><th>Type</th><th>Make &amp; model</th><th>Matched template</th><th>IP</th><th>Status</th><th>Connected to</th></tr>
+                <tr style={{ textAlign: "left" }}><th style={{ padding: 4 }}>Include as</th><th>Name</th><th>Type</th><th>Make &amp; model</th><th>Matched template</th><th>Host / mount</th><th>IP</th><th>Status</th><th>Connected to</th></tr>
               </thead>
               <tbody>
                 {items.map((i) => (
@@ -113,8 +119,26 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
                       {i.virtual && i.mode === "skip" && <div style={{ fontSize: 10, opacity: 0.7 }}>virtual, not drawn</div>}
                     </td>
                     <td>{i.dev.name}{i.units.length > 1 && <span style={{ opacity: 0.6 }}> (stack of {i.units.length})</span>}</td>
-                    <td>{i.dev.type}</td><td>{i.dev.model}</td>
-                    <td style={{ opacity: i.generic ? 0.6 : 1 }}>{i.mode === "endpoint" || i.mode === "skip" ? "" : i.tplName}</td>
+                    <td>
+                      <select style={{ ...inp, maxWidth: 150 }} value={i.type} title="Change this if Auvik got the type wrong" onChange={(e) => setType(i.key, e.target.value)}>
+                        {(TYPES.includes(i.type) ? TYPES : [i.type, ...TYPES]).map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </td><td>{i.dev.model}</td>
+                    <td style={{ opacity: i.generic ? 0.6 : 1 }}>{["rack", "off"].includes(i.mode) ? (i.desktop && i.mount === "kit" ? i.kitName : i.tplName) : ""}</td>
+                    <td>
+                      {i.mode === "vm" && (
+                        <select style={{ ...inp, maxWidth: 170 }} value={i.host ?? ""} onChange={(e) => setHost(i.key, e.target.value)}>
+                          <option value="">No host</option>
+                          {hosts.map((h) => <option key={h.key} value={h.key}>{h.dev.name}</option>)}
+                        </select>
+                      )}
+                      {i.desktop && ["rack", "off"].includes(i.mode) && (
+                        <select style={inp} value={i.mount} onChange={(e) => setMount(i.key, e.target.value as Mount)}>
+                          <option value="kit">Mount kit (front ports)</option>
+                          <option value="shelf">Shelf</option>
+                        </select>
+                      )}
+                    </td>
                     <td>{i.dev.ips[0]}</td><td><StatusChip s={i.dev.status} /></td>
                     <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={i.connectedTo}>{i.connectedTo}</td>
                   </tr>

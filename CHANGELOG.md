@@ -2,6 +2,19 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.5.0 — 2026-11-16
+Desktop app 2.3.0 has the same changes.
+- **Cables follow a device while you drag it.** Network and power cables re-route as you move a device between U slots, racks or around the off-rack area. They settle when you let go. Press Escape to cancel the move.
+- **Views.** The toolbar has Rack, Infrastructure, Switch and Endpoints. Click a device in any view to select it. Click "Show in rack" to go back to it in the rack.
+  - **Infrastructure:** a diagram of the network gear, laid out top to bottom: firewalls, core switches or stack, access switches, then servers, hypervisors, access points and the UPS. Each line is the cables between two devices; hover it for the ports. Endpoint and VM boxes hang under their switch or host. You can turn power cables on and off.
+  - **Switch:** pick a switch or stack unit to see its ports in front-panel order. Each port is colored by what is plugged in (network device, PC, phone, IoT, printer, VM, empty). The table below lists port, device, type, IP and MAC.
+  - **Endpoints:** every endpoint in one table (PCs, phones, IoT, printers, VMs and unplaced devices) with switch and port. Filter by kind, search, sort, or copy as CSV.
+- **Import Auvik, more choices.** "Include as" adds Phone, IoT and Virtual machine. IP phones and phone systems (Grandstream, Mitel, Yealink, Polycom and others) default to Phone. Cameras and small boards (Dahua, Raspberry Pi, ESPHome and others) default to IoT. You can change the Type of any row in the review, and the row is sorted again.
+- **VM boxes.** Virtual machines go in an off-rack "VMs on <host>" box, with a dashed line to the host. Auvik does not say which host a VM runs on, so the importer guesses from the vendor (Scale Computing, Hyper-V, VMware). Change the guess with the Host column in the review. VMs with no host go in "VMs (no host)".
+- **Firewall mount kit.** Desktop-size firewalls such as the SonicWall TZ now go in a 1U rack-mount kit with the ports brought to the front, and cables plug in at the front. Pick Shelf in the review's Mount column to keep the old shelf instead. Both kits are in the device list to add by hand.
+- Fixed: a device with two links to the same switch (a dual-homed server, or a firewall with several links to a stack) got only one cable on import. All links now come in, each on its own port.
+- The device Type can be edited in the properties panel.
+
 ## 2.4.0 — 2026-11-16
 Desktop app 2.2.0 has the same changes.
 - **Import Auvik.** Build a rack from an Auvik device export (`.xlsx`). A review screen lists every device. You choose how each one comes in: in the rack, off-rack, as an endpoint, or skipped. You also pick a new layout (and its rack model) or the rack you have open. Import adds the devices and the cables Auvik saw between them, on the switch ports it reported.

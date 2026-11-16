@@ -3,7 +3,8 @@ export interface Device {
   id: number; name: string; type: string; u_size: number; rack: number | null; u: number; side: number;
   half: boolean; rows: number; fx: number; fy: number; face: string; color?: string; ports: Port[]; plate?: any; model?: string; ip?: string; serial?: string; notes?: string;
   auvik_id?: string; auvik_name?: string; auvik_macs?: string[]; auvik_model?: string;
-  endpoints?: { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string }[];
+  endpoints?: { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; kind?: "pc" | "phone" | "iot" | "printer" | "vm" | "other" }[];
+  vm_host?: number; // "Virtual machines" box: id of the device the VMs run on
 }
 export interface Rack {
   id: number; name: string; u: number; x: number; y: number;

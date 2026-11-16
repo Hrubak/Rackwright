@@ -2,7 +2,7 @@
 import JSZip from "jszip";
 import { readXlsx, colIndex } from "../src/auvik/xlsx";
 import { parseAuvik, parseConnected } from "../src/auvik/parse";
-import { buildItems, resolvePlan, parsePort, classify } from "../src/auvik/plan";
+import { buildItems, resolvePlan, parsePort, classify, retype, setMode, inferKind, summarize } from "../src/auvik/plan";
 import { applyInPlace, findMissing } from "../src/auvik/apply";
 import { Doc, RW } from "../src/types";
 import { portOf, clone } from "../src/edit";
@@ -16,8 +16,8 @@ const stable = (s: string) => { let h = 7; for (const c of s) h = (h * 31 + c.ch
 const seen = new Map<string, number>();
 const mac = (name = "") => { const n = (seen.get(name) || 0) + 1; seen.set(name, n); const h = stable(name + n); return `02:00:5E:${(h >> 16 & 255).toString(16).padStart(2, "0")}:${(h >> 8 & 255).toString(16).padStart(2, "0")}:${(h & 255).toString(16).padStart(2, "0")}`.toUpperCase(); };
 const ipFor = (name: string) => `10.99.${stable(name) % 200 + 1}.${stable(name + "x") % 200 + 10}`;
-interface D { name: string; type: string; model?: string; conn?: string; status?: string; serial?: string; mac?: string; ip?: string }
-const row = (d: D) => ["Example Co", "exampleco", d.status || "Up", d.name, d.type, d.model || "", d.mac ?? mac(d.name), d.ip ?? ipFor(d.name), "10.99.1.0/24", d.conn ?? "0", "1.0", d.serial ?? "", "2.0", ""];
+interface D { name: string; type: string; model?: string; conn?: string; status?: string; serial?: string; mac?: string; ip?: string; desc?: string }
+const row = (d: D) => ["Example Co", "exampleco", d.status || "Up", d.name, d.type, d.model || "", d.mac ?? mac(d.name), d.ip ?? ipFor(d.name), "10.99.1.0/24", d.conn ?? "0", "1.0", d.serial ?? "", "2.0", d.desc ?? ""];
 
 function devices(extra: D[] = [], drop: string[] = [], ipChange: Record<string, string> = {}): D[] {
   const L: D[] = [
@@ -133,12 +133,13 @@ async function main() {
   t("endpoint group sizes", g02.endpoints!.length === 7 && dn("Endpoints on EX-SW-STACK unit 3").endpoints!.length === 1 && dn("Endpoints on EX-SW-STACK unit 1").endpoints!.length === 2, g02.endpoints!.length + "");
   t("group summary label", /^7 devices \(/.test(g02.model || "") && /phones/.test(g02.model || ""), g02.model);
   t("group is off-rack with a port per endpoint", g02.rack == null && g02.ports.length === 7 && g02.type === "Endpoints");
-  t("unplaced list", plan.unplaced.some((u) => u.name === "Orphan Laptop") && plan.unplaced.some((u) => u.name === "EX-VM1") && plan.unplaced.some((u) => u.name === "Wifi Laptop") && doc.auvik!.unplaced.length === plan.unplaced.length, plan.unplaced.map((u) => u.name).join());
+  t("unplaced list", plan.unplaced.some((u) => u.name === "Orphan Laptop") && plan.unplaced.some((u) => u.name === "Wifi Laptop") && doc.auvik!.unplaced.length === plan.unplaced.length, plan.unplaced.map((u) => u.name).join());
   t("virtual listed, not drawn", plan.virtual.includes("EX-SZ") && !doc.devices.some((d) => d.name === "EX-SZ"));
   const ups = dn("EX-UPS");
   t("UPS at the bottom", ups.rack != null && ups.u === 1, "u=" + ups.u);
   t("network core above servers", dn("EX-CORE").u > dn("EX-ESX1").u && dn("EX-FW").u > dn("EX-CORE").u, `fw ${dn("EX-FW").u} core ${dn("EX-CORE").u} esx ${dn("EX-ESX1").u}`);
-  t("desktop firewall sits on a shelf", doc.devices.some((d) => d.type === "Shelf" && d.rack === dn("EX-FW").rack));
+  t("desktop firewall gets a 1U mount kit by default", dn("EX-FW").rack != null && dn("EX-FW").u_size === 1 && !dn("EX-FW").half && !doc.devices.some((d) => d.type === "Shelf") && /mount kit/i.test(items.find((i) => i.dev.name === "EX-FW")!.kitName));
+  t("VM listed in a VM box", doc.devices.some((d) => d.type === "Virtual machines" && d.endpoints!.some((e) => e.name === "EX-VM1")) && plan.vmBoxes.length === 1);
   t("AP and iDRAC off-rack", dn("EX-AP1").rack == null && dn("EX-ESX1-iDRAC").rack == null && cableTo("EX-ESX1-iDRAC", "Mgmt")?.name === "EX-SW-02");
   const pairs = doc.cables.map((c) => { const a = portOf(doc, c.a)!.d.id, b = portOf(doc, c.b)!.d.id; return a < b ? `${a}-${b}` : `${b}-${a}`; });
   const portsUsed = doc.cables.flatMap((c) => [c.a, c.b]);
@@ -166,6 +167,101 @@ async function main() {
   t("still no duplicate ports", new Set(ports2).size === ports2.length);
   t("group rebuilt in place", doc.devices.filter((d) => d.name === "Endpoints on EX-SW-02").length === 1 && dn("Endpoints on EX-SW-02").endpoints!.length === 7 && dn("Endpoints on EX-SW-02").id === g02.id);
   t("device count", doc.devices.length === before.devices.length + 1, `${before.devices.length} -> ${doc.devices.length}`);
+
+
+  // ---------------------------------------------------------------- v2: dual links, kinds, VM hosts, type override, mount kit
+  const fx2 = (extra: D[] = [], drop: string[] = []): D[] => [
+    { name: "EX2-FW", type: "Firewall", model: "SonicWALL TZ 570", serial: "FW2SER", conn: "EX2-SW through GigabitEthernet1/1/1" },
+    { name: "EX2-SW", type: "Layer 3 Switch", model: "Brocade ICX7250-48-HPOE", serial: "SW2SER", conn: "EX2-FW through X1, EX2-HV1 through eth0, EX2-HV1 through eth1" },
+    { name: "EX2-HV1", type: "Hypervisor", model: "Pegatron Linux", desc: "Linux hc-node-1 4.19 .sc00", conn: "EX2-SW through 2.5GigabitEthernet1/1/7, EX2-SW through 2.5GigabitEthernet1/1/10" },
+    { name: "EX2-HV2", type: "Hypervisor", model: "Microsoft Hyper-V", conn: "EX2-SW through GigabitEthernet1/1/11" },
+    { name: "EX2-ESX", type: "Server", model: "VMware ESXi host", conn: "EX2-SW through GigabitEthernet1/1/12" },
+    { name: "VM-S1", type: "Virtual Machine", model: "Scale Computing" },
+    { name: "VM-H1", type: "Virtual Machine", model: "Microsoft Hyper-V" },
+    { name: "VM-V1", type: "Virtual Machine", model: "VMware Virtual Machine" },
+    { name: "VM-X", type: "Virtual Machine", model: "Mitel 3300 MAS" },
+    { name: "Ph-1", type: "IP Phone", conn: "EX2-SW through GigabitEthernet1/1/20" },
+    { name: "Tel-1", type: "Telecommunications Device", conn: "EX2-SW through GigabitEthernet1/1/24" },
+    { name: "Cam-D", type: "Generic Device", model: "Dahua IPC", conn: "EX2-SW through GigabitEthernet1/1/21" },
+    { name: "Gen-Pi", type: "Generic Device", model: "Raspberry Pi Foundation", conn: "EX2-SW through GigabitEthernet1/1/23" },
+    { name: "Gen-Plain", type: "Generic Device", model: "", conn: "EX2-SW through GigabitEthernet1/1/25" },
+    { name: "PC-X", type: "Workstation", conn: "EX2-SW through GigabitEthernet1/1/22" },
+    ...extra,
+  ].filter((d) => !drop.includes(d.name));
+  const q = await load(fx2());
+  const qi = buildItems(q);
+  const qm = (n: string) => qi.find((i) => i.dev.name === n)!;
+  t("hypervisor is a server in the rack", qm("EX2-HV1").kind === "server" && qm("EX2-HV1").mode === "rack");
+  t("VM default mode is Virtual machine", ["VM-S1", "VM-H1", "VM-V1", "VM-X"].every((n) => qm(n).mode === "vm"));
+  t("phone / IoT default modes", qm("Ph-1").mode === "phone" && qm("Tel-1").mode === "phone" && qm("Cam-D").mode === "iot" && qm("Gen-Pi").mode === "iot" && qm("Gen-Plain").mode === "endpoint" && qm("PC-X").mode === "endpoint");
+  t("kind inference", inferKind("Workstation") === "pc" && inferKind("Printer") === "printer" && inferKind("Generic Device", "Espressif Inc.") === "iot" && inferKind("Unknown") === "other" && inferKind("Generic Device", "Grandstream") === "phone");
+  t("VM host guess by vendor", qm("VM-S1").host === qm("EX2-HV1").key && qm("VM-H1").host === qm("EX2-HV2").key && qm("VM-V1").host === qm("EX2-ESX").key && qm("VM-X").host === "",
+    qi.filter((i) => i.mode === "vm").map((i) => `${i.dev.name}=${i.host}`).join());
+  t("desktop firewall defaults to the mount kit", qm("EX2-FW").desktop && qm("EX2-FW").mount === "kit" && /rack mount kit/i.test(qm("EX2-FW").kitName), qm("EX2-FW").kitName);
+  t("summary uses kinds", summarize(["phone", "phone", "pc", "iot"]) === "4 devices (2 phones, 1 PC, 1 IoT device)", summarize(["phone", "phone", "pc", "iot"]));
+
+  const d2 = empty();
+  const r2a = run(d2, q, { target: "new" });
+  const n2 = (n: string) => d2.devices.find((d) => d.name === n)!;
+  const links = (a: string, b: string) => d2.cables.filter((c) => { const x = portOf(d2, c.a)!.d.name, y = portOf(d2, c.b)!.d.name; return (x === a && y === b) || (x === b && y === a); });
+  const hvLinks = links("EX2-HV1", "EX2-SW");
+  t("both links of a dual-homed server get cables", hvLinks.length === 2, `${hvLinks.length}`);
+  const swPorts = hvLinks.map((c) => { const a = portOf(d2, c.a)!, b = portOf(d2, c.b)!; return (a.d.name === "EX2-SW" ? a : b).p.name; }).sort();
+  const hvPorts = hvLinks.map((c) => { const a = portOf(d2, c.a)!, b = portOf(d2, c.b)!; return (a.d.name === "EX2-HV1" ? a : b).p.id; });
+  t("each link uses its own switch port and its own server port", swPorts.join() === "SFP+1,SFP+2" || swPorts.join() === "10,7", swPorts.join());
+  t("server ports differ", new Set(hvPorts).size === 2);
+  const allPorts2 = d2.cables.flatMap((c) => [c.a, c.b]);
+  t("no port is cabled twice", new Set(allPorts2).size === allPorts2.length);
+  t("mount kit: firewall is 1U in the rack with X1 on the front ports", n2("EX2-FW").rack != null && n2("EX2-FW").u_size === 1 && !d2.devices.some((d) => d.type === "Shelf") &&
+    n2("EX2-FW").ports.some((x) => x.name === "X1") && links("EX2-FW", "EX2-SW").length === 1 && (() => { const c = links("EX2-FW", "EX2-SW")[0]; const a = portOf(d2, c.a)!, b = portOf(d2, c.b)!; return (a.d.name === "EX2-FW" ? a : b).p.name === "X1"; })());
+  t("mount kit has no leftover shelf port clash", !n2("EX2-FW").plate?.off);
+
+  const hv1 = n2("EX2-HV1"), vms = d2.devices.filter((d) => d.type === "Virtual machines");
+  const boxS = d2.devices.find((d) => d.name === "VMs on EX2-HV1")!;
+  const boxN = d2.devices.find((d) => d.name === "VMs (no host)")!;
+  t("VM boxes: one per host plus no-host box", vms.length === 4 && !!boxS && !!boxN, vms.map((d) => d.name).join());
+  t("VM box points at its host", boxS.vm_host === hv1.id && boxS.auvik_id === `vm:${qm("EX2-HV1").key}` && boxN.vm_host === undefined && boxN.auvik_id === "vm:none");
+  t("VM box content", boxS.endpoints!.length === 1 && boxS.endpoints![0].kind === "vm" && boxS.endpoints![0].name === "VM-S1" && boxN.endpoints![0].name === "VM-X" && boxS.ports.length === 0 && boxS.rack == null);
+  t("VM boxes are laid out off-rack, left of the racks", vms.every((d) => d.fx + RW <= Math.min(...d2.racks.map((r) => r.x))));
+  const g2 = d2.devices.find((d) => d.name === "Endpoints on EX2-SW")!;
+  const kc = (k: string) => g2.endpoints!.filter((e) => e.kind === k).length;
+  t("endpoint kinds recorded", kc("phone") === 2 && kc("iot") === 2 && kc("pc") === 1 && kc("other") === 1, g2.endpoints!.map((e) => e.kind).join());
+  t("group summary from kinds", /2 phones/.test(g2.model || "") && /2 IoT devices/.test(g2.model || "") && /1 PC/.test(g2.model || ""), g2.model);
+
+  // re-import: same cables, VM box rebuilt in place with the changed VM list
+  const idBefore = boxS.id, cablesBefore = d2.cables.length, devsBefore = d2.devices.length;
+  const q2 = await load(fx2([{ name: "VM-S2", type: "Virtual Machine", model: "Scale Computing" }], ["VM-S1"]));
+  run(d2, q2, { target: "current", rackId: d2.racks[0].id });
+  const boxS2 = d2.devices.find((d) => d.name === "VMs on EX2-HV1")!;
+  t("re-import adds no cables for dual links", d2.cables.length === cablesBefore && links("EX2-HV1", "EX2-SW").length === 2, `${cablesBefore} -> ${d2.cables.length}`);
+  t("re-import rebuilds the VM box in place", boxS2.id === idBefore && boxS2.endpoints!.map((e) => e.name).join() === "VM-S2" && boxS2.vm_host === n2("EX2-HV1").id);
+  t("re-import adds no devices", d2.devices.length === devsBefore, `${devsBefore} -> ${d2.devices.length}`);
+  t("re-import keeps server ports", n2("EX2-HV1").ports.length === hv1.ports.length);
+
+  // user choices: Include as, Host, Type, Mount
+  let ui = setMode(qi, "Gen-Plain" && qm("Gen-Plain").key, "phone");
+  t("Include as Phone", ui.find((i) => i.dev.name === "Gen-Plain")!.mode === "phone");
+  ui = setMode(ui, qm("PC-X").key, "vm");
+  t("switching to Virtual machine guesses no host for a plain row", ui.find((i) => i.dev.name === "PC-X")!.host === "");
+  const asPrinter = retype(q, qi, qm("PC-X").key, "Printer");
+  const pp = resolvePlan(q, asPrinter);
+  t("Type override re-classifies the row", asPrinter.find((i) => i.dev.name === "PC-X")!.type === "Printer" && pp.groups[0].members.find((m) => m.name === "PC-X")!.kind === "printer");
+  const asVm = retype(q, qi, qm("Gen-Plain").key, "Virtual Machine");
+  t("Type override to Virtual Machine switches to VM mode with a host guess", asVm.find((i) => i.dev.name === "Gen-Plain")!.kind === "vm" && asVm.find((i) => i.dev.name === "Gen-Plain")!.mode === "vm" && asVm.find((i) => i.dev.name === "Gen-Plain")!.host === "");
+  const asSw = retype(q, qi, qm("EX2-ESX").key, "Switch");
+  t("Type override changes the template match", asSw.find((i) => i.dev.name === "EX2-ESX")!.kind === "switch" && asSw.find((i) => i.dev.name === "EX2-ESX")!.tplName !== qm("EX2-ESX").tplName && asSw.find((i) => i.dev.name === "VM-V1")!.host === "");
+  t("edits on other rows survive a Type change", retype(q, setMode(qi, qm("Cam-D").key, "skip"), qm("PC-X").key, "Printer").find((i) => i.dev.name === "Cam-D")!.mode === "skip");
+
+  const d3 = empty();
+  const shelfItems = qi.map((i) => (i.dev.name === "EX2-FW" ? { ...i, mount: "shelf" as const } : i));
+  const plan3 = resolvePlan(q, shelfItems);
+  applyInPlace(d3, plan3, { target: "new" }, shelfItems);
+  const fw3 = d3.devices.find((d) => d.name === "EX2-FW")!;
+  t("Mount = Shelf keeps the shelf path", d3.devices.some((d) => d.type === "Shelf" && d.rack === fw3.rack) && !!fw3.plate?.off);
+  t("host changed by the user is used", (() => {
+    const it = qi.map((i) => (i.dev.name === "VM-S1" ? { ...i, host: qm("EX2-ESX").key } : i));
+    return resolvePlan(q, it).vmBoxes.some((b) => b.name === "VMs on EX2-ESX" && b.members.some((m) => m.name === "VM-S1"));
+  })());
 
   const small = empty();
   run(small, p, { target: "new", rackU: 12 });

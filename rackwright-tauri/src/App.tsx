@@ -6,6 +6,14 @@ import { ConflictDialog, NamePrompt, RackList, UserBar, WebProps } from "./web";
 import RackView, { Resolver, Sel } from "./RackView";
 import ExportMenu from "./export/ExportMenu";
 import { Device, Doc, PortPos, RouteResult } from "./types";
+import { LiveRouter, provisionalDoc, targetKey } from "./liveRoute";
+import type { Target } from "./edit";
+import InfraView from "./views/InfraView";
+import SwitchView from "./views/SwitchView";
+import EndpointsView from "./views/EndpointsView";
+
+type ViewId = "rack" | "infra" | "switch" | "endpoints";
+const VIEWS: [ViewId, string][] = [["rack", "Rack"], ["infra", "Infrastructure"], ["switch", "Switch"], ["endpoints", "Endpoints"]];
 import RackPicker, { PickResult } from "./RackPicker";
 import { RACK_MODELS, genericDefaultU, kindLabel, dimsText, specOf, modelById } from "./racks";
 import { AuvikInfo, EndpointTable, UnplacedDialog } from "./auvik/Panels";
@@ -44,6 +52,16 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [routes, setRoutes] = useState<RouteResult>(none);
   const [ports, setPorts] = useState<PortPos[]>([]);
   const [sel, setSel] = useState<Sel>(null);
+  const [view, setView] = useState<ViewId>("rack");
+  // while a device is dragged: a provisional document with the routes and ports computed for it
+  const [live, setLive] = useState<{ doc: Doc; routes: RouteResult; ports: PortPos[] } | null>(null);
+  const dragKey = useRef("");
+  const liveRouter = useRef<LiveRouter | null>(null);
+  if (!liveRouter.current) liveRouter.current = new LiveRouter(
+    (d, f) => Promise.all([backend.routeCables(d, f), backend.portPositions(d)]).then(([routes, ports]) => ({ routes, ports })),
+    (d, r) => setLive({ doc: d, routes: r.routes, ports: r.ports }),
+    (e) => setMsg(String(e instanceof Error ? e.message : e)),
+  );
   const [pending, setPending] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
@@ -74,8 +92,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
 
   useEffect(() => {
     let stale = false;
-    backend.routeCables(doc, face).then((r) => { if (!stale) setRoutes(r); }).catch((e) => setMsg(String(e instanceof Error ? e.message : e)));
-    backend.portPositions(doc).then((p) => { if (!stale) setPorts(p); }).catch((e) => setMsg(String(e instanceof Error ? e.message : e)));
+    Promise.all([backend.routeCables(doc, face), backend.portPositions(doc)])
+      .then(([r, p]) => { if (!stale) { setRoutes(r); setPorts(p); setLive(null); } })
+      .catch((e) => setMsg(String(e instanceof Error ? e.message : e)));
     return () => { stale = true; };
   }, [doc, face]);
 
@@ -216,6 +235,19 @@ export default function App({ web }: { web?: WebProps } = {}) {
       dev.rack = rack; if (rack != null) { dev.u = u; dev.side = side; } else { dev.fx = fx; dev.fy = fy; }
     });
 
+  const onDragTarget = useCallback((id: number, t: Target) => {
+    const k = targetKey(id, t);
+    if (k === dragKey.current) return;
+    dragKey.current = k;
+    const pd = provisionalDoc(doc, id, t);
+    if (pd) liveRouter.current!.request(pd, face); // an invalid target keeps the last cables on screen
+  }, [doc, face]);
+  // Dropped (the saved routes replace the live ones when they arrive) or cancelled (back to the saved routes now).
+  const onDragEnd = useCallback((committed: boolean) => {
+    dragKey.current = ""; liveRouter.current!.cancel();
+    if (!committed) setLive(null);
+  }, []);
+
   const targetRack = () => {
     const rid = sel?.kind === "rack" ? sel.id : sel?.kind === "dev" ? doc.devices.find((x) => x.id === sel.id)?.rack : null;
     return doc.racks.find((r) => r.id === rid) ?? (doc.racks.length === 1 ? doc.racks[0] : undefined);
@@ -339,7 +371,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>{label}<br />
       <input style={{ ...inp, width: w }} value={val} onChange={(e) => set(e.target.value)} /></label>
   );
-  const devSet = (dv: Device, k: "name" | "ip" | "model" | "serial" | "notes", v: string) =>
+  const devSet = (dv: Device, k: "name" | "type" | "ip" | "model" | "serial" | "notes", v: string) =>
     edit((d) => { (d.devices.find((x) => x.id === dv.id)! as any)[k] = v; }, `dev${dv.id}${k}`);
   const dragDev = pdrag && pdrag.active ? { ...PROTOS[pdrag.i], face: CATALOG[pdrag.i].plate ? "both" : face } : null;
   const portsCabled = (dv: Device) => dv.ports.filter((p) => doc.cables.some((c) => c.a === p.id || c.b === p.id)).length;
@@ -368,14 +400,20 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <button style={btn} onClick={() => setImportOpen(true)}>Import list</button>
         <button style={btn} onClick={() => setAuvikOpen(true)} title="Build racks from an Auvik device export (.xlsx)">Import Auvik</button>
         <button style={btn} onClick={() => setFitTick((n) => n + 1)} title="Home">Fit</button>
-        <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>
+        <span style={{ display: "inline-flex", marginRight: 8 }}>
+          {VIEWS.map(([id, label], i) => (
+            <button key={id} onClick={() => setView(id)} title={`${label} view`}
+              style={{ ...btn, marginRight: 0, borderRadius: i === 0 ? "4px 0 0 4px" : i === VIEWS.length - 1 ? "0 4px 4px 0" : 0, marginLeft: i ? -1 : 0, background: view === id ? "#2a3a52" : btn.background, borderColor: view === id ? "#5b8bd0" : "#3a3d42" }}>{label}</button>
+          ))}
+        </span>
+        {view === "rack" && <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>}
         <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8 }}>
           {IS_WEB ? (cur ? `${cur.name} (v${cur.version})` : "unsaved rack") : (path ?? "no file")} | {doc.racks.length}R {doc.devices.length}D {doc.cables.length}C {msg}
         </span>
         {IS_WEB && web && <UserBar web={web} />}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-        <div style={{ width: 270, background: "#1b1d21", borderRight: "1px solid #2c2f35", display: "flex", flexDirection: "column", fontSize: 12 }}>
+        <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: "#1b1d21", borderRight: "1px solid #2c2f35", flexDirection: "column", fontSize: 12 }}>
           <input style={{ ...inp, margin: "6px 6px 3px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
           <div style={{ display: "flex", gap: 6, margin: "0 6px 4px", alignItems: "center" }}>
             <select style={{ ...inp, flex: 1, minWidth: 0 }} value={typeF} onChange={(e) => setTypeF(e.target.value)}>
@@ -403,10 +441,19 @@ export default function App({ web }: { web?: WebProps } = {}) {
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
-          <RackView doc={doc} face={face} routes={routes} ports={ports} selected={sel} onSelect={setSel}
+          {view !== "rack" && selDev && (
+            <button style={{ ...btn, position: "absolute", right: 10, top: 10, zIndex: 5, marginRight: 0 }} onClick={() => setView("rack")}>Show {selDev.name} in rack</button>
+          )}
+          {view === "infra" && <InfraView doc={doc} selected={sel} onSelect={setSel} />}
+          {view === "switch" && <SwitchView doc={doc} selected={sel} onSelect={setSel} />}
+          {view === "endpoints" && <EndpointsView doc={doc} selected={sel} onSelect={setSel} />}
+          <div style={{ position: "absolute", inset: 0, display: view === "rack" ? "block" : "none" }}>
+          <RackView doc={doc} liveDoc={live?.doc ?? null} onDragTarget={onDragTarget} onDragEnd={onDragEnd} face={face}
+            routes={live ? live.routes : routes} ports={live ? live.ports : ports} selected={sel} onSelect={setSel}
             pendingPort={pending} onPort={onPort} onMoveDevice={onMoveDevice} onReject={(w) => say(w, true)}
             drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} />
           <CableOverlay cables={doc.cables} mode={cableColor} onMode={(m) => { setCableColor(m); try { localStorage.setItem("rw.cableColor", m); } catch { /* ignore */ } }} />
+          </div>
           {toast && (
             <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", padding: "6px 14px", borderRadius: 5, fontSize: 13,
               background: toast.bad ? "#5a1d1d" : "#1d3a2a", border: `1px solid ${toast.bad ? "#f85149" : "#2ea043"}`, pointerEvents: "none" }}>{toast.text}</div>
@@ -454,7 +501,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
           {selDev && <>
-            <b>{selDev.type}</b>
+            {field("Type", selDev.type, (v) => devSet(selDev, "type", v))}
             {field("Name", selDev.name, (v) => devSet(selDev, "name", v))}
             {field("Model", selDev.model ?? "", (v) => devSet(selDev, "model", v))}
             {field("IP", selDev.ip ?? "", (v) => devSet(selDev, "ip", v))}

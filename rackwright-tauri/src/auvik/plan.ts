@@ -4,11 +4,14 @@ import type { Device } from "../types";
 import { AuvikDevice, ParsedAuvik, normMac } from "./parse";
 
 export type Kind = "firewall" | "router" | "switch" | "server" | "storage" | "ups" | "pdu" | "ap" | "ipmi" | "controller" | "vm" | "endpoint";
-export type Mode = "rack" | "off" | "endpoint" | "skip";
+export type Mode = "rack" | "off" | "endpoint" | "phone" | "iot" | "vm" | "skip";
+export type EpKind = "pc" | "phone" | "iot" | "printer" | "vm" | "other";
+export type Mount = "kit" | "shelf";
 
 export interface PlanItem {
   key: string;            // auvik_id: serial || mac || name
   dev: AuvikDevice;
+  type: string;           // Auvik type; editable in the review step (changing it re-classifies the row)
   kind: Kind;
   mode: Mode;             // editable in the review step
   defaultMode: Mode;
@@ -17,6 +20,10 @@ export interface PlanItem {
   generic: boolean;       // no specific catalog match
   units: number[];        // stack unit numbers (more than one = stack)
   connectedTo: string;    // readable list of neighbours
+  host: string | null;    // VM rows: key of the device the VM runs on, "" = no host, null = not guessed yet
+  desktop: boolean;       // desktop-size firewall (does not fit a 19" rack by itself)
+  mount: Mount;           // desktop firewalls: "kit" = 1U rack-mount kit with front ports, "shelf" = on a shelf
+  kitName: string;        // template used for the mount kit
 }
 
 export const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -41,29 +48,41 @@ export function classify(d: Pick<AuvikDevice, "type" | "name" | "model">): Kind 
 const INFRA_VM = /smartzone|\bvsz\b|vcenter|vcsa|controller|\bwlc\b|unifi\s*(network|controller)|sophos|firewall/i;
 
 const RACK_KINDS: Kind[] = ["firewall", "router", "switch", "server", "storage", "ups", "pdu"];
-function defaultMode(kind: Kind, linked: boolean, d: AuvikDevice): { mode: Mode; virtual: boolean } {
+const PHONE_RE = /grandstream|mitel|yealink|polycom|\bpoly\b|fanvil|snom|avaya|cisco ip phone|aastra/i;
+const IOT_RE = /dahua|raspberry|espressif|esphome|logitech|tripp|camera|hikvision|\bring\b|\bnest\b|sonos|shelly|tasmota/i;
+
+/** What kind of endpoint is this? Used for "Endpoint" mode; Phone / IoT / Virtual machine modes set it directly. */
+export function inferKind(type: string, model = "", name = ""): EpKind {
+  const t = type.toLowerCase();
+  if (/phone|telecom/.test(t)) return "phone";
+  if (/workstation|laptop|desktop|\bpc\b/.test(t)) return "pc";
+  if (/printer/.test(t)) return "printer";
+  if (/virtual/.test(t)) return "vm";
+  if (PHONE_RE.test(`${model} ${name}`)) return "phone";
+  if (IOT_RE.test(`${model} ${name}`) || /camera|\biot\b/.test(t)) return "iot";
+  return "other";
+}
+/** The endpoint kind a row gets from its Include-as choice. */
+export const epKindOf = (it: Pick<PlanItem, "mode" | "type" | "dev">): EpKind =>
+  it.mode === "phone" ? "phone" : it.mode === "iot" ? "iot" : it.mode === "vm" ? "vm" : inferKind(it.type, it.dev.model, it.dev.name);
+export const isEndpointMode = (m: Mode) => m === "endpoint" || m === "phone" || m === "iot";
+
+function defaultMode(kind: Kind, linked: boolean, d: AuvikDevice, type: string): { mode: Mode; virtual: boolean } {
   if (RACK_KINDS.includes(kind)) return { mode: "rack", virtual: false };
   if (kind === "ap" || kind === "ipmi") return { mode: "off", virtual: false };
   if (kind === "controller") return linked ? { mode: "rack", virtual: false } : { mode: "skip", virtual: true };
-  if (kind === "vm" && !linked && INFRA_VM.test(`${d.name} ${d.model}`)) return { mode: "skip", virtual: true };
-  return { mode: "endpoint", virtual: false };
+  if (kind === "vm") return !linked && INFRA_VM.test(`${d.name} ${d.model}`) ? { mode: "skip", virtual: true } : { mode: "vm", virtual: false };
+  const k = inferKind(type, d.model, d.name);
+  return { mode: k === "phone" ? "phone" : k === "iot" ? "iot" : "endpoint", virtual: false };
 }
 
-/** Plural noun used in the endpoint group summary. */
-export function endpointWord(type: string): string {
-  const t = type.toLowerCase();
-  if (/phone|telecom/.test(t)) return "phone";
-  if (/workstation|laptop|desktop|\bpc\b/.test(t)) return "PC";
-  if (/camera/.test(t)) return "camera";
-  if (/printer/.test(t)) return "printer";
-  if (/virtual/.test(t)) return "VM";
-  return "other";
-}
-export function summarize(types: string[]): string {
-  const n = types.length;
-  const c = new Map<string, number>();
-  for (const t of types) { const w = endpointWord(t); c.set(w, (c.get(w) || 0) + 1); }
-  const parts = [...c.entries()].sort((a, b) => b[1] - a[1]).map(([w, k]) => (w === "other" ? `${k} other` : `${k} ${w}${k === 1 ? "" : "s"}`));
+const KIND_WORD: Record<EpKind, [string, string]> = { pc: ["PC", "PCs"], phone: ["phone", "phones"], iot: ["IoT device", "IoT devices"], printer: ["printer", "printers"], vm: ["VM", "VMs"], other: ["other", "other"] };
+/** "30 devices (23 phones, 3 PCs, 4 other)". */
+export function summarize(kinds: EpKind[]): string {
+  const n = kinds.length;
+  const c = new Map<EpKind, number>();
+  for (const k of kinds) c.set(k, (c.get(k) || 0) + 1);
+  const parts = [...c.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => (k === "other" ? `${v} other` : `${v} ${KIND_WORD[k][v === 1 ? 0 : 1]}`));
   return `${n} device${n === 1 ? "" : "s"}${parts.length ? ` (${parts.join(", ")})` : ""}`;
 }
 
@@ -119,6 +138,25 @@ function ipmiTemplate(): Tpl {
 export function groupTemplate(n: number): Tpl {
   const rows = Math.max(2, Math.min(12, Math.ceil(n / 12)));
   return { name: "Endpoints", type: "Endpoints", u_size: Math.max(1, Math.ceil((12 * rows + 4) / 26)), half: false, color: "#44566a", rows, model: "", ports: [] };
+}
+
+export function vmTemplate(): Tpl {
+  return { name: "Virtual machines", type: "Virtual machines", u_size: 1, half: false, color: "#4b3f72", rows: 1, model: "", ports: [] };
+}
+
+/** Desktop-size gear: a desktop faceplate, or half a rack wide. */
+export const isDesktopTpl = (t: Tpl) => !!(t.plate?.off || t.plate?.desk || t.half);
+/** 1U rack-mount kit that brings a desktop firewall's ports to the front. Port names follow the firewall (X0..X9 on SonicWall TZ), so Auvik names like X1 still land. */
+export function mountKit(t: Tpl): Tpl {
+  const base = t.group === "SonicWall" || /sonicwall/i.test(t.name) ? CATALOG.find((c) => c.name === "SonicWall TZ rack mount kit (front ports)") : null;
+  if (base) { const k = clone(base); k.model = t.model || k.model; return k; }
+  const k = clone(byName("Firewall 1U mount kit, front ports"));
+  const own = t.ports.filter((p) => p.type !== "Power");
+  if (own.length) k.ports = clone(own);
+  k.model = t.model || "";
+  if (t.plate?.brand) { k.plate.brand = t.plate.brand; k.plate.bc = t.plate.bc || k.plate.bc; }
+  k.name = t.name.replace(/\s*\(desktop\)\s*$/i, "") + " mount kit (front ports)";
+  return k;
 }
 
 /** Pick the catalog template for an Auvik device. `maxPort` = highest numbered front port in use (sizes generic switches and ICX units). */
@@ -210,15 +248,17 @@ function upsMatch(text: string): Tpl | null {
 }
 
 // ---------------------------------------------------------------- links
-export interface Link { a: string; b: string; ifA: string; ifB: string }
+export interface Link { a: string; b: string; ifA: string; ifB: string; n?: number }
 const linkKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** One link per device pair. "A lists B through X" means X is B's interface. */
+/** One link per cable. "A lists B through X" means X is B's interface. Both sides usually list the same cable, so the
+ *  interfaces seen on each side are paired in order; two cables between the same pair stay two links. */
 export function buildLinks(p: ParsedAuvik, keyOf: Map<AuvikDevice, string>): { links: Link[]; unresolved: number } {
   const byName = new Map<string, AuvikDevice>();
   for (const d of p.devices) if (!byName.has(d.rawName.toLowerCase())) byName.set(d.rawName.toLowerCase(), d);
-  const map = new Map<string, Link>();
+  const map = new Map<string, { a: string; b: string; ifA: string[]; ifB: string[] }>();
   let unresolved = 0;
+  const add = (list: string[], iface: string) => { if (!iface || !list.includes(iface)) list.push(iface); };
   for (const a of p.devices) for (const n of a.neighbors) {
     const b = byName.get(n.name.toLowerCase());
     if (!b) { unresolved++; continue; }
@@ -226,11 +266,17 @@ export function buildLinks(p: ParsedAuvik, keyOf: Map<AuvikDevice, string>): { l
     const ka = keyOf.get(a)!, kb = keyOf.get(b)!;
     const k = linkKey(ka, kb);
     let l = map.get(k);
-    if (!l) { l = ka < kb ? { a: ka, b: kb, ifA: "", ifB: "" } : { a: kb, b: ka, ifA: "", ifB: "" }; map.set(k, l); }
-    // the interface belongs to b
-    if (l.b === kb) { if (!l.ifB && n.iface) l.ifB = n.iface; } else if (!l.ifA && n.iface) l.ifA = n.iface;
+    if (!l) { l = ka < kb ? { a: ka, b: kb, ifA: [], ifB: [] } : { a: kb, b: ka, ifA: [], ifB: [] }; map.set(k, l); }
+    add(l.b === kb ? l.ifB : l.ifA, n.iface); // the interface belongs to b
   }
-  return { links: [...map.values()], unresolved };
+  const links: Link[] = [];
+  for (const l of map.values()) {
+    const named = (x: string[]) => x.filter(Boolean), blanks = (x: string[]) => x.length - named(x).length;
+    const n = Math.max(1, named(l.ifA).length, named(l.ifB).length, blanks(l.ifA), blanks(l.ifB));
+    const fa = [...named(l.ifA)], fb = [...named(l.ifB)];
+    for (let i = 0; i < n; i++) links.push({ a: l.a, b: l.b, ifA: fa[i] || "", ifB: fb[i] || "", n: i });
+  }
+  return { links, unresolved };
 }
 
 // ---------------------------------------------------------------- plan
@@ -238,13 +284,15 @@ export interface PlanUnit {
   key: string; itemKey: string; name: string; unit?: number; item: PlanItem; tpl: Tpl; generic: boolean;
   mode: "rack" | "off"; maxPort: number; mainSlot: number; slotOffsets: Record<number, number>; isGroup?: false;
 }
-export interface Member { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; key: string }
+export interface Member { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; key: string; kind: EpKind }
 export interface PlanGroup { key: string; name: string; unit: PlanUnit; members: Member[]; summary: string; isGroup: true; tpl: Tpl }
+/** VMs on one host (or the "no host" box). Drawn as an off-rack "Virtual machines" device with no ports. */
+export interface PlanVmBox { key: string; name: string; hostKey: string | null; hostUnit: PlanUnit | null; members: Member[]; summary: string; tpl: Tpl }
 export interface PortRef { target: PlanUnit | PlanGroup; iface: string; fast: boolean; member?: number }
 export interface PlanCable { a: PortRef; b: PortRef; label: string; key: string }
 export interface Unplaced { name: string; type: string; model: string; ip: string; mac: string; status: string; reason: string }
 export interface ImportPlan {
-  site: string; units: PlanUnit[]; groups: PlanGroup[]; cables: PlanCable[]; unplaced: Unplaced[]; virtual: string[]; warnings: string[];
+  site: string; units: PlanUnit[]; groups: PlanGroup[]; vmBoxes: PlanVmBox[]; cables: PlanCable[]; unplaced: Unplaced[]; virtual: string[]; warnings: string[];
 }
 
 interface Analysis { items: PlanItem[]; byKey: Map<string, PlanItem>; links: Link[]; warnings: string[] }
@@ -272,7 +320,8 @@ function portLayout(ifaces: string[]) {
   return { unitNums, layout };
 }
 
-function analyze(p: ParsedAuvik): Analysis {
+function analyze(p: ParsedAuvik, prev: PlanItem[] = []): Analysis {
+  const typeOver = new Map(prev.map((i) => [i.key, i.type]));
   const warnings = [...p.warnings];
   const keyOf = new Map<AuvikDevice, string>();
   const seen = new Set<string>();
@@ -288,17 +337,19 @@ function analyze(p: ParsedAuvik): Analysis {
   const byKey = new Map<string, PlanItem>();
   for (const d of p.devices) {
     const key = keyOf.get(d)!;
-    const kind = classify(d);
+    const type = typeOver.get(key) ?? d.type;
+    const kind = classify({ type, name: d.name, model: d.model });
     const mine = links.filter((l) => l.a === key || l.b === key);
-    const { mode, virtual } = defaultMode(kind, mine.length > 0, d);
+    const { mode, virtual } = defaultMode(kind, mine.length > 0, d, type);
     const ifs = mine.map((l) => ifaceOf(l, key)).filter(Boolean);
     const { unitNums, layout } = portLayout(kind === "switch" ? ifs : []);
     const units = unitNums.length > 1 ? unitNums : [];
     const lay = layout(units.length ? units[0] : null);
-    const { tpl, generic } = matchTemplate(d, kind, lay.maxPort);
+    const { tpl, generic } = matchTemplate({ ...d, type }, kind, lay.maxPort);
     const names = new Map(p.devices.map((x) => [keyOf.get(x)!, x.name]));
+    const desktop = kind === "firewall" && isDesktopTpl(tpl);
     const item: PlanItem = {
-      key, dev: d, kind, mode, defaultMode: mode, virtual, tplName: (generic ? "generic: " : "") + tpl.name, generic, units,
+      key, dev: d, type, kind, mode, defaultMode: mode, virtual, host: null, desktop, mount: "kit", kitName: desktop ? mountKit(tpl).name : "", tplName: (generic ? "generic: " : "") + tpl.name, generic, units,
       connectedTo: mine.map((l) => names.get(otherOf(l, key)) || "").filter(Boolean).join(", "),
     };
     items.push(item); byKey.set(key, item);
@@ -306,13 +357,47 @@ function analyze(p: ParsedAuvik): Analysis {
   return { items, byKey, links, warnings };
 }
 
-export function buildItems(p: ParsedAuvik): PlanItem[] { return analyze(p).items; }
+export function buildItems(p: ParsedAuvik): PlanItem[] { return fillHosts(analyze(p).items); }
+
+// ---------------------------------------------------------------- VM hosts
+const HOST_RULES: [RegExp, RegExp][] = [
+  [/scale/i, /pegatron|scale|\.sc\d{2}/i],
+  [/hyper-?v|microsoft/i, /hyper-?v|microsoft/i],
+  [/vmware/i, /esxi|vmware/i],
+];
+/** Guess which host a VM runs on from vendor words. Hosts are the placed servers / hypervisors; the first match wins. "" = no guess. */
+export function guessHost(vm: Pick<PlanItem, "dev">, hosts: PlanItem[]): string {
+  const vtext = `${vm.dev.model} ${vm.dev.description}`;
+  for (const [vr, hr] of HOST_RULES) {
+    if (!vr.test(vtext)) continue;
+    const h = hosts.find((x) => hr.test(`${x.dev.model} ${x.dev.name} ${x.dev.description}`));
+    return h ? h.key : "";
+  }
+  return "";
+}
+export const hostsOf = (items: PlanItem[]) => items.filter((i) => i.kind === "server" && (i.mode === "rack" || i.mode === "off"));
+/** Give every VM row that has no host choice yet (or whose host is no longer a placed server) a guessed one. */
+export function fillHosts(items: PlanItem[]): PlanItem[] {
+  const hosts = hostsOf(items);
+  return items.map((i) => (i.mode === "vm" && (i.host === null || (i.host && !hosts.some((h) => h.key === i.host))) ? { ...i, host: guessHost(i, hosts) } : i));
+}
+/** The user changed "Include as" on one row. */
+export function setMode(items: PlanItem[], key: string, mode: Mode): PlanItem[] {
+  return fillHosts(items.map((i) => (i.key === key ? { ...i, mode, host: mode === "vm" ? i.host : null } : i)));
+}
+/** The user changed the Type of one row: classify it again (kind, default Include as, template). Other rows keep their edits. */
+export function retype(p: ParsedAuvik, items: PlanItem[], key: string, type: string): PlanItem[] {
+  const next = items.map((i) => (i.key === key ? { ...i, type } : i));
+  const fresh = analyze(p, next).items.find((i) => i.key === key);
+  if (!fresh) return items;
+  return fillHosts(next.map((i) => (i.key === key ? { ...fresh, mount: i.mount } : i)));
+}
 
 const PRIORITY: Record<Kind, number> = { firewall: 0, router: 1, switch: 2, controller: 3, server: 4, pdu: 5, ups: 6, storage: 7, ap: 8, ipmi: 9, vm: 10, endpoint: 11 };
 
 /** Turn the (possibly edited) review rows into concrete devices, endpoint groups and cables. */
 export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
-  const an = analyze(p);
+  const an = analyze(p, items);
   const warnings = [...an.warnings];
   const mode = new Map(items.map((i) => [i.key, i.mode]));
   const item = (k: string) => an.byKey.get(k)!;
@@ -329,7 +414,8 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const stack = unitNums.length > 1;
     for (const u of stack ? unitNums : [null]) {
       const lay = layout(u);
-      const { tpl, generic } = matchTemplate(it.dev, it.kind, lay.maxPort);
+      let { tpl, generic } = matchTemplate({ ...it.dev, type: it.type }, it.kind, lay.maxPort);
+      if (it.kind === "firewall" && it.mount === "kit" && isDesktopTpl(tpl)) { tpl = mountKit(tpl); generic = false; }
       
       list.push({
         key: stack ? `${it.key}#${u}` : it.key, itemKey: it.key, name: stack ? `${it.dev.name} unit ${u}` : it.dev.name, unit: stack ? (u as number) : undefined,
@@ -368,7 +454,7 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const label = swSide ? `${swSide.u.name} ${swSide.i}` : `${ua.name} - ${ub.name}`;
     const okA = claim(ua, ia, ub.name), okB = claim(ub, ib, ua.name);
     if (!okA || !okB) continue;
-    cables.push({ a: { target: ua, iface: ia, fast }, b: { target: ub, iface: ib, fast }, label, key: l.a < l.b ? `${l.a}|${l.b}` : `${l.b}|${l.a}` });
+    cables.push({ a: { target: ua, iface: ia, fast }, b: { target: ub, iface: ib, fast }, label, key: (l.a < l.b ? `${l.a}|${l.b}` : `${l.b}|${l.a}`) + (l.n ? `#${l.n}` : "") });
   }
 
   // 3. endpoints: group per switch unit, one port per endpoint
@@ -377,7 +463,7 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
   const virtual: string[] = [];
   for (const it of items) {
     if (it.mode === "skip") { if (it.virtual) virtual.push(it.dev.name); continue; }
-    if (it.mode !== "endpoint") continue;
+    if (!isEndpointMode(it.mode)) continue;
     const d = it.dev;
     const row = (reason: string): Unplaced => ({ name: d.name, type: d.type, model: d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", status: d.status, reason });
     const mine = an.links.filter((l) => l.a === it.key || l.b === it.key);
@@ -400,12 +486,12 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const u = unitFor(best.other.key, best.iface);
     let g = groups.get(u.key);
     if (!g) { g = { key: `g:${u.key}`, name: `Endpoints on ${u.name}`, unit: u, members: [], summary: "", isGroup: true, tpl: groupTemplate(0) }; groups.set(u.key, g); }
-    g.members.push({ name: d.name, type: d.type, model: d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: best.iface, status: d.status, key: it.key });
+    g.members.push({ name: d.name, type: d.type, model: d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: best.iface, status: d.status, key: it.key, kind: epKindOf(it) });
   }
   const groupList = [...groups.values()];
   for (const g of groupList) {
     g.members.sort((x, y) => (parsePort(x.port)?.num ?? 9999) - (parsePort(y.port)?.num ?? 9999) || x.name.localeCompare(y.name));
-    g.summary = summarize(g.members.map((m) => m.type));
+    g.summary = summarize(g.members.map((m) => m.kind));
     g.tpl = groupTemplate(g.members.length);
     g.members.forEach((m, i) => {
       if (!m.port) return; // connected, but Auvik did not say which port
@@ -413,7 +499,23 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
       cables.push({ a: { target: g, iface: "", fast: false, member: i }, b: { target: g.unit, iface: m.port, fast: false }, label: `${g.unit.name} ${m.port}`, key: `${g.key}|${m.key}` });
     });
   }
-  return { site: p.site, units, groups: groupList, cables, unplaced, virtual, warnings };
+
+  // 4. virtual machines: one box per host (or one without a host), no ports
+  const vmBoxes = new Map<string, PlanVmBox>();
+  const hostItems = hostsOf(items);
+  for (const it of items) {
+    if (it.mode !== "vm") continue;
+    const d = it.dev;
+    const hk = it.host === null ? guessHost(it, hostItems) : it.host;
+    const hostUnit = hk && hostItems.some((h) => h.key === hk) ? unitsOf.get(hk)?.[0] ?? null : null;
+    const bk = hostUnit ? `vm:${hk}` : "vm:none";
+    let b = vmBoxes.get(bk);
+    if (!b) { b = { key: bk, name: hostUnit ? `VMs on ${hostUnit.name}` : "VMs (no host)", hostKey: hostUnit ? hk : null, hostUnit, members: [], summary: "", tpl: vmTemplate() }; vmBoxes.set(bk, b); }
+    b.members.push({ name: d.name, type: it.type, model: d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: "", status: d.status, key: it.key, kind: "vm" });
+  }
+  const vmList = [...vmBoxes.values()].sort((x, y) => (x.hostKey ? 0 : 1) - (y.hostKey ? 0 : 1) || x.name.localeCompare(y.name));
+  for (const b of vmList) { b.members.sort((x, y) => x.name.localeCompare(y.name)); b.summary = summarize(b.members.map((m) => m.kind)); }
+  return { site: p.site, units, groups: groupList, vmBoxes: vmList, cables, unplaced, virtual, warnings };
 }
 
 // ---------------------------------------------------------------- locating ports on a device (also used on devices already in the document)
