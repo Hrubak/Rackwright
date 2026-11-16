@@ -1,0 +1,50 @@
+name: web
+
+# The desktop crate (rackwright-tauri/src-tauri) is not built here: it needs webkit.
+on:
+  push:
+    branches: [web]
+  pull_request:
+    branches: [web]
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: web/server
+      - name: Build
+        working-directory: web/server
+        run: cargo build --release
+      - name: Test
+        working-directory: web/server
+        run: cargo test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rackwright-tauri/package-lock.json
+      - name: Install
+        working-directory: rackwright-tauri
+        run: npm ci
+      - name: Build (desktop front end)
+        working-directory: rackwright-tauri
+        run: npm run build
+      - name: Build (web)
+        working-directory: rackwright-tauri
+        run: npm run build:web
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck && shellcheck -S warning proxmox/ct/rackwright.sh proxmox/install/rackwright-install.sh
