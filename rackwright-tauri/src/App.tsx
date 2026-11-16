@@ -5,8 +5,10 @@ import * as A from "./api";
 import { ConflictDialog, NamePrompt, RackList, UserBar, WebProps } from "./web";
 import RackView, { Resolver, Sel } from "./RackView";
 import { Device, Doc, PortPos, RouteResult } from "./types";
+import RackPicker, { PickResult } from "./RackPicker";
+import { RACK_MODELS, genericDefaultU, kindLabel, dimsText, specOf, modelById } from "./racks";
 import {
-  CATALOG, addRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
+  CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
   placeNew, portOf, protoOf, rackUsage, shapeOf, tplRackStatus,
 } from "./edit";
 
@@ -50,6 +52,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [cableColor, setCableColor] = useState<CableColorMode>(() => { try { return localStorage.getItem("rw.cableColor") === "type" ? "type" : "own"; } catch { return "own"; } });
   const [fitTick, setFitTick] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [picker, setPicker] = useState<"new" | "add" | null>(null);
   const [importText, setImportText] = useState("");
   const [importH, setImportH] = useState("0");
   const resolveRef = useRef<Resolver>(() => ({ kind: "none" }));
@@ -111,7 +114,14 @@ export default function App({ web }: { web?: WebProps } = {}) {
   }, [sel, edit]);
 
   const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(d); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
-  const doNew = () => { if (!dirty || confirm("Discard unsaved changes?")) reset(clone(empty), null); };
+  const doNew = () => { if (!dirty || confirm("Discard unsaved changes?")) setPicker("new"); };
+  const onPick = (r: PickResult) => {
+    const mode = picker; setPicker(null);
+    if (mode === "new") {
+      const d = clone(empty); const rk = addRack(d, r.name, r.u, specOf(r.model));
+      reset(d, null); setSel({ kind: "rack", id: rk.id });
+    } else if (mode === "add") edit((d) => { const rk = addRack(d, r.name, r.u, specOf(r.model)); setSel({ kind: "rack", id: rk.id }); });
+  };
   const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
   const doOpen = async () => {
@@ -335,7 +345,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <button style={btn} onClick={() => doSave(true)}>Save as</button>
         <button style={btn} onClick={doUndo} disabled={!undo.length}>Undo</button>
         <button style={btn} onClick={doRedo} disabled={!redo.length}>Redo</button>
-        <button style={btn} onClick={() => edit((d) => { const r = addRack(d); setSel({ kind: "rack", id: r.id }); })}>+ Rack</button>
+        <button style={btn} onClick={() => setPicker("add")}>+ Rack</button>
         {IS_WEB && <button style={btn} onClick={doImportFile} title="Load a .rack.json file from this computer">Import file</button>}
         {IS_WEB && <button style={btn} onClick={doExportFile} title="Download as .rack.json">Export file</button>}
         <button style={btn} onClick={() => setImportOpen(true)}>Import list</button>
@@ -399,10 +409,28 @@ export default function App({ web }: { web?: WebProps } = {}) {
             {field("Height (U)", selRack.u, (v) => edit((d) => {
               const r = d.racks.find((x) => x.id === selRack.id)!;
               const n = Math.max(1, Math.min(60, parseInt(v) || 1));
-              const top = d.devices.filter((x) => x.rack === r.id).reduce((m, x) => Math.max(m, x.u + x.u_size - 1), 0);
-              if (n < top) return `!U${top} is occupied: remove or move devices first`;
-              r.u = n;
+              const why = resizeRack(d, r, n);
+              if (why) return "!" + why;
             }, `rh${selRack.id}`), 60)}
+            <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>Model<br />
+              <select style={{ ...inp, width: 208 }} value={selRack.model ?? ""} onChange={(e) => {
+                const mod = modelById(e.target.value); if (!mod) return;
+                edit((d) => {
+                  const r = d.racks.find((x) => x.id === selRack.id)!;
+                  const u = mod.generic ? r.u : mod.u;
+                  if (u !== r.u) { const why = resizeRack(d, r, u); if (why) return "!" + why; }
+                  applySpec(r, specOf(mod));
+                });
+              }}>
+                {!selRack.model && <option value="">(none)</option>}
+                {selRack.model && !modelById(selRack.model) && <option value={selRack.model}>{selRack.model_name || selRack.model}</option>}
+                {["cabinet", "open4", "twopost", "wall", "desktop"].map((k) => (
+                  <optgroup key={k} label={kindLabel(k)}>
+                    {RACK_MODELS.filter((m) => m.kind === k).map((m) => <option key={m.id} value={m.id}>{m.generic ? m.name : `${m.name} (${m.u}U)`}</option>)}
+                  </optgroup>
+                ))}
+              </select></label>
+            {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>{kindLabel(selRack.kind)}, {dimsText(selRack.width_mm, selRack.depth_mm)}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
           {selDev && <>
@@ -471,6 +499,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {IS_WEB && showRacks && <RackList currentId={cur?.id ?? null} onClose={() => setShowRacks(false)} onOpen={(m) => loadShared(m.id)} />}
       {IS_WEB && nameAsk && <NamePrompt title={nameAsk.title} initial={nameAsk.initial} onOk={nameAsk.cb} onCancel={() => setNameAsk(null)} />}
       {IS_WEB && conflict && <ConflictDialog by={conflict.by} onTheirs={conflictTheirs} onMine={conflictMine} onCancel={() => setConflict(null)} />}
+      {picker && <RackPicker title={picker === "new" ? "New rack" : "Add a rack"} okLabel={picker === "new" ? "Create" : "Add rack"}
+        defaultName={picker === "new" ? "Rack 1" : `Rack ${doc.racks.length + 1}`} onPick={onPick} onCancel={() => setPicker(null)} />}
       {importOpen && (
         <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 520, border: "1px solid #3a3d42" }}>
