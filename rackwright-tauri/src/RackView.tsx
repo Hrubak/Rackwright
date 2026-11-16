@@ -169,7 +169,7 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
                 const w = world(e); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, sx: e.clientX, sy: e.clientY, moved: false };
               }}>
               {blob ? drawBlob(d, l, t, face === "rear", isSel)
-                : <rect stroke={isSel ? "#ffd33d" : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={2} fill={mgr ? "#1d2024" : col} />}
+                : <rect stroke={isSel ? "#ffd33d" : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={d.type === "Endpoints" ? 8 : 2} fill={mgr ? "#1d2024" : col} />}
               {plate ? plate.nodes : null}
               {blob ? (
                 <>
@@ -181,6 +181,9 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
                   <text x={lx} y={t + (two ? 9 : q.h / 2)} fill={fg} fontSize={13} fontWeight={700} dominantBaseline="central" style={{ pointerEvents: "none" }}>{clip(d.name, labw - 8, 7.4)}</text>
                   {two && <text x={lx} y={t + 21} fill={fg} fontSize={10.5} opacity={0.85} dominantBaseline="central" style={{ pointerEvents: "none" }}>{clip(sub, labw - 8, 5.8)}</text>}
                 </>
+              )}
+              {d.type === "Endpoints" && d.endpoints && (
+                <g style={{ pointerEvents: "none" }}><circle cx={l + 14} cy={b - 13} r={9} fill="#e6e8eb" /><text x={l + 14} y={b - 13} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700} fill="#1b1d21">{d.endpoints.length}</text></g>
               )}
               {d.ports.map((p) => {
                 const g = pp.get(p.id); if (!g) return null;

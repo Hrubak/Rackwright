@@ -271,7 +271,8 @@ pub fn route_all(doc: &Doc, face: &str) -> RouteResult {
             }
             p.extend([[bx, sb], [bx, b.py], [b.px, b.py]]);
             for (e, x, dx) in [(a, ax, j.xa), (b, bx, j.xb)] {
-                if !e.mgr && (x - dx).abs() > UNSUPPORTED_RUN {
+                // off-rack gear cannot have a cable manager, so only rack-mounted ends get the hint
+                if !e.mgr && doc.devices[e.di].rack.is_some() && (x - dx).abs() > UNSUPPORTED_RUN {
                     let d = &doc.devices[e.di];
                     res.hints.push(Hint {
                         cable: j.cable,

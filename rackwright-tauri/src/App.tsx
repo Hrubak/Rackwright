@@ -1,5 +1,5 @@
 import { CableOverlay, CableColorMode } from "./Cables";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { backend, IS_WEB } from "./backend";
 import * as A from "./api";
 import { ConflictDialog, NamePrompt, RackList, UserBar, WebProps } from "./web";
@@ -8,6 +8,8 @@ import ExportMenu from "./export/ExportMenu";
 import { Device, Doc, PortPos, RouteResult } from "./types";
 import RackPicker, { PickResult } from "./RackPicker";
 import { RACK_MODELS, genericDefaultU, kindLabel, dimsText, specOf, modelById } from "./racks";
+import { AuvikInfo, EndpointTable, UnplacedDialog } from "./auvik/Panels";
+const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
   placeNew, portOf, protoOf, rackUsage, shapeOf, tplRackStatus,
@@ -53,6 +55,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [cableColor, setCableColor] = useState<CableColorMode>(() => { try { return localStorage.getItem("rw.cableColor") === "type" ? "type" : "own"; } catch { return "own"; } });
   const [fitTick, setFitTick] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [auvikOpen, setAuvikOpen] = useState(false);
+  const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [picker, setPicker] = useState<"new" | "add" | null>(null);
   const [importText, setImportText] = useState("");
   const [importH, setImportH] = useState("0");
@@ -362,6 +366,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
           ...(IS_WEB ? [{ label: "Export file (.rack.json)", run: doExportFile }] : []),
         ]} />
         <button style={btn} onClick={() => setImportOpen(true)}>Import list</button>
+        <button style={btn} onClick={() => setAuvikOpen(true)} title="Build racks from an Auvik device export (.xlsx)">Import Auvik</button>
         <button style={btn} onClick={() => setFitTick((n) => n + 1)} title="Home">Fit</button>
         <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>
         <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8 }}>
@@ -416,6 +421,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
               {doc.cables.length} cables<br />
               <span style={{ opacity: 0.6 }}>Click a device, rack or cable to edit it. Arrow keys nudge a selected device, Ctrl+D duplicates, Home fits the view.</span>
             </div>
+            <AuvikInfo doc={doc} onOpen={() => setUnplacedOpen(true)} />
           </>}
           {selRack && <>
             <b>Rack</b>
@@ -485,6 +491,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <div style={{ fontSize: 12, margin: "6px 0", opacity: 0.7 }}>
               {selDev.u_size}U, {selDev.ports.length} ports ({portsCabled(selDev)} cabled). Drag to move; click a port, then another, to cable.
             </div>
+            <EndpointTable dev={selDev} />
             <button style={btn} onClick={() => { let id = 0; if (edit((d) => { id = duplicateDevice(d, selDev.id)?.id ?? 0; })) setSel({ kind: "dev", id }); }}>Duplicate</button>
           </>}
           {selCable && <>
@@ -515,6 +522,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {IS_WEB && conflict && <ConflictDialog by={conflict.by} onTheirs={conflictTheirs} onMine={conflictMine} onCancel={() => setConflict(null)} />}
       {picker && <RackPicker title={picker === "new" ? "New rack" : "Add a rack"} okLabel={picker === "new" ? "Create" : "Add rack"}
         defaultName={picker === "new" ? "Rack 1" : `Rack ${doc.racks.length + 1}`} onPick={onPick} onCancel={() => setPicker(null)} />}
+      {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
+      {unplacedOpen && <UnplacedDialog items={doc.auvik?.unplaced ?? []} onClose={() => setUnplacedOpen(false)} />}
       {importOpen && (
         <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 520, border: "1px solid #3a3d42" }}>
