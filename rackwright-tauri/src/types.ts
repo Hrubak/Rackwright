@@ -3,7 +3,10 @@ export interface Device {
   id: number; name: string; type: string; u_size: number; rack: number | null; u: number; side: number;
   half: boolean; rows: number; fx: number; fy: number; face: string; color?: string; ports: Port[]; plate?: any; model?: string; ip?: string; serial?: string; notes?: string;
 }
-export interface Rack { id: number; name: string; u: number; x: number; y: number }
+export interface Rack {
+  id: number; name: string; u: number; x: number; y: number;
+  kind?: string; model?: string; model_name?: string; width_mm?: number; depth_mm?: number;
+}
 export interface Cable { id: number; a: number; b: number; color: string; type?: string; style?: string; label?: string }
 export interface Doc { v: number; nid: number; racks: Rack[]; devices: Device[]; cables: Cable[] }
 export interface Route { cable: number; pts: [number, number][]; mode: string; dir_a: number; dir_b: number }

@@ -1,5 +1,6 @@
 import { Doc, Device, Rack, Cable, RW, RAIL, UH, HDR } from "./types";
 import catalog from "./catalog.json";
+import type { RackSpec } from "./racks";
 
 export interface Tpl {
   name: string; type: string; u_size: number; color: string; half?: boolean; rows?: number;
@@ -148,11 +149,32 @@ export function duplicateDevice(doc: Doc, id: number): Device | null {
   return d;
 }
 
-export function addRack(doc: Doc, name?: string, u = 42): Rack {
+export function addRack(doc: Doc, name?: string, u = 42, spec?: RackSpec): Rack {
   const x = doc.racks.reduce((m, r) => Math.max(m, r.x + RW + 2 * RAIL + 90), 0);
   const r: any = { id: nid(doc), name: name || `Rack ${doc.racks.length + 1}`, u, x, y: 0, numbering: "up", color: "#3a3d42", notes: "" };
+  if (spec) applySpec(r, spec);
   doc.racks.push(r);
   return r;
+}
+
+/** Set the model fields on a rack (missing dimensions are removed). */
+export function applySpec(r: any, spec: RackSpec) {
+  r.kind = spec.kind; r.model = spec.model; r.model_name = spec.model_name;
+  if (spec.width_mm) r.width_mm = spec.width_mm; else delete r.width_mm;
+  if (spec.depth_mm) r.depth_mm = spec.depth_mm; else delete r.depth_mm;
+}
+
+/** Change a rack's height. Returns a plain message when devices would end up outside it, else "". */
+export function resizeRack(doc: Doc, r: Rack, u: number): string {
+  const probe = { ...r, u };
+  for (const d of doc.devices) {
+    if (d.rack !== r.id) continue;
+    if (d.u + d.u_size - 1 > u) return `Can't make ${r.name} ${u}U: ${d.name} reaches U${d.u + d.u_size - 1}. Move or remove it first.`;
+    const p = checkPlace(doc, d, probe, d.u, d.side);
+    if (!p.ok) return `Can't make ${r.name} ${u}U: ${p.why || d.name + " would not fit"}`;
+  }
+  r.u = u;
+  return "";
 }
 
 /** Put a new device in the first free slot of `rackId` (or any rack), else off-rack. */

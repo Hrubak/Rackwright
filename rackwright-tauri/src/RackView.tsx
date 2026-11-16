@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import RackFrame from "./RackFrame";
+import { kindLabel } from "./racks";
 import { Target, devDims, rackUsage, resolveTarget, shapeOf } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
@@ -131,8 +133,9 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
         {doc.racks.map((r) => (
           <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }}>
             <rect stroke={selected?.kind === "rack" && selected.id === r.id ? "#ffd33d" : "#3a3d42"} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill="#1d2025" />
+            {r.kind && <RackFrame kind={r.kind} x={r.x} y={r.y} w={RW + 2 * RAIL} h={HDR + r.u * UH + PADB} />}
             <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill="#e6e8eb" fontSize={16} fontWeight={600}>{r.name}</text>
-            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill="#7d838c" fontSize={10.5}>{`${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill="#7d838c" fontSize={10.5}>{r.kind ? `${r.model_name || kindLabel(r.kind)} · ${r.u}U · ${rackUsage(doc, r).used}U used, ${rackUsage(doc, r).free}U free` : `${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
             <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill="#0b0c0e" stroke="#2c2f35" />
             {Array.from({ length: r.u }, (_, i) => {
               const y = r.y + HDR + (r.u - i - 1) * UH;

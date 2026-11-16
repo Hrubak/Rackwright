@@ -1,4 +1,4 @@
-import { CATALOG, addRack, fromTpl, checkPlace, findFree, shapeOf, resolveTarget, placeNew, protoOf } from "../src/edit";
+import { resizeRack, CATALOG, addRack, fromTpl, checkPlace, findFree, shapeOf, resolveTarget, placeNew, protoOf } from "../src/edit";
 import { Doc, UH, HDR, RAIL } from "../src/types";
 
 let fails = 0;
@@ -62,6 +62,15 @@ const tg2 = resolveTarget(doc, p1, rx, rowY(10));
 t("cursor on occupied -> not ok", tg2.kind === "rack" && !tg2.p.ok);
 const tg3 = resolveTarget(doc, p1, -5000, -5000);
 t("far away -> float/none", tg3.kind !== "rack");
+
+const sdoc: Doc = { v: 1, nid: 1, racks: [], devices: [], cables: [] };
+const sr: any = addRack(sdoc, "Wall", 12, { kind: "wall", model: "tl-srw12us", model_name: "Tripp Lite SmartRack SRW12US", width_mm: 530, depth_mm: 500 });
+t("addRack spec stored", sr.kind === "wall" && sr.model === "tl-srw12us" && sr.u === 12 && sr.width_mm === 530 && sr.depth_mm === 500 && sr.model_name.includes("SRW12US"));
+const plain: any = addRack(sdoc);
+t("addRack without spec has no kind", plain.kind === undefined && plain.u === 42);
+const sd = fromTpl(sdoc, CATALOG[sw]); sd.rack = sr.id; sd.u = 10; sd.side = 0; sd.face = "front"; sdoc.devices.push(sd);
+t("resize below device refused", resizeRack(sdoc, sr, 8) !== "" && sr.u === 12);
+t("resize above ok", resizeRack(sdoc, sr, 20) === "" && sr.u === 20);
 
 const full = placeNew(doc, fromTpl(doc, CATALOG[sw]), "front", r.id);
 t("placeNew returns string", typeof full === "string", full);
