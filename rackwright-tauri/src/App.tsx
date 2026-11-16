@@ -1,3 +1,4 @@
+import { CableOverlay, CableColorMode } from "./Cables";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { backend, IS_WEB } from "./backend";
 import * as A from "./api";
@@ -46,6 +47,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [fitsOnly, setFitsOnly] = useState(false);
   const [palSel, setPalSel] = useState<number | null>(null);
   const [pdrag, setPdrag] = useState<{ i: number; x: number; y: number; active: boolean } | null>(null);
+  const [cableColor, setCableColor] = useState<CableColorMode>(() => { try { return localStorage.getItem("rw.cableColor") === "type" ? "type" : "own"; } catch { return "own"; } });
   const [fitTick, setFitTick] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
@@ -374,7 +376,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
           <RackView doc={doc} face={face} routes={routes} ports={ports} selected={sel} onSelect={setSel}
             pendingPort={pending} onPort={onPort} onMoveDevice={onMoveDevice} onReject={(w) => say(w, true)}
-            drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} />
+            drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} />
+          <CableOverlay cables={doc.cables} mode={cableColor} onMode={(m) => { setCableColor(m); try { localStorage.setItem("rw.cableColor", m); } catch { /* ignore */ } }} />
           {toast && (
             <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", padding: "6px 14px", borderRadius: 5, fontSize: 13,
               background: toast.bad ? "#5a1d1d" : "#1d3a2a", border: `1px solid ${toast.bad ? "#f85149" : "#2ea043"}`, pointerEvents: "none" }}>{toast.text}</div>
