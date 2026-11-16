@@ -255,7 +255,7 @@ const mkPorts = (prefix: string, n: number, type: string, start = 1) =>
 const pwr = () => mkPorts("Power", 1, "Power", 0);
 
 /** Catalog lookup (ported from the Python app): Dell/UniFi/Synology rules, then vendor model names. */
-function catalogMatch(name: string, u: number): Tpl | null {
+export function catalogMatch(name: string, u: number): Tpl | null {
   const n = name.toLowerCase();
   const pool = CATALOG.filter((t) => t.plate);
   const sized = (t: Tpl | undefined | null): Tpl | null => {
