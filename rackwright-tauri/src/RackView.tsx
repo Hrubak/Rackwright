@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Target, devDims, rackUsage, resolveTarget, shapeOf } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
+import Cables, { CableColorMode } from "./Cables";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
-
-const LANE_W = 2.2;
 
 function devRect(doc: Doc, d: Device) {
   const { w, h } = devDims(d);
@@ -52,13 +51,14 @@ export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
 export type Resolver = (dev: Device, clientX: number, clientY: number) => Target;
 
-export default function RackView({ doc, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick }: {
+export default function RackView({ doc, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own" }: {
   doc: Doc; face: "front" | "rear"; routes: RouteResult; ports: PortPos[];
   selected: Sel; onSelect: (s: Sel) => void; pendingPort: number | null; onPort: (pid: number) => void;
   onMoveDevice: (id: number, rack: number | null, u: number, side: number, fx: number, fy: number) => void;
   onReject: (why: string) => void;
-  drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number;
+  drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number; cableColor?: CableColorMode;
 }) {
+  const [hovDev, setHovDev] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const mv = useRef<{ id: number; ox: number; oy: number; sx: number; sy: number; moved: boolean } | null>(null);
   const [mvGhost, setMvGhost] = useState<{ dev: Device; t: Target } | null>(null);
@@ -93,7 +93,6 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
   const gh = mvGhost ?? (drag && dragT && dragT.kind !== "none" ? { dev: drag.dev, t: dragT } : null);
   const pp = useMemo(() => new Map(ports.map((p) => [p[0], p])), [ports]);
   const vis = (d: Device) => d.rack == null || d.face === face || d.face === "both";
-  const cab = (id: number) => doc.cables.find((c) => c.id === id);
 
   return (
     <svg ref={svgRef} style={{ width: "100%", height: "100%", background: "#14161a", cursor: drag ? "copy" : undefined }}
@@ -162,7 +161,7 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
           const sub = d.ip || d.model || d.type;
           const cableOn = (pid: number) => { const c = doc.cables.find((x) => x.a === pid || x.b === pid); return c ? (c.color || "#1f6feb") : null; };
           return (
-            <g key={d.id} onMouseDown={(e) => {
+            <g key={d.id} onMouseEnter={() => setHovDev(d.id)} onMouseLeave={() => setHovDev(null)} onMouseDown={(e) => {
                 e.stopPropagation(); onSelect({ kind: "dev", id: d.id });
                 const w = world(e); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, sx: e.clientX, sy: e.clientY, moved: false };
               }}>
@@ -210,23 +209,7 @@ export default function RackView({ doc, face, routes, ports, selected, onSelect,
               <text x={x + 6} y={y - 10} fill="#fff" fontSize={10.5} dominantBaseline="central">{why}</text></g>}
           </g>;
         })()}
-        {routes.routes.map((r) => {
-          const c = cab(r.cable), sel = selected?.kind === "cable" && selected.id === r.cable, color = c?.color || "#999";
-          const d = r.pts.map((p, i) => `${i ? "L" : "M"}${p[0]} ${p[1]}`).join(" ");
-          const dash = c?.style === "dashed" ? "6 4" : undefined;
-          const plug = (p: [number, number], dir: number) => (
-            <rect x={p[0] - 3} y={dir > 0 ? p[1] : p[1] - 8} width={6} height={8} fill={color} stroke={sel ? "#ffd33d" : "#000a"} />
-          );
-          return (
-            <g key={r.cable} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "cable", id: r.cable }); }} style={{ cursor: "pointer" }}>
-              <path d={d} fill="none" stroke={sel ? "#ffd33d" : "#000c"} strokeWidth={LANE_W + 1.6} strokeLinejoin="miter" strokeLinecap="butt" />
-              <path d={d} fill="none" stroke={color} strokeWidth={LANE_W} strokeDasharray={dash} strokeLinejoin="miter" strokeLinecap="butt" />
-              {plug(r.pts[0], r.dir_a)}
-              {plug(r.pts[r.pts.length - 1], r.dir_b)}
-              <title>{c?.label || `cable ${r.cable}`}</title>
-            </g>
-          );
-        })}
+        <Cables doc={doc} routes={routes.routes} selected={selected} hoverDev={hovDev} onSelect={onSelect} colorMode={cableColor} zoom={view.z} />
       </g>
     </svg>
   );
