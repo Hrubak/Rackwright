@@ -2,6 +2,16 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.9.0 — 2026-11-16
+Desktop app 2.6.0 has the same changes.
+- **Rear mounting.** "Mounted" in the properties panel now works for every device, including firewalls and switches with a faceplate. Pick one of:
+  - Front, full depth (the default for gear with a faceplate);
+  - Front only (short), which leaves the rear of that U free;
+  - Rear, full depth: the ports face the rear. The rear view shows the device's front panel, the front view shows its back, and a yellow stripe on its left edge marks it;
+  - Rear only (short), which leaves the front of that U free, for example for a patch panel in front of a rear-mounted switch.
+- **Three HE150 nodes per shelf.** Scale Computing HE150 now takes a third of a shelf, so three fit side by side on one 1U shelf. HE250 still takes half, two per shelf. HE150 nodes in racks you already saved move to the new size when you open them: the right-hand node moves to the right third. Side in the properties panel offers left, middle and right, and the arrow keys move between them.
+- **KVM switches.** New 1U KVM models: Tripp Lite NetDirector 8-port and 16-port Cat5 KVM over IP (B064-008-01-IPG, B064-016-01-IPG), Tripp Lite 16-port HDMI/USB KVM (B024-H4U16), and a generic "KVM switch 1U". Each has PC ports, a local console port and power; the IP models also have a LAN port.
+
 ## 2.8.0 — 2026-11-16
 Web only. The desktop app does not change.
 - **Update the server from the web.** Admins get an Update server button next to Users. Check for updates shows the running version, the newest version on the branch the container was installed from, and what changed. Update now runs the same steps as typing `update` in the container and shows the log while it works. When it finishes, click Reload page.

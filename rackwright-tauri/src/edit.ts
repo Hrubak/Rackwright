@@ -3,7 +3,7 @@ import catalog from "./catalog.json";
 import type { RackSpec } from "./racks";
 
 export interface Tpl {
-  name: string; type: string; u_size: number; color: string; half?: boolean; rows?: number;
+  name: string; type: string; u_size: number; color: string; half?: boolean; cols?: number; rows?: number;
   model?: string; ip?: string; short?: string; group?: string; plate?: any;
   ports: { name: string; type: string; label?: string }[];
 }
@@ -19,10 +19,60 @@ export function fromTpl(doc: Doc, t: Tpl): Device {
     side: 0, half: !!t.half, color: t.color, ip: t.ip || "", serial: "", notes: "", rows: t.rows || 0,
     ports: [], fx: 0, fy: 0, face: "front",
   };
+  if (t.half && t.cols && t.cols > 2) d.cols = t.cols;
   if (t.plate) { d.plate = clone(t.plate); d.face = "both"; }
   for (const p of t.ports) d.ports.push({ id: nid(doc), name: p.name, type: p.type, label: p.label || "" });
   return d;
 }
+
+type Width = { half?: boolean; cols?: number };
+/** Columns a row is split into for this device: 1 = full width, 2 = half width, 3 = a third (HE150 on a shelf). */
+export const colsOf = (d: Width) => (d.half ? Math.max(2, Math.round(d.cols || 2)) : 1);
+/** The columns (`side` values) this device can stand in. */
+export const sidesOf = (d: Width) => Array.from({ length: colsOf(d) }, (_, i) => i);
+/** Left edge offset inside the rack, in px. */
+export const xOffset = (d: Width & { side: number }) => { const n = colsOf(d); return n > 1 ? (RW / n) * Math.min(Math.max(0, d.side), n - 1) : 0; };
+/** Do two devices in the same U share any width? */
+function overlapX(a: Width, sa: number, b: Width, sb: number): boolean {
+  const na = colsOf(a), nb = colsOf(b);
+  const a0 = Math.min(Math.max(0, na > 1 ? sa : 0), na - 1) / na, b0 = Math.min(Math.max(0, nb > 1 ? sb : 0), nb - 1) / nb;
+  return a0 < b0 + 1 / nb - 1e-9 && b0 < a0 + 1 / na - 1e-9;
+}
+/** "half", "1/3" or "" for the device lists. */
+export const widthLabel = (d: Width) => (colsOf(d) === 2 ? " half" : colsOf(d) > 2 ? ` 1/${colsOf(d)}` : "");
+/** Side for a column chosen with the arrow keys. */
+export const stepSide = (d: Width & { side: number }, dir: -1 | 1) => Math.min(colsOf(d) - 1, Math.max(0, d.side + dir));
+
+/**
+ * How a device is mounted. "Front" and "rear" are the rails the device hangs on (its ports face that way);
+ * full depth fills the U at both faces, short leaves the other face free for something else.
+ */
+export type Mount = "front" | "front-short" | "rear" | "rear-short";
+export const MOUNTS: { v: Mount; label: string }[] = [
+  { v: "front", label: "Front, full depth" },
+  { v: "front-short", label: "Front only (short)" },
+  { v: "rear", label: "Rear, full depth (ports face the rear)" },
+  { v: "rear-short", label: "Rear only (short)" },
+];
+export function mountOf(d: Pick<Device, "face"> & { rev?: boolean }): Mount {
+  const f = d.face || "front";
+  if (f === "both") return d.rev ? "rear" : "front";
+  return f === "rear" ? "rear-short" : "front-short";
+}
+/** Set face / rev for a mount choice. */
+export function setMount(d: Device, m: Mount) {
+  d.face = m === "front" || m === "rear" ? "both" : m === "front-short" ? "front" : "rear";
+  if (m.startsWith("rear")) d.rev = true; else delete d.rev;
+}
+/** Bring older documents up to date when they are opened. HE150 nodes stand three to a shelf since 2.9.0. */
+export function upgradeDoc(doc: Doc): Doc {
+  for (const d of doc.devices) {
+    if (d.plate?.nuc === "he150" && d.half && !d.cols) { d.cols = 3; if (d.side === 1) d.side = 2; }
+  }
+  return doc;
+}
+/** Which panel of the device faces the viewer on this face of the rack. */
+export const showsRear = (d: { rev?: boolean }, face: "front" | "rear") => (face === "rear") !== !!d.rev;
 
 export function fits(doc: Doc, r: Rack, d: Device, ignore?: Set<number>): boolean {
   const lo = d.u, hi = d.u + d.u_size - 1;
@@ -32,7 +82,7 @@ export function fits(doc: Doc, r: Rack, d: Device, ignore?: Set<number>): boolea
     const fa = o.face || "front", fb = d.face || "front";
     if (!(fa === fb || fa === "both" || fb === "both")) continue;
     if (o.u <= hi && o.u + o.u_size - 1 >= lo) {
-      if (!(o.half && d.half) || o.side === d.side) return false;
+      if (overlapX(o, o.side, d, d.side)) return false;
     }
   }
   return true;
@@ -45,7 +95,7 @@ export function findFree(doc: Doc, r: Rack, d: Device): [number, number] | null 
   const maxU = r.u - d.u_size + 1, fromTop = !isHeavy(d);
   for (let i = 0; i < maxU; i++) {
     const u = fromTop ? maxU - i : i + 1;
-    for (const side of d.half ? [0, 1] : [0])
+    for (const side of sidesOf(d))
       if (checkPlace(doc, d, r, u, side).ok) return [u, side];
   }
   return null;
@@ -61,9 +111,9 @@ export function shapeOf(d: Pick<Device, "type" | "rack" | "plate" | "model" | "n
   if (!isAp) return "rect";
   return /nanohd|mr4|mr5|ruckus|r[3-7]\d0|9120|ap-5/i.test(`${d.model} ${d.name}`) ? "squircle" : "disc";
 }
-export function devDims(d: Pick<Device, "type" | "rack" | "plate" | "model" | "name" | "half" | "u_size">) {
+export function devDims(d: Pick<Device, "type" | "rack" | "plate" | "model" | "name" | "half" | "u_size"> & { cols?: number }) {
   if (shapeOf(d) !== "rect") return { w: BLOB, h: BLOB };
-  return { w: d.half ? RW / 2 : RW, h: Math.max(1, d.u_size) * UH };
+  return { w: RW / colsOf(d), h: Math.max(1, d.u_size) * UH };
 }
 
 export interface Placement { ok: boolean; why?: string; warn?: string }
@@ -85,7 +135,7 @@ export function checkPlace(doc: Doc, d: Device, r: Rack, u: number, side: number
     if (o.u > hi || o.u + o.u_size - 1 < lo) continue;
     // A desktop unit stands on a shelf with its bottom U; a taller unit (2U) rises above the shelf into free U.
     if (off && o.type === "Shelf" && o.u <= lo && o.u + o.u_size - 1 >= lo) { shelf = true; continue; }
-    if (o.half && d.half && o.side !== side) continue;
+    if (!overlapX(o, o.side, d, side)) continue;
     return no(`U${Math.max(lo, o.u)} is taken by ${o.name}`);
   }
   if (off && !shelf) return no(`${d.name} is a desktop unit: put it on a Shelf or leave it off-rack`);
@@ -105,7 +155,7 @@ export function placeOnShelf(doc: Doc, d: Device, r: Rack, near?: number): boole
   const tplShelf = CATALOG.find((c) => c.type === "Shelf");
   if (!tplShelf) return false;
   const shelves = doc.devices.filter((x) => x.rack === r.id && x.type === "Shelf");
-  const sides = d.half ? [0, 1] : [0];
+  const sides = sidesOf(d);
   const maxU = Math.max(0, r.u - d.u_size + 1);
   const us = Array.from({ length: maxU }, (_, i) => maxU - i); // top down
   if (near != null) us.sort((a, b) => Math.abs(a - near) - Math.abs(b - near) || b - a);
@@ -149,7 +199,7 @@ export function resolveTarget(doc: Doc, d: Device, wx: number, wy: number, grab?
     if (cx < l - 40 || cx > l + RW + 40 || rowY < r.y + HDR - 20 || rowY > r.y + HDR + r.u * UH + 20) continue;
     const row = Math.floor((r.y + HDR + r.u * UH - rowY) / UH); // 0 = bottom U
     const u = Math.min(Math.max(1, row + 1 - (d.u_size - 1)), Math.max(1, r.u - d.u_size + 1));
-    const side = d.half && cx > l + RW / 2 ? 1 : 0;
+    const n = colsOf(d), side = n > 1 ? Math.min(n - 1, Math.max(0, Math.floor(((cx - l) / RW) * n))) : 0;
     return { kind: "rack", r, u, side, p: checkPlace(doc, d, r, u, side) };
   }
   return grab ? { kind: "float", fx: wx - grab.ox, fy: wy - grab.oy } : { kind: "float", fx: wx - w / 2, fy: wy - h / 2 };

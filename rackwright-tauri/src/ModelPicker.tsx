@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CATALOG, Tpl } from "./edit";
+import { CATALOG, Tpl, widthLabel } from "./edit";
 import type { Device } from "./types";
 
 const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
@@ -32,7 +32,7 @@ export default function ModelPicker({ dev, onPick, onCancel }: { dev: Device; on
           {list.map(({ c, i }) => (
             <div key={i} onClick={() => setSel(i)} onDoubleClick={() => onPick(c)}
               style={{ padding: "4px 8px", borderBottom: "1px solid #24272c", cursor: "pointer", background: sel === i ? "#2a3a52" : undefined }}>
-              {c.name} <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}{c.half ? " half" : ""}</span>
+              {c.name} <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}{widthLabel(c)}</span>
             </div>
           ))}
           {!list.length && <div style={{ padding: 10, opacity: 0.6 }}>Nothing matches.</div>}

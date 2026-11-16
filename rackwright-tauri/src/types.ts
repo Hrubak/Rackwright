@@ -8,6 +8,8 @@ export interface Device {
   locked?: string[]; // fields edited by hand (name, type, model, ip, serial, notes, mac); an Auvik import leaves them alone
   oobm?: { name: string; ip: string; mac: string; key: string; portId?: number }; // iDRAC / iLO / BMC shown on this server's rear port
   vm_host?: number; // "Virtual machines" box: id of the device the VMs run on
+  cols?: number; // partial-width gear: the row is split into this many columns (default 2 = half width); `side` is the column
+  rev?: boolean; // turned around: ports face the rear (the rear view shows its front panel)
 }
 export interface Rack {
   id: number; name: string; u: number; x: number; y: number;

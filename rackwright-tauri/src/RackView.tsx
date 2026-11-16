@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import RackFrame from "./RackFrame";
 import { kindLabel } from "./racks";
-import { Target, devDims, rackUsage, resolveTarget, shapeOf } from "./edit";
+import { Target, devDims, mountOf, rackUsage, resolveTarget, shapeOf, showsRear, xOffset } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import Cables, { CableColorMode } from "./Cables";
 import type { CableOpts } from "./cableView";
@@ -13,7 +13,7 @@ function devRect(doc: Doc, d: Device) {
   const r = d.rack != null ? doc.racks.find((x) => x.id === d.rack) : undefined;
   if (r) {
     const t = r.y + HDR + (r.u - (d.u + d.u_size - 1)) * UH;
-    const l = r.x + RAIL + (d.half && d.side === 1 ? RW / 2 : 0);
+    const l = r.x + RAIL + xOffset(d);
     return { l, t, w, h };
   }
   return { l: d.fx, t: d.fy, w, h };
@@ -175,7 +175,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           const col = d.color || "#3b6ea8";
           const pg = d.ports.map((p) => pp.get(p.id)).filter((g): g is PortPos => !!g).map((g) => [g[1], g[2], g[3]] as [number, number, number]);
           const blob = shapeOf(d) !== "rect";
-          const plate = d.plate && !blob ? drawPlate(d, l, t, r, b, pg, face === "rear", view.z) : null;
+          const plate = d.plate && !blob ? drawPlate(d, l, t, r, b, pg, showsRear(d, face), view.z) : null;
           const mgr = !plate && d.type === "Cable manager";
           const fg = plate ? plate.fg : fgFor(col);
           const lx = plate ? plate.lx : l + 7, labw = plate ? plate.labw : Math.min(150, q.w * 0.3);
@@ -213,7 +213,9 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
                 ) : null;
                 return <g key={p.id}>{node}{lab}</g>;
               })}
-              <title>{d.name}</title>
+              {/* Rear-mounted (turned around): a yellow stripe on the left edge, clear of labels and ports. */}
+              {d.rack != null && d.rev && <rect x={l + 1} y={t + 1} width={3} height={q.h - 2} fill="#ffd33d" style={{ pointerEvents: "none" }} />}
+              <title>{d.name}{d.rack != null && mountOf(d).startsWith("rear") ? " (rear mounted)" : ""}</title>
             </g>
           );
         })}

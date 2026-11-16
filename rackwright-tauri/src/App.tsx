@@ -25,7 +25,7 @@ import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
-  placeNew, portOf, protoOf, rackUsage, shapeOf, tplRackStatus,
+  placeNew, portOf, protoOf, rackUsage, shapeOf, tplRackStatus, MOUNTS, Mount, mountOf, setMount, sidesOf, stepSide, upgradeDoc, widthLabel,
 } from "./edit";
 
 const empty: Doc = { v: 1, nid: 1, racks: [], devices: [], cables: [] };
@@ -145,7 +145,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     setSel(null);
   }, [sel, edit]);
 
-  const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(d); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
+  const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(upgradeDoc(d)); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
   const doNew = () => { if (!dirty || confirm("Discard unsaved changes?")) setPicker("new"); };
   const onPick = (r: PickResult) => {
     const mode = picker; setPicker(null);
@@ -352,7 +352,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       else if (selDev && selDev.rack != null && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const du = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
-        const ds = e.key === "ArrowLeft" ? 0 : e.key === "ArrowRight" ? 1 : selDev.side;
+        const ds = e.key === "ArrowLeft" ? stepSide(selDev, -1) : e.key === "ArrowRight" ? stepSide(selDev, 1) : selDev.side;
         place(selDev.id, selDev.rack, selDev.u + du, selDev.half ? ds : 0);
       }
     };
@@ -449,7 +449,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
                   title="Drag into the rack, or double-click to add"
                   style={{ padding: "4px 8px", borderBottom: "1px solid #24272c", cursor: "grab", background: palSel === i ? "#2a3a52" : undefined, opacity: st === "full" ? 0.5 : 1 }}>
                   <span style={{ opacity: 0.6, marginRight: 6 }}>{icon(i)}</span>{c.name}{" "}
-                  <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}{c.half ? " half" : ""}</span>
+                  <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}{widthLabel(c)}</span>
                   {st === "off" && <span style={{ color: "#d29922" }}> off-rack</span>}
                   {st === "full" && <span style={{ color: "#f85149" }}> no room</span>}
                 </div>
@@ -533,7 +533,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
                 if (v === "") { edit((d) => { const x = d.devices.find((y) => y.id === selDev.id)!; x.fx = x.fx || 40; x.fy = x.fy || 40; x.rack = null; }); return; }
                 const r = doc.racks.find((x) => x.id === Number(v))!;
                 const probe = { ...selDev, rack: r.id };
-                for (let u = r.u - selDev.u_size + 1; u >= 1; u--) for (const s of selDev.half ? [0, 1] : [0])
+                for (let u = r.u - selDev.u_size + 1; u >= 1; u--) for (const s of sidesOf(selDev))
                   if (checkPlace(doc, probe, r, u, s).ok) { place(selDev.id, r.id, u, s); return; }
                 say(`No room in ${r.name} for ${selDev.name}`, true);
               }}>
@@ -544,14 +544,14 @@ export default function App({ web }: { web?: WebProps } = {}) {
               <label>U<br /><input type="number" style={{ ...inp, width: 56 }} value={selDev.u} min={1}
                 onChange={(e) => { const n = parseInt(e.target.value); if (n) place(selDev.id, selDev.rack!, n, selDev.side); }} /></label>
               {selDev.half && <label>Side<br /><select style={inp} value={selDev.side} onChange={(e) => place(selDev.id, selDev.rack!, selDev.u, Number(e.target.value))}>
-                <option value={0}>left</option><option value={1}>right</option></select></label>}
+                {sidesOf(selDev).map((s, i, a) => <option key={s} value={s}>{a.length === 2 ? ["left", "right"][i] : a.length === 3 ? ["left", "middle", "right"][i] : `column ${i + 1}`}</option>)}</select></label>}
               <label>Mounted<br />
-                <select style={inp} value={selDev.face} disabled={!!selDev.plate} onChange={(e) => edit((d) => {
-                  const x = d.devices.find((y) => y.id === selDev.id)!; x.face = e.target.value;
+                <select style={inp} value={mountOf(selDev)} title="Which rails it hangs on (its ports face that way). Short gear leaves the other side of the U free." onChange={(e) => edit((d) => {
+                  const x = d.devices.find((y) => y.id === selDev.id)!; setMount(x, e.target.value as Mount);
                   const r = d.racks.find((z) => z.id === x.rack);
                   if (r) { const p = checkPlace(d, x, r, x.u, x.side); if (!p.ok) return "!" + p.why; }
                 })}>
-                  <option>front</option><option>rear</option><option>both</option>
+                  {MOUNTS.map((m) => <option key={m.v} value={m.v}>{m.label}</option>)}
                 </select></label>
             </div>}
             <div style={{ display: "flex", gap: 8, margin: "6px 0", fontSize: 12, alignItems: "flex-end" }}>

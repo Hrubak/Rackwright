@@ -162,7 +162,8 @@ export function drawPlate(d: Device, l: number, t: number, r: number, b: number,
     if (st === "nuc") {
       // Scale Computing edge node on a shelf (SNUC chassis). SFP+/LAN/DC-in sockets come from the port grid on the right;
       // all other front and rear I/O here is decorative art.
-      const he250 = p.nuc === "he250", ax = l + 104, ae = pl - 2;
+      // The art is about 64 px wide; on a third-width box (HE150, three per shelf) it moves left to stay clear of the ports.
+      const he250 = p.nuc === "he250", ax = Math.min(l + 104, pl - 66), ae = pl - 2, labw = Math.max(40, ax - l - 10);
       rc(l + 1, t + 1, r - 1, b - 1, "#17181b", "#4a4e54"); rc(l + 1, b - 4, r - 1, b - 1, "#0f1012");
       const usbA = (x: number, y: number, c: string) => { rc(x, y - 3, x + 9, y + 3, "#0c0d0f", "#6b717a"); rc(x + 1, y - 0.5, x + 8, y + 1.5, c); };
       const usbC = (x: number, y: number) => rc(x, y - 2, x + 8, y + 2, "#0c0d0f", "#8b9097");
@@ -181,7 +182,7 @@ export function drawPlate(d: Device, l: number, t: number, r: number, b: number,
           usbA(ax + 16, y, "#2b2e33"); usbA(ax + 27, y, "#2a6fdb"); jack(ax + 43, y);
           rc(ax + 50, y - 4, ax + 62, y + 4, "#14151a", "#c9ced4"); ov(ax + 56, y, 1.2, "#3ddc5b"); // power button
         }
-        return done(l + 8, 94, lab);
+        return done(l + 8, labw, lab);
       }
       const y1 = t + 12, y2 = t + 22, y3 = b - 9;
       if (he250) {
@@ -196,7 +197,7 @@ export function drawPlate(d: Device, l: number, t: number, r: number, b: number,
         usbC(ax + 40, y1); hdmi(ax + 40, y2 + 1);
         rc(ax, b - 10, ae, b - 6, "#25272b", "#4a4e54");                                     // blank expansion plate
       }
-      return done(l + 8, 94, lab);
+      return done(l + 8, labw, lab);
     }
     if (st === "ap") {
       if (!rear) { ov(l + 15, cy, 9.5, "#ffffff", "#9aa0a6"); ov(l + 15, cy, 6.5, body, bc); ov(l + 15, cy, 2, bc); return done(l + 30, 150, lab); }

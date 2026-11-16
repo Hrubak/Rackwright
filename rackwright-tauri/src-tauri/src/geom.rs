@@ -37,12 +37,24 @@ pub fn is_blob(d: &Device) -> bool {
         })
 }
 
+/// Columns a row is split into for this device: 1 = full width, 2 = half width (default for `half`),
+/// more for narrower shelf gear (the optional `cols` field, e.g. 3 HE150 nodes on one shelf).
+/// `side` is the column, from the left. Mirrors `colsOf` in edit.ts.
+pub fn cols(d: &Device) -> i64 {
+    if !d.half {
+        return 1;
+    }
+    d.extra.get("cols").and_then(|v| v.as_f64()).map(|n| n.round() as i64).filter(|&n| n >= 2).unwrap_or(2)
+}
+
 pub fn dev_rect(doc: &Doc, d: &Device) -> Rect {
-    let w = if d.half { RW / 2.0 } else { RW };
+    let n = cols(d);
+    let w = RW / n as f64;
     let size = d.u_size.max(1) as f64;
     if let Some(r) = d.rack.and_then(|id| doc.racks.iter().find(|r| r.id == id)) {
         let top = r.y + HDR + (r.u - (d.u + d.u_size - 1)) as f64 * UH;
-        let left = r.x + RAIL + if d.half && d.side == 1 { RW / 2.0 } else { 0.0 };
+        let col = if n > 1 { d.side.clamp(0, n - 1) } else { 0 };
+        let left = r.x + RAIL + col as f64 * w;
         Rect { l: left, t: top, r: left + w, b: top + size * UH }
     } else if is_blob(d) {
         Rect { l: d.fx, t: d.fy, r: d.fx + AP_D, b: d.fy + AP_D }
@@ -124,4 +136,27 @@ pub fn port_index(doc: &Doc) -> HashMap<i64, (PortPos, usize)> {
         }
     }
     m
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shelf_columns() {
+        let doc: Doc = serde_json::from_str(
+            r#"{"racks": [{"id": 1, "name": "R", "u": 10, "x": 0, "y": 0}], "devices": [
+                {"id": 2, "u_size": 2, "rack": 1, "u": 3, "side": 0, "half": true, "cols": 3},
+                {"id": 3, "u_size": 2, "rack": 1, "u": 3, "side": 2, "half": true, "cols": 3},
+                {"id": 4, "u_size": 2, "rack": 1, "u": 6, "side": 1, "half": true},
+                {"id": 5, "u_size": 1, "rack": 1, "u": 9, "side": 1}]}"#,
+        )
+        .unwrap();
+        let r = |i: usize| dev_rect(&doc, &doc.devices[i]);
+        assert_eq!(cols(&doc.devices[0]), 3);
+        assert!((r(0).l - RAIL).abs() < 1e-9 && (r(0).r - (RAIL + RW / 3.0)).abs() < 1e-9);
+        assert!((r(1).l - (RAIL + 2.0 * RW / 3.0)).abs() < 1e-9);
+        assert!((r(2).l - (RAIL + RW / 2.0)).abs() < 1e-9 && (r(2).r - (RAIL + RW)).abs() < 1e-9);
+        assert!((r(3).l - RAIL).abs() < 1e-9 && (r(3).r - (RAIL + RW)).abs() < 1e-9);
+    }
 }

@@ -1,5 +1,5 @@
 // Shared, UI-free helpers for the PDF and Visio exports. Pure functions only (they also run under tsx in tests).
-import { devDims } from "../edit";
+import { devDims, xOffset } from "../edit";
 import { Device, Doc, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB } from "../types";
 
 export type Face = "front" | "rear";
@@ -12,7 +12,7 @@ export function devRect(doc: Doc, d: Device) {
   const r = d.rack != null ? doc.racks.find((x) => x.id === d.rack) : undefined;
   if (r) {
     const t = r.y + HDR + (r.u - (d.u + d.u_size - 1)) * UH;
-    const l = r.x + RAIL + (d.half && d.side === 1 ? RW / 2 : 0);
+    const l = r.x + RAIL + xOffset(d);
     return { l, t, w, h };
   }
   return { l: d.fx, t: d.fy, w, h };

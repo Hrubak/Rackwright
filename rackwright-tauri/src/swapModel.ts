@@ -1,6 +1,6 @@
 // Change a device's size, or swap it for another catalog model. Pure document edits; call inside one edit() for one undo step.
 import { Device, Doc, Port, Rack } from "./types";
-import { Tpl, checkPlace, clone, fromTpl, placeOnShelf } from "./edit";
+import { Tpl, checkPlace, clone, fromTpl, placeOnShelf, sidesOf, widthLabel } from "./edit";
 
 export interface EditResult { ok: boolean; msg: string }
 const fail = (msg: string): EditResult => ({ ok: false, msg });
@@ -9,7 +9,7 @@ const fail = (msg: string): EditResult => ({ ok: false, msg });
 function slots(old: { u: number; u_size: number; side: number }, dev: Device): [number, number][] {
   const top = old.u + old.u_size - 1;
   const us = Array.from(new Set([top - dev.u_size + 1, old.u])).filter((u) => u >= 1);
-  const sides = dev.half ? Array.from(new Set([old.side, 0, 1])) : [0];
+  const sides = Array.from(new Set([old.side, ...sidesOf(dev)])).filter((s) => sidesOf(dev).includes(s));
   return us.flatMap((u) => sides.map((s) => [u, s] as [number, number]));
 }
 
@@ -17,7 +17,8 @@ function slots(old: { u: number; u_size: number; side: number }, dev: Device): [
 function nearest(doc: Doc, dev: Device, r: Rack, u0: number, side0: number): [number, number] | null {
   const max = r.u - dev.u_size + 1;
   const us = Array.from({ length: Math.max(0, max) }, (_, i) => i + 1).sort((a, b) => Math.abs(a - u0) - Math.abs(b - u0) || b - a);
-  for (const u of us) for (const s of dev.half ? [side0, 1 - side0] : [0])
+  const sides = sidesOf(dev).sort((a, b) => Math.abs(a - side0) - Math.abs(b - side0));
+  for (const u of us) for (const s of sides)
     if (checkPlace(doc, dev, r, u, s).ok) return [u, s];
   return null;
 }
@@ -44,7 +45,7 @@ function refit(doc: Doc, dev: Device, old: { rack: number | null; u: number; u_s
   if (nearby) {
     const s = nearest(doc, dev, r, old.u, old.side);
     if (s) { dev.rack = r.id; dev.u = s[0]; dev.side = s[1]; return { why: "" }; }
-    return { why: `No room in ${r.name} for ${dev.name} (${dev.u_size}U${dev.half ? ", half width" : ""}).` };
+    return { why: `No room in ${r.name} for ${dev.name} (${dev.u_size}U${widthLabel(dev) ? "," + widthLabel(dev) + " width" : ""}).` };
   }
   return { why: first || `${dev.name} does not fit there` };
 }
@@ -63,7 +64,7 @@ export function resizeDevice(doc: Doc, id: number, uSize: number, half?: boolean
   if (half != null && half !== !!dev.half && dev.plate) return fail("This model has a fixed width");
   if (n === dev.u_size && (half == null || half === !!dev.half)) return { ok: true, msg: "" };
   dev.u_size = n;
-  if (half != null) { dev.half = half; if (!half) dev.side = 0; }
+  if (half != null) { dev.half = half; delete dev.cols; if (!half) dev.side = 0; }
   const r = refit(work, dev, old, false);
   if (r.why) return fail(r.why);
   Object.assign(doc, work);
@@ -127,14 +128,18 @@ export function swapModel(doc: Doc, id: number, tpl: Tpl): SwapResult {
   if (!dev) return bad("No such device");
   const old = { rack: dev.rack, u: dev.u, u_size: dev.u_size, side: dev.side };
   const was = { type: dev.type, model: dev.model };
+  const had = !!dev.plate;
 
   const fresh = fromTpl(work, tpl); // gives new ids to the template ports
   const pm = mapPorts(work, dev, fresh.ports);
 
   dev.u_size = fresh.u_size; dev.half = fresh.half; dev.color = fresh.color; dev.rows = fresh.rows;
+  if (fresh.cols) dev.cols = fresh.cols; else delete dev.cols;
+  if (dev.side >= sidesOf(dev).length) dev.side = sidesOf(dev).length - 1;
   dev.type = tpl.type;
   if (tpl.model) dev.model = tpl.model;
-  if (fresh.plate) { dev.plate = fresh.plate; dev.face = "both"; } else { delete dev.plate; if (dev.face === "both") dev.face = "front"; }
+  // A rear or short mount stays as it was; a new faceplate on a front-only plain box becomes full depth.
+  if (fresh.plate) { dev.plate = fresh.plate; if (!dev.rev && dev.face === "front" && !had) dev.face = "both"; } else delete dev.plate;
   dev.ports = pm.ports;
   if (dev.auvik_id) {
     const lock = new Set(dev.locked ?? []);
