@@ -2,6 +2,28 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.6.0 — 2026-11-16
+Desktop app 2.4.0 has the same changes.
+- **Edit devices.** The properties panel adds a MAC field. A Ports list lets you rename ports, change their type, add ports and delete them. Deleting a port that has a cable asks first and removes the cable.
+- **Your edits are kept.** When you change a field on an imported device or endpoint, it gets a lock icon. The next Auvik import leaves it alone. Click the lock to let Auvik update it again.
+- **Edit endpoints and VMs.** Select an "Endpoints on ..." or "VMs on ..." box to edit each member (name, kind, type, model, IP, MAC, switch port). You can also:
+  - add a member by hand, on a free switch port you pick;
+  - remove a member, which removes its port and cable;
+  - move a member to another switch's box;
+  - change a VM box's host.
+- In the Endpoints view, click a row to open that member. "Place on switch..." puts an unplaced device on a switch port you choose.
+- **Re-import shows what changed.** Import Auvik into a rack that already has Auvik devices to get a Changes list:
+  - new devices, changed fields (IP, model, name), new cables and cables that moved to another port or switch, all ticked;
+  - fields you edited by hand, shown as kept and unticked;
+  - cables Auvik no longer sees, and devices or endpoints missing from the export, unticked (nothing is removed unless you tick it).
+  Import does exactly what is ticked, as one undo step. A moved cable keeps its color and type. Cables you drew by hand and endpoints you added by hand are never touched.
+- **iDRAC / iLO on the back of the server.** Out-of-band management cards no longer come in as separate boxes. Each becomes an iDRAC, iLO or BMC port on the rear of its server, cabled to its switch port. The importer guesses the server from the name ("Server1-iDRAC" goes to "Server1") or serial. You can change it in the review's Host column. If the server is not in the export, "New server" adds a 2U placeholder server with that name, which you can replace later.
+- **Cable display** (bottom left of the rack view, remembered per browser):
+  - Show: all cables, only the selected device's cables, or none. With none, a dot marks each connected port.
+  - Style: routed (as before) or stubs. Stubs are a short line at each port labeled with the far end, such as "→ SW-02 :34".
+  - Hide endpoint cables: show only the infrastructure links.
+  PDF and Visio exports still draw every cable.
+
 ## 2.5.0 — 2026-11-16
 Desktop app 2.3.0 has the same changes.
 - **Cables follow a device while you drag it.** Network and power cables re-route as you move a device between U slots, racks or around the off-rack area. They settle when you let go. Press Escape to cancel the move.

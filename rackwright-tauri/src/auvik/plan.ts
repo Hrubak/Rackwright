@@ -283,16 +283,20 @@ export function buildLinks(p: ParsedAuvik, keyOf: Map<AuvikDevice, string>): { l
 export interface PlanUnit {
   key: string; itemKey: string; name: string; unit?: number; item: PlanItem; tpl: Tpl; generic: boolean;
   mode: "rack" | "off"; maxPort: number; mainSlot: number; slotOffsets: Record<number, number>; isGroup?: false;
+  existingId?: number;    // stands for a server already in the document (an OOBM host chosen in the review); never created
+  placeholder?: boolean;  // "New server" made for an OOBM controller
 }
 export interface Member { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; key: string; kind: EpKind }
 export interface PlanGroup { key: string; name: string; unit: PlanUnit; members: Member[]; summary: string; isGroup: true; tpl: Tpl }
 /** VMs on one host (or the "no host" box). Drawn as an off-rack "Virtual machines" device with no ports. */
 export interface PlanVmBox { key: string; name: string; hostKey: string | null; hostUnit: PlanUnit | null; members: Member[]; summary: string; tpl: Tpl }
-export interface PortRef { target: PlanUnit | PlanGroup; iface: string; fast: boolean; member?: number }
+export interface PortRef { target: PlanUnit | PlanGroup; iface: string; fast: boolean; member?: number; oobm?: string /* key of the OOBM controller: the end is the host's OOBM port */ }
 export interface PlanCable { a: PortRef; b: PortRef; label: string; key: string }
 export interface Unplaced { name: string; type: string; model: string; ip: string; mac: string; status: string; reason: string }
+/** An iDRAC / iLO / BMC drawn as a port on the back of its host server. */
+export interface PlanOobm { key: string; item: PlanItem; name: string; ip: string; mac: string; serial: string; port: string; unit: PlanUnit; newServer: boolean }
 export interface ImportPlan {
-  site: string; units: PlanUnit[]; groups: PlanGroup[]; vmBoxes: PlanVmBox[]; cables: PlanCable[]; unplaced: Unplaced[]; virtual: string[]; warnings: string[];
+  site: string; units: PlanUnit[]; groups: PlanGroup[]; vmBoxes: PlanVmBox[]; cables: PlanCable[]; unplaced: Unplaced[]; virtual: string[]; warnings: string[]; oobms: PlanOobm[];
 }
 
 interface Analysis { items: PlanItem[]; byKey: Map<string, PlanItem>; links: Link[]; warnings: string[] }
@@ -357,7 +361,7 @@ function analyze(p: ParsedAuvik, prev: PlanItem[] = []): Analysis {
   return { items, byKey, links, warnings };
 }
 
-export function buildItems(p: ParsedAuvik): PlanItem[] { return fillHosts(analyze(p).items); }
+export function buildItems(p: ParsedAuvik, ctx?: HostCtx): PlanItem[] { return fillHosts(analyze(p).items, ctx); }
 
 // ---------------------------------------------------------------- VM hosts
 const HOST_RULES: [RegExp, RegExp][] = [
@@ -376,21 +380,64 @@ export function guessHost(vm: Pick<PlanItem, "dev">, hosts: PlanItem[]): string 
   return "";
 }
 export const hostsOf = (items: PlanItem[]) => items.filter((i) => i.kind === "server" && (i.mode === "rack" || i.mode === "off"));
-/** Give every VM row that has no host choice yet (or whose host is no longer a placed server) a guessed one. */
-export function fillHosts(items: PlanItem[]): PlanItem[] {
-  const hosts = hostsOf(items);
-  return items.map((i) => (i.mode === "vm" && (i.host === null || (i.host && !hosts.some((h) => h.key === i.host))) ? { ...i, host: guessHost(i, hosts) } : i));
+
+// ---------------------------------------------------------------- OOBM hosts (iDRAC / iLO / BMC)
+/** Servers already in the document, offered as OOBM hosts. */
+export interface HostCtx { servers: { id: number; name: string; serial: string; oobmKey?: string; auvikKey?: string }[] }
+export const hostCtxOf = (doc: { devices: Device[] }): HostCtx => ({
+  servers: doc.devices.filter((d) => (d.type === "Server" || d.type === "Storage") && !d.auvik_id?.startsWith("g:") && !d.auvik_id?.startsWith("vm:"))
+    .map((d) => ({ id: d.id, name: d.name, serial: d.serial || "", oobmKey: d.oobm?.key, auvikKey: d.auvik_id?.split("#")[0] })),
+});
+export const oobmHostsOf = (items: PlanItem[]) => items.filter((i) => (i.kind === "server" || i.kind === "storage") && (i.mode === "rack" || i.mode === "off"));
+/** The server name an iDRAC belongs to: "Host1-iDrac" -> "Host1", "idrac-esxi9" -> "esxi9". */
+export function stripOobm(name: string): string {
+  const s = name.trim().split(".")[0].replace(/^(idrac|ilo|bmc|ipmi)[-_ ]+/i, "").replace(/[-_ ]*(idrac\d*|ilo\d*|bmc|ipmi|imm\d*|oobm)$/i, "").trim();
+  return s || name.trim();
+}
+/** "iDRAC", "iLO", "BMC" or "OOBM" from the vendor / model text. */
+export function oobmPortName(d: Pick<AuvikDevice, "name" | "model" | "description">): string {
+  const t = `${d.model} ${d.name} ${d.description}`;
+  if (/idrac|dell/i.test(t)) return "iDRAC";
+  if (/ilo|ilo\d|hpe|hewlett|hp/i.test(t)) return "iLO";
+  if (/bmc|supermicro|ipmi/i.test(t)) return "BMC";
+  return "OOBM";
+}
+/** Which host does this controller belong to? Plan key, "doc:<id>", or "new". Matches the host's saved OOBM key first, then name, then serial. */
+export function guessOobmHost(it: Pick<PlanItem, "key" | "dev">, hosts: PlanItem[], ctx?: HostCtx): string {
+  const mine = ctx?.servers.find((s) => s.oobmKey === it.key);
+  if (mine) return mine.auvikKey && hosts.some((h) => h.key === mine.auvikKey) ? mine.auvikKey : `doc:${mine.id}`;
+  const want = stripOobm(it.dev.name).toLowerCase();
+  const same = (n: string) => !!n && n.toLowerCase().split(".")[0] === want;
+  const bySerial = it.dev.serial;
+  const h = hosts.find((x) => same(x.dev.name)) ?? (bySerial ? hosts.find((x) => x.dev.serial === bySerial) : undefined);
+  if (h) return h.key;
+  const s = ctx?.servers.find((x) => !x.oobmKey && same(x.name)) ?? (bySerial ? ctx?.servers.find((x) => x.serial === bySerial && !x.oobmKey) : undefined);
+  return s ? `doc:${s.id}` : "new";
+}
+const isOobmRow = (i: PlanItem) => i.kind === "ipmi" && (i.mode === "rack" || i.mode === "off");
+/** Give every VM row and every OOBM row that has no host choice yet (or whose host is gone) a guessed one. */
+export function fillHosts(items: PlanItem[], ctx?: HostCtx): PlanItem[] {
+  const hosts = hostsOf(items), oh = oobmHostsOf(items);
+  return items.map((i) => {
+    if (i.mode === "vm" && (i.host === null || (i.host && !hosts.some((h) => h.key === i.host)))) return { ...i, host: guessHost(i, hosts) };
+    if (isOobmRow(i)) {
+      const h = i.host;
+      const ok = h !== null && (h === "new" || h === "off" || (h.startsWith("doc:") ? !!ctx?.servers.some((s) => `doc:${s.id}` === h) : oh.some((x) => x.key === h)));
+      if (!ok) return { ...i, host: guessOobmHost(i, oh, ctx) };
+    }
+    return i;
+  });
 }
 /** The user changed "Include as" on one row. */
-export function setMode(items: PlanItem[], key: string, mode: Mode): PlanItem[] {
-  return fillHosts(items.map((i) => (i.key === key ? { ...i, mode, host: mode === "vm" ? i.host : null } : i)));
+export function setMode(items: PlanItem[], key: string, mode: Mode, ctx?: HostCtx): PlanItem[] {
+  return fillHosts(items.map((i) => (i.key === key ? { ...i, mode, host: mode === "vm" || (i.kind === "ipmi" && (mode === "rack" || mode === "off")) ? i.host : null } : i)), ctx);
 }
 /** The user changed the Type of one row: classify it again (kind, default Include as, template). Other rows keep their edits. */
-export function retype(p: ParsedAuvik, items: PlanItem[], key: string, type: string): PlanItem[] {
+export function retype(p: ParsedAuvik, items: PlanItem[], key: string, type: string, ctx?: HostCtx): PlanItem[] {
   const next = items.map((i) => (i.key === key ? { ...i, type } : i));
   const fresh = analyze(p, next).items.find((i) => i.key === key);
   if (!fresh) return items;
-  return fillHosts(next.map((i) => (i.key === key ? { ...fresh, mount: i.mount } : i)));
+  return fillHosts(next.map((i) => (i.key === key ? { ...fresh, mount: i.mount } : i)), ctx);
 }
 
 const PRIORITY: Record<Kind, number> = { firewall: 0, router: 1, switch: 2, controller: 3, server: 4, pdu: 5, ups: 6, storage: 7, ap: 8, ipmi: 9, vm: 10, endpoint: 11 };
@@ -406,8 +453,12 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
   // 1. one unit per placed device, several per stack
   const units: PlanUnit[] = [];
   const unitsOf = new Map<string, PlanUnit[]>();
+  // OOBM controllers with a host become a port on the host (a placed server, a server already in the document, or a new placeholder)
+  const oobmHostable = new Set(oobmHostsOf(items).map((h) => h.key));
+  const isOobm = (it: PlanItem) => it.kind === "ipmi" && isActive(it.key) && !!it.host && it.host !== "off" &&
+    (it.host === "new" || it.host.startsWith("doc:") || oobmHostable.has(it.host));
   for (const it of items) {
-    if (!isActive(it.key)) continue;
+    if (!isActive(it.key) || isOobm(it)) continue;
     const ifs = an.links.filter((l) => l.a === it.key || l.b === it.key).map((l) => ifaceOf(l, it.key)).filter(Boolean);
     const { unitNums, layout } = portLayout(it.kind === "switch" ? ifs : []);
     const list: PlanUnit[] = [];
@@ -425,9 +476,30 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     unitsOf.set(it.key, list);
     units.push(...list);
   }
-  units.sort((x, y) => PRIORITY[x.item.kind] - PRIORITY[y.item.kind] || (x.unit ?? 0) - (y.unit ?? 0));
+  const oobms: PlanOobm[] = [];
+  const oobmOf = new Map<string, PlanOobm>();
+  for (const it of items) {
+    if (!isOobm(it)) continue;
+    const d = it.dev, h = it.host as string;
+    let unit: PlanUnit | undefined, newServer = false;
+    if (h === "new") {
+      const name = stripOobm(d.name);
+      const tpl = clone(CATALOG.find((c) => c.name === "Server 2U")!);
+      unit = { key: `oobm:${it.key}`, itemKey: `oobm:${it.key}`, name, item: it, tpl, generic: true, mode: "rack", maxPort: 0, mainSlot: 1, slotOffsets: {}, placeholder: true };
+      units.push(unit); newServer = true;
+    } else if (h.startsWith("doc:")) {
+      const id = parseInt(h.slice(4));
+      unit = { key: h, itemKey: h, name: "", item: it, tpl: clone(CATALOG.find((c) => c.name === "Server 2U")!), generic: true, mode: "off", maxPort: 0, mainSlot: 1, slotOffsets: {}, existingId: id };
+    } else unit = unitsOf.get(h)![0];
+    const o: PlanOobm = { key: it.key, item: it, name: d.name, ip: d.ips[0] || "", mac: d.macs[0] || "", serial: d.serial, port: oobmPortName(d), unit, newServer };
+    oobms.push(o); oobmOf.set(it.key, o);
+  }
+  const prio = (u: PlanUnit) => (u.placeholder ? PRIORITY.server : PRIORITY[u.item.kind]);
+  units.sort((x, y) => prio(x) - prio(y) || (x.unit ?? 0) - (y.unit ?? 0));
 
   const unitFor = (itemKey: string, iface: string): PlanUnit => {
+    const o = oobmOf.get(itemKey);
+    if (o) return o.unit;
     const list = unitsOf.get(itemKey)!;
     if (list.length === 1) return list[0];
     const pp = parsePort(iface);
@@ -454,7 +526,10 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const label = swSide ? `${swSide.u.name} ${swSide.i}` : `${ua.name} - ${ub.name}`;
     const okA = claim(ua, ia, ub.name), okB = claim(ub, ib, ua.name);
     if (!okA || !okB) continue;
-    cables.push({ a: { target: ua, iface: ia, fast }, b: { target: ub, iface: ib, fast }, label, key: (l.a < l.b ? `${l.a}|${l.b}` : `${l.b}|${l.a}`) + (l.n ? `#${l.n}` : "") });
+    const ra: PortRef = { target: ua, iface: ia, fast }, rb: PortRef = { target: ub, iface: ib, fast };
+    if (oobmOf.has(l.a)) { ra.oobm = l.a; ra.iface = ""; }
+    if (oobmOf.has(l.b)) { rb.oobm = l.b; rb.iface = ""; }
+    cables.push({ a: ra, b: rb, label, key: (l.a < l.b ? `${l.a}|${l.b}` : `${l.b}|${l.a}`) + (l.n ? `#${l.n}` : "") });
   }
 
   // 3. endpoints: group per switch unit, one port per endpoint
@@ -515,7 +590,7 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
   }
   const vmList = [...vmBoxes.values()].sort((x, y) => (x.hostKey ? 0 : 1) - (y.hostKey ? 0 : 1) || x.name.localeCompare(y.name));
   for (const b of vmList) { b.members.sort((x, y) => x.name.localeCompare(y.name)); b.summary = summarize(b.members.map((m) => m.kind)); }
-  return { site: p.site, units, groups: groupList, vmBoxes: vmList, cables, unplaced, virtual, warnings };
+  return { site: p.site, units, groups: groupList, vmBoxes: vmList, cables, unplaced, virtual, warnings, oobms };
 }
 
 // ---------------------------------------------------------------- locating ports on a device (also used on devices already in the document)

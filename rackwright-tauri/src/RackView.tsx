@@ -4,6 +4,7 @@ import { kindLabel } from "./racks";
 import { Target, devDims, rackUsage, resolveTarget, shapeOf } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import Cables, { CableColorMode } from "./Cables";
+import type { CableOpts } from "./cableView";
 import VmLinks from "./VmLinks";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
 
@@ -54,14 +55,14 @@ export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
 export type Resolver = (dev: Device, clientX: number, clientY: number) => Target;
 
-export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own" }: {
+export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own", cableOpts }: {
   doc: Doc; face: "front" | "rear"; routes: RouteResult;
   /** Provisional document while an existing device is dragged (device drawn at its target; routes/ports props then belong to it). */
   liveDoc?: Doc | null; onDragTarget?: (id: number, t: Target) => void; onDragEnd?: (committed: boolean) => void; ports: PortPos[];
   selected: Sel; onSelect: (s: Sel) => void; pendingPort: number | null; onPort: (pid: number) => void;
   onMoveDevice: (id: number, rack: number | null, u: number, side: number, fx: number, fy: number) => void;
   onReject: (why: string) => void;
-  drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number; cableColor?: CableColorMode;
+  drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number; cableColor?: CableColorMode; cableOpts?: CableOpts;
 }) {
   const doc = liveDoc ?? committed; // what is drawn; hit-testing and edits use `committed`
   const [hovDev, setHovDev] = useState<number | null>(null);
@@ -233,7 +234,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           </g>;
         })()}
         <VmLinks doc={doc} rectOf={(d) => devRect(doc, d)} visible={vis} />
-        <Cables doc={doc} routes={routes.routes} selected={selected} hoverDev={hovDev} onSelect={onSelect} colorMode={cableColor} zoom={view.z} />
+        <Cables doc={doc} routes={routes.routes} selected={selected} hoverDev={hovDev} onSelect={onSelect} colorMode={cableColor} zoom={view.z} opts={cableOpts} />
       </g>
     </svg>
   );

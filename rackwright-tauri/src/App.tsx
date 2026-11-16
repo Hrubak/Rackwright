@@ -1,4 +1,5 @@
 import { CableOverlay, CableColorMode } from "./Cables";
+import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { backend, IS_WEB } from "./backend";
 import * as A from "./api";
@@ -17,6 +18,8 @@ const VIEWS: [ViewId, string][] = [["rack", "Rack"], ["infra", "Infrastructure"]
 import RackPicker, { PickResult } from "./RackPicker";
 import { RACK_MODELS, genericDefaultU, kindLabel, dimsText, specOf, modelById } from "./racks";
 import { AuvikInfo, EndpointTable, UnplacedDialog } from "./auvik/Panels";
+import PortsEditor from "./PortsEditor";
+import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
@@ -71,6 +74,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [palSel, setPalSel] = useState<number | null>(null);
   const [pdrag, setPdrag] = useState<{ i: number; x: number; y: number; active: boolean } | null>(null);
   const [cableColor, setCableColor] = useState<CableColorMode>(() => { try { return localStorage.getItem("rw.cableColor") === "type" ? "type" : "own"; } catch { return "own"; } });
+  const [cableOpts, setCableOpts] = useState<CableOpts>(loadOpts);
+  const [epFocus, setEpFocus] = useState<{ dev: number; idx: number } | null>(null);
   const [fitTick, setFitTick] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
@@ -367,12 +372,22 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const endp = (pid: number) => { const o = portOf(doc, pid); return o ? `${o.d.name} ${o.p.name}` : "?"; };
   const cab = (c: NonNullable<typeof selCable>, patch: Record<string, unknown>) =>
     edit((d) => { Object.assign(d.cables.find((x) => x.id === c.id)!, patch); }, `cab${c.id}`);
-  const field = (label: string, val: string | number, set: (v: string) => void, w = 200) => (
-    <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>{label}<br />
+  const lockIcon = (dv: Device, k: string) => dv.locked?.includes(k) ? (
+    <button title="Next Auvik import may update this field" onClick={(e) => { e.preventDefault(); edit((d) => { const x = d.devices.find((y) => y.id === dv.id)!; x.locked = (x.locked ?? []).filter((f) => f !== k); if (!x.locked.length) delete x.locked; }); }}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: "0 3px", fontSize: 11, color: "#d29922" }}>{"\u{1F512}"}</button>
+  ) : null;
+  const field = (label: string, val: string | number, set: (v: string) => void, w = 200, lock?: ReactNode) => (
+    <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>{label}{lock}<br />
       <input style={{ ...inp, width: w }} value={val} onChange={(e) => set(e.target.value)} /></label>
   );
-  const devSet = (dv: Device, k: "name" | "type" | "ip" | "model" | "serial" | "notes", v: string) =>
-    edit((d) => { (d.devices.find((x) => x.id === dv.id)! as any)[k] = v; }, `dev${dv.id}${k}`);
+  const devSet = (dv: Device, k: "name" | "type" | "ip" | "model" | "serial" | "notes" | "mac", v: string) =>
+    edit((d) => {
+      const x = d.devices.find((y) => y.id === dv.id)! as any;
+      if (x[k] === v) return;
+      x[k] = v;
+      if (x.auvik_id && !(x.locked ?? []).includes(k)) x.locked = [...(x.locked ?? []), k];
+    }, `dev${dv.id}${k}`);
+  const legendCables = useMemo(() => { const v = visibleCables(doc, cableOpts, sel, null); return doc.cables.filter((c) => v.has(c.id)); }, [doc, cableOpts, sel]);
   const dragDev = pdrag && pdrag.active ? { ...PROTOS[pdrag.i], face: CATALOG[pdrag.i].plate ? "both" : face } : null;
   const portsCabled = (dv: Device) => dv.ports.filter((p) => doc.cables.some((c) => c.a === p.id || c.b === p.id)).length;
   const sum = (() => {
@@ -446,13 +461,13 @@ export default function App({ web }: { web?: WebProps } = {}) {
           )}
           {view === "infra" && <InfraView doc={doc} selected={sel} onSelect={setSel} />}
           {view === "switch" && <SwitchView doc={doc} selected={sel} onSelect={setSel} />}
-          {view === "endpoints" && <EndpointsView doc={doc} selected={sel} onSelect={setSel} />}
+          {view === "endpoints" && <EndpointsView doc={doc} selected={sel} onSelect={setSel} edit={edit} onMember={(dev, idx) => setEpFocus({ dev, idx })} />}
           <div style={{ position: "absolute", inset: 0, display: view === "rack" ? "block" : "none" }}>
           <RackView doc={doc} liveDoc={live?.doc ?? null} onDragTarget={onDragTarget} onDragEnd={onDragEnd} face={face}
             routes={live ? live.routes : routes} ports={live ? live.ports : ports} selected={sel} onSelect={setSel}
             pendingPort={pending} onPort={onPort} onMoveDevice={onMoveDevice} onReject={(w) => say(w, true)}
-            drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} />
-          <CableOverlay cables={doc.cables} mode={cableColor} onMode={(m) => { setCableColor(m); try { localStorage.setItem("rw.cableColor", m); } catch { /* ignore */ } }} />
+            drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} cableOpts={cableOpts} />
+          <CableOverlay cables={legendCables} opts={cableOpts} onOpts={(o) => { setCableOpts(o); saveOpts(o); }} mode={cableColor} onMode={(m) => { setCableColor(m); try { localStorage.setItem("rw.cableColor", m); } catch { /* ignore */ } }} />
           </div>
           {toast && (
             <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", padding: "6px 14px", borderRadius: 5, fontSize: 13,
@@ -501,12 +516,13 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
           {selDev && <>
-            {field("Type", selDev.type, (v) => devSet(selDev, "type", v))}
-            {field("Name", selDev.name, (v) => devSet(selDev, "name", v))}
-            {field("Model", selDev.model ?? "", (v) => devSet(selDev, "model", v))}
-            {field("IP", selDev.ip ?? "", (v) => devSet(selDev, "ip", v))}
-            {field("Serial", selDev.serial ?? "", (v) => devSet(selDev, "serial", v))}
-            <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>Notes<br />
+            {field("Type", selDev.type, (v) => devSet(selDev, "type", v), 200, lockIcon(selDev, "type"))}
+            {field("Name", selDev.name, (v) => devSet(selDev, "name", v), 200, lockIcon(selDev, "name"))}
+            {field("Model", selDev.model ?? "", (v) => devSet(selDev, "model", v), 200, lockIcon(selDev, "model"))}
+            {field("IP", selDev.ip ?? "", (v) => devSet(selDev, "ip", v), 200, lockIcon(selDev, "ip"))}
+            {field("MAC", selDev.mac ?? "", (v) => devSet(selDev, "mac", v), 200, lockIcon(selDev, "mac"))}
+            {field("Serial", selDev.serial ?? "", (v) => devSet(selDev, "serial", v), 200, lockIcon(selDev, "serial"))}
+            <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>Notes{lockIcon(selDev, "notes")}<br />
               <textarea style={{ ...inp, width: 200, height: 46 }} value={selDev.notes ?? ""} onChange={(e) => devSet(selDev, "notes", e.target.value)} /></label>
             <label style={{ fontSize: 12 }}>Rack<br />
               <select style={{ ...inp, width: 208 }} value={selDev.rack ?? ""} onChange={(e) => {
@@ -538,7 +554,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <div style={{ fontSize: 12, margin: "6px 0", opacity: 0.7 }}>
               {selDev.u_size}U, {selDev.ports.length} ports ({portsCabled(selDev)} cabled). Drag to move; click a port, then another, to cable.
             </div>
-            <EndpointTable dev={selDev} />
+            <PortsEditor key={selDev.id} dev={selDev} doc={doc} edit={edit} />
+            {(selDev.type === "Endpoints" || selDev.type === "Virtual machines") &&
+              <EndpointTable dev={selDev} doc={doc} edit={edit} focusIdx={epFocus?.dev === selDev.id ? epFocus.idx : null} />}
             <button style={btn} onClick={() => { let id = 0; if (edit((d) => { id = duplicateDevice(d, selDev.id)?.id ?? 0; })) setSel({ kind: "dev", id }); }}>Duplicate</button>
           </>}
           {selCable && <>

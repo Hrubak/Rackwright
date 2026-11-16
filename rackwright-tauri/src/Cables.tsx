@@ -2,6 +2,7 @@ import React, { memo, useMemo, useState } from "react";
 import { findBundles } from "./bundles";
 import { isOutlet } from "./edit";
 import type { Cable, Device, Doc, Route } from "./types";
+import { CableOpts, DEFAULT_OPTS, Stub, StubEnd, dotCables, layoutStubs, visibleCables } from "./cableView";
 
 export type CableColorMode = "own" | "type";
 export type Focus = { kind: "cable" | "dev" | "rack"; id: number } | null;
@@ -159,8 +160,33 @@ function place(e: React.MouseEvent): { x: number; y: number } {
   const q = pt.matrixTransform(m.inverse()); return { x: q.x, y: q.y };
 }
 
-export default function Cables({ doc, routes, selected, hoverDev, onSelect, colorMode, zoom }: {
-  doc: Doc; routes: Route[]; selected: Focus; hoverDev: number | null; onSelect: (s: Focus) => void; colorMode: CableColorMode; zoom: number;
+// ---- a stub: short line out of the faceplate, label at its end
+const StubShape = memo(function StubShape({ s, color, state, zoom, onPick, onEnter, onMove, onLeave }: {
+  s: Stub; color: string; state: CState; zoom: number; onPick: (id: number) => void;
+  onEnter: (id: number, e: React.MouseEvent) => void; onMove: (e: React.MouseEvent) => void; onLeave: () => void;
+}) {
+  const show = (s.labelOn || state === "sel" || state === "rel") && zoom >= 0.5;
+  const down = s.dir > 0;
+  return (
+    <g opacity={state === "dim" ? 0.25 : 1} style={{ cursor: "pointer" }}
+      onClick={(e) => { e.stopPropagation(); onPick(s.cable); }}
+      onMouseEnter={(e) => onEnter(s.cable, e)} onMouseMove={onMove} onMouseLeave={onLeave}>
+      <title>{s.full}</title>
+      {state === "sel" && <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke="#ffd33d" strokeWidth={5} strokeLinecap="round" opacity={0.9} />}
+      <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke="#000" strokeOpacity={0.4} strokeWidth={3.4} strokeLinecap="round" />
+      <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+      <circle cx={s.x2} cy={s.y2} r={2.4} fill={color} stroke="#000" strokeOpacity={0.5} strokeWidth={0.6} />
+      <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth={8} />
+      {show && (
+        <text transform={`translate(${s.x + 3} ${s.y2 + (down ? 5 : -5)}) rotate(${down ? 90 : -90})`} textAnchor={down ? "start" : "end"}
+          fontSize={8} fill="#d5dae0" stroke="#0b0c0e" strokeWidth={2.2} paintOrder="stroke" style={{ pointerEvents: "none" }}>{s.short}</text>
+      )}
+    </g>
+  );
+});
+
+export default function Cables({ doc, routes, selected, hoverDev, onSelect, colorMode, zoom, opts = DEFAULT_OPTS }: {
+  doc: Doc; routes: Route[]; selected: Focus; hoverDev: number | null; onSelect: (s: Focus) => void; colorMode: CableColorMode; zoom: number; opts?: CableOpts;
 }) {
   const [hovC, setHovC] = useState<TipInfo | null>(null);
   const cmap = useMemo(() => new Map<number, Cable>(doc.cables.map((c) => [c.id, c])), [doc.cables]);
@@ -180,6 +206,24 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
       ends: c ? [pinfo.get(c.a)?.dev.id, pinfo.get(c.b)?.dev.id] : [],
     };
   }), [routes, cmap, colorMode, pinfo]);
+
+  const vis = useMemo(() => visibleCables(doc, opts, selected, hoverDev), [doc, opts, selected, hoverDev]);
+  const dots = useMemo(() => dotCables(doc, opts), [doc, opts]);
+  const shown = useMemo(() => shapes.filter((s) => vis.has(s.id)), [shapes, vis]);
+  const shownRoutes = useMemo(() => routes.filter((r) => vis.has(r.cable)), [routes, vis]);
+  const stubs = useMemo(() => {
+    if (opts.style !== "stubs") return [];
+    const ends: StubEnd[] = [];
+    for (const s of shown) {
+      const c = cmap.get(s.id); if (!c) continue;
+      const ia = pinfo.get(c.a), ib = pinfo.get(c.b);
+      if (!ia || !ib) continue;
+      ends.push({ cable: s.id, dev: ia.dev.id, pt: s.a, dir: s.da, far: { dev: ib.dev.name, port: ib.name } });
+      ends.push({ cable: s.id, dev: ib.dev.id, pt: s.b, dir: s.db, far: { dev: ia.dev.name, port: ia.name } });
+    }
+    return layoutStubs(ends);
+  }, [opts.style, shown, cmap, pinfo]);
+  const shapeById = useMemo(() => new Map(shapes.map((s) => [s.id, s])), [shapes]);
 
   const focus: Focus = hovC ? { kind: "cable", id: hovC.id } : hoverDev != null ? { kind: "dev", id: hoverDev } : selected;
   const active = !!focus && (focus.kind === "cable" || focus.kind === "dev");
@@ -206,8 +250,17 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
 
   return (
     <g>
-      <Harness routes={routes} faded={active} />
-      {shapes.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
+      {opts.style === "routed" && <Harness routes={shownRoutes} faded={active} />}
+      {opts.style === "routed" && shown.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
+      {opts.style === "stubs" && stubs.map((s, i) => {
+        const sh = shapeById.get(s.cable);
+        return <StubShape key={`${s.cable}:${i}`} s={s} color={sh?.color || "#999"} state={sh ? stateOf(sh) : "normal"} zoom={zoom} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />;
+      })}
+      {dots.size > 0 && shapes.filter((s) => dots.has(s.id)).map((s) => (
+        <g key={"dot" + s.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onPick(s.id); }}>
+          {[s.a, s.b].map((p, k) => <circle key={k} cx={p[0]} cy={p[1]} r={3.4} fill={s.color} stroke="#0b0c0e" strokeWidth={1} />)}
+        </g>
+      ))}
       {hovC && tip && (
         <g transform={`translate(${hovC.x + 10 / zoom} ${hovC.y + 12 / zoom}) scale(${1 / zoom})`} style={{ pointerEvents: "none" }}>
           <rect width={Math.max(...tip.map((t) => t.length)) * 5.6 + 12} height={tip.length * 14 + 8} rx={4} fill="#0b0c0e" fillOpacity={0.94} stroke="#3a3d42" />
@@ -219,7 +272,7 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
 }
 
 // ---- HTML overlay for the canvas corner: colour mode switch and the by-type legend
-export function CableOverlay({ cables, mode, onMode }: { cables: Cable[]; mode: CableColorMode; onMode: (m: CableColorMode) => void }) {
+export function CableOverlay({ cables, mode, onMode, opts = DEFAULT_OPTS, onOpts }: { cables: Cable[]; mode: CableColorMode; onMode: (m: CableColorMode) => void; opts?: CableOpts; onOpts?: (o: CableOpts) => void }) {
   const rows = useMemo(() => {
     const m = new Map<string, { label: string; color: string; n: number }>();
     for (const c of cables) {
@@ -228,6 +281,7 @@ export function CableOverlay({ cables, mode, onMode }: { cables: Cable[]; mode: 
     }
     return [...m.values()].sort((a, b) => b.n - a.n);
   }, [cables]);
+  const selSt: React.CSSProperties = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 3, fontSize: 11.5 };
   const box: React.CSSProperties = { background: "#0b0c0eee", border: "1px solid #3a3d42", borderRadius: 5, fontSize: 11.5, color: "#c9ced4" };
   return (
     <div style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start", pointerEvents: "none" }}>
@@ -246,6 +300,23 @@ export function CableOverlay({ cables, mode, onMode }: { cables: Cable[]; mode: 
           <option value="own">own</option><option value="type">by type</option>
         </select>
       </label>
+      {onOpts && (
+        <div style={{ ...box, padding: "3px 8px", pointerEvents: "auto", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label>Show{" "}
+            <select value={opts.show} onChange={(e) => onOpts({ ...opts, show: e.target.value as CableOpts["show"] })} style={selSt}>
+              <option value="all">all</option><option value="selected">selected</option><option value="none">none</option>
+            </select>
+          </label>
+          <label>Style{" "}
+            <select value={opts.style} onChange={(e) => onOpts({ ...opts, style: e.target.value as CableOpts["style"] })} style={selSt}>
+              <option value="routed">routed</option><option value="stubs">stubs</option>
+            </select>
+          </label>
+          <label title="Hide cables to Endpoints, Virtual machines and off-rack devices">
+            <input type="checkbox" checked={opts.hideEndpoints} onChange={(e) => onOpts({ ...opts, hideEndpoints: e.target.checked })} /> Hide endpoint cables
+          </label>
+        </div>
+      )}
     </div>
   );
 }

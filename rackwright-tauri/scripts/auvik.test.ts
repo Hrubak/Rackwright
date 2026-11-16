@@ -2,10 +2,11 @@
 import JSZip from "jszip";
 import { readXlsx, colIndex } from "../src/auvik/xlsx";
 import { parseAuvik, parseConnected } from "../src/auvik/parse";
-import { buildItems, resolvePlan, parsePort, classify, retype, setMode, inferKind, summarize } from "../src/auvik/plan";
+import { buildItems, resolvePlan, parsePort, classify, retype, setMode, inferKind, summarize, hostCtxOf, stripOobm, guessOobmHost } from "../src/auvik/plan";
+import { computeDiff, defaultSelection } from "../src/auvik/diff";
 import { applyInPlace, findMissing } from "../src/auvik/apply";
-import { Doc, RW } from "../src/types";
-import { portOf, clone } from "../src/edit";
+import { Device, Doc, RW } from "../src/types";
+import { portOf, clone, nid, newCable, fromTpl, CATALOG } from "../src/edit";
 
 let fails = 0;
 const t = (name: string, ok: boolean, extra = "") => { if (!ok) fails++; console.log((ok ? "PASS " : "FAIL ") + name + (extra ? "  " + extra : "")); };
@@ -81,10 +82,12 @@ async function makeXlsx(ds: D[]): Promise<Uint8Array> {
 
 const load = async (ds: D[]) => parseAuvik(await readXlsx(await makeXlsx(ds)));
 const empty = (): Doc => ({ v: 1, nid: 1, racks: [], devices: [], cables: [] });
-const run = (doc: Doc, p: Awaited<ReturnType<typeof load>>, opt: Parameters<typeof applyInPlace>[2]) => {
-  const items = buildItems(p);
+const run = (doc: Doc, p: Awaited<ReturnType<typeof load>>, opt: Parameters<typeof applyInPlace>[2], sel?: (ids: string[]) => Set<string>, tweak?: (i: ReturnType<typeof buildItems>) => ReturnType<typeof buildItems>) => {
+  let items = buildItems(p, hostCtxOf(doc));
+  if (tweak) items = tweak(items);
   const plan = resolvePlan(p, items);
-  return { plan, items, res: applyInPlace(doc, plan, opt, items) };
+  const diff = computeDiff(doc, plan, items);
+  return { plan, items, diff, res: applyInPlace(doc, plan, opt, items, sel ? sel(diff.changes.map((c) => c.id)) : undefined) };
 };
 
 async function main() {
@@ -140,11 +143,12 @@ async function main() {
   t("network core above servers", dn("EX-CORE").u > dn("EX-ESX1").u && dn("EX-FW").u > dn("EX-CORE").u, `fw ${dn("EX-FW").u} core ${dn("EX-CORE").u} esx ${dn("EX-ESX1").u}`);
   t("desktop firewall gets a 1U mount kit by default", dn("EX-FW").rack != null && dn("EX-FW").u_size === 1 && !dn("EX-FW").half && !doc.devices.some((d) => d.type === "Shelf") && /mount kit/i.test(items.find((i) => i.dev.name === "EX-FW")!.kitName));
   t("VM listed in a VM box", doc.devices.some((d) => d.type === "Virtual machines" && d.endpoints!.some((e) => e.name === "EX-VM1")) && plan.vmBoxes.length === 1);
-  t("AP and iDRAC off-rack", dn("EX-AP1").rack == null && dn("EX-ESX1-iDRAC").rack == null && cableTo("EX-ESX1-iDRAC", "Mgmt")?.name === "EX-SW-02");
-  const pairs = doc.cables.map((c) => { const a = portOf(doc, c.a)!.d.id, b = portOf(doc, c.b)!.d.id; return a < b ? `${a}-${b}` : `${b}-${a}`; });
+  t("AP off-rack", dn("EX-AP1").rack == null);
+  t("iDRAC becomes the host's port, not a box", !doc.devices.some((d) => d.name === "EX-ESX1-iDRAC") && dn("EX-ESX1").oobm?.name === "EX-ESX1-iDRAC" && cableTo("EX-ESX1", "iDRAC")?.name === "EX-SW-02");
+  const pairOf = (c: { a: number; b: number }) => { const a = portOf(doc, c.a)!.d, b = portOf(doc, c.b)!.d; return { a, b, k: a.id < b.id ? `${a.id}-${b.id}` : `${b.id}-${a.id}` }; };
+  const plain = doc.cables.map(pairOf).filter((x) => x.a.type !== "Endpoints" && x.b.type !== "Endpoints" && x.a.name !== "EX-ESX1" && x.b.name !== "EX-ESX1");
   const portsUsed = doc.cables.flatMap((c) => [c.a, c.b]);
-  const grp = (id: number) => doc.devices.find((d) => d.id === id)!.type === "Endpoints";
-  t("no duplicate cables", new Set(portsUsed).size === portsUsed.length && new Set(pairs.filter((_, i) => !grp(portOf(doc, doc.cables[i].a)!.d.id) && !grp(portOf(doc, doc.cables[i].b)!.d.id))).size === pairs.filter((_, i) => !grp(portOf(doc, doc.cables[i].a)!.d.id) && !grp(portOf(doc, doc.cables[i].b)!.d.id)).length);
+  t("no duplicate cables", new Set(portsUsed).size === portsUsed.length && new Set(plain.map((x) => x.k)).size === plain.length);
   t("both-sides link gives one UPS cable", doc.cables.filter((c) => { const a = portOf(doc, c.a)!.d.name, b = portOf(doc, c.b)!.d.name; return (a === "EX-UPS" && b === "EX-CORE") || (b === "EX-UPS" && a === "EX-CORE"); }).length === 1);
   t("cable label + type", doc.cables.some((c) => c.label === "EX-SW-STACK unit 3 GigabitEthernet3/1/22" && c.type === "Cat6"));
   t("uplink slot lands on SFP+", land("EX-SW-STACK unit 1", "SFP+1"));
@@ -234,7 +238,7 @@ async function main() {
   run(d2, q2, { target: "current", rackId: d2.racks[0].id });
   const boxS2 = d2.devices.find((d) => d.name === "VMs on EX2-HV1")!;
   t("re-import adds no cables for dual links", d2.cables.length === cablesBefore && links("EX2-HV1", "EX2-SW").length === 2, `${cablesBefore} -> ${d2.cables.length}`);
-  t("re-import rebuilds the VM box in place", boxS2.id === idBefore && boxS2.endpoints!.map((e) => e.name).join() === "VM-S2" && boxS2.vm_host === n2("EX2-HV1").id);
+  t("re-import rebuilds the VM box in place and keeps the VM that left the export", boxS2.id === idBefore && boxS2.endpoints!.map((e) => e.name).join() === "VM-S2,VM-S1" && boxS2.vm_host === n2("EX2-HV1").id, boxS2.endpoints!.map((e) => e.name).join());
   t("re-import adds no devices", d2.devices.length === devsBefore, `${devsBefore} -> ${d2.devices.length}`);
   t("re-import keeps server ports", n2("EX2-HV1").ports.length === hv1.ports.length);
 
@@ -262,6 +266,138 @@ async function main() {
     const it = qi.map((i) => (i.dev.name === "VM-S1" ? { ...i, host: qm("EX2-ESX").key } : i));
     return resolvePlan(q, it).vmBoxes.some((b) => b.name === "VMs on EX2-ESX" && b.members.some((m) => m.name === "VM-S1"));
   })());
+
+  // ---------------------------------------------------------------- v3: re-import review (diff) and OOBM on the host
+  t("stripOobm", stripOobm("Host1-iDrac") === "Host1" && stripOobm("esxi9-idrac") === "esxi9" && stripOobm("idrac-esxi4") === "esxi4" && stripOobm("Node7-ILO") === "Node7" && stripOobm("plain") === "plain");
+
+  const fx3 = (o: { pc1?: string; pc3?: string; srvPort?: string; srvIp?: string; noUplink?: boolean; noPhone?: boolean; extra?: D[]; idracOn?: string } = {}): D[] => [
+    { name: "EX3-SWA", type: "Layer 3 Switch", model: "Brocade ICX7250-48-HPOE", serial: "SWAser", conn: o.noUplink ? "0" : "EX3-SWB through GigabitEthernet1/1/48" },
+    { name: "EX3-SWB", type: "Layer 3 Switch", model: "Brocade ICX7250-48-HPOE", serial: "SWBser", conn: o.noUplink ? "0" : "EX3-SWA through GigabitEthernet1/1/47" },
+    { name: "Host1", type: "Server", model: "Dell PowerEdge R640", serial: "PXser", ip: "10.99.3.10", conn: `EX3-SWA through GigabitEthernet1/1/${o.srvPort ?? "10"}` },
+    { name: "Host1-iDrac", type: "Intelligent Platform Management Interface", model: "Dell iDRAC9", ip: "10.99.3.110", conn: `EX3-SWA through GigabitEthernet1/1/${o.idracOn ?? "11"}` },
+    { name: "Lonely-bmc", type: "Intelligent Platform Management Interface", model: "Supermicro BMC", ip: "10.99.3.120", conn: "EX3-SWB through GigabitEthernet1/1/12" },
+    { name: "PC-1", type: "Workstation", conn: `EX3-SWA through GigabitEthernet1/1/${o.pc1 ?? "5"}` },
+    { name: "PC-2", type: "Workstation", conn: "EX3-SWA through GigabitEthernet1/1/6" },
+    ...(o.noPhone ? [] : [{ name: "Phone-1", type: "IP Phone", conn: "EX3-SWA through GigabitEthernet1/1/7" } as D]),
+    { name: "PC-3", type: "Workstation", conn: o.pc3 ?? "EX3-SWB through GigabitEthernet1/1/5" },
+    { name: "PC-5", type: "Workstation", conn: "EX3-SWB through GigabitEthernet1/1/6" },
+    ...(o.extra ?? []),
+  ].map((d) => ({ ...d, ip: d.name === "Host1" && o.srvIp ? o.srvIp : (d as D).ip }));
+  const idsOf = (ds: ReturnType<typeof computeDiff>) => ds.changes.map((c) => c.id);
+
+  // guess + first import
+  const p3 = await load(fx3());
+  const it3 = buildItems(p3, { servers: [] });
+  const idr = it3.find((i) => i.dev.name === "Host1-iDrac")!, lone = it3.find((i) => i.dev.name === "Lonely-bmc")!, px = it3.find((i) => i.dev.name === "Host1")!;
+  t("OOBM host guessed by name", idr.host === px.key && lone.host === "new", `${idr.host} / ${lone.host}`);
+  t("OOBM host guessed by serial", guessOobmHost({ key: "k", dev: { ...idr.dev, name: "Mgmt-A", serial: "PXser" } }, it3.filter((i) => i.kind === "server")) === px.key);
+  t("OOBM host picks a server already in the document", guessOobmHost(lone, [], { servers: [{ id: 7, name: "lonely", serial: "" }] }) === "doc:7");
+  const e3 = empty();
+  run(e3, p3, { target: "new" });
+  const m3 = (n: string) => e3.devices.find((d) => d.name === n)!;
+  const pid3 = m3("Host1").ports.find((x) => x.name === "iDRAC")!;
+  const cableAt = (doc: Doc, pid: number) => doc.cables.find((c) => c.a === pid || c.b === pid);
+  t("OOBM: port on the host, cabled to the switch", !!pid3 && !!cableAt(e3, pid3.id) && portOf(e3, cableAt(e3, pid3.id)!.a === pid3.id ? cableAt(e3, pid3.id)!.b : cableAt(e3, pid3.id)!.a)!.d.name === "EX3-SWA" && cableAt(e3, pid3.id)!.label === "EX3-SWA GigabitEthernet1/1/11");
+  t("OOBM: host keeps its details", m3("Host1").oobm?.name === "Host1-iDrac" && m3("Host1").oobm?.ip === "10.99.3.110" && /OOBM: iDRAC Host1-iDrac; IP 10.99.3.110/.test(m3("Host1").notes || "") && m3("Host1").oobm?.portId === pid3.id);
+  t("OOBM: no off-rack box and no stray iDRAC port", !e3.devices.some((d) => d.name === "Host1-iDrac") && m3("Host1").ports.filter((x) => /idrac/i.test(x.name)).length === 1);
+  const ph = m3("Lonely");
+  t("OOBM: placeholder server in the rack", ph.rack != null && ph.u_size === 2 && ph.type === "Server" && /Placeholder: created for Lonely-bmc/.test(ph.notes || "") && !ph.auvik_id && ph.oobm?.key === lone.key);
+  t("OOBM: placeholder port is cabled to its switch", (() => { const pt = ph.ports.find((x) => x.id === ph.oobm!.portId)!; const c = cableAt(e3, pt.id); return !!c && portOf(e3, c.a === pt.id ? c.b : c.a)!.d.name === "EX3-SWB"; })());
+  t("OOBM: the rear port lives in the host's port list next to the NICs", (() => { const i = ph.ports.findIndex((x) => x.id === ph.oobm!.portId); return i > 0 && ph.ports[i - 1].name.startsWith("NIC") || /idrac/i.test(ph.ports[i].name); })());
+
+  // re-import of the same export: nothing to do, nothing duplicated
+  const sameDevs = e3.devices.length, sameCables = e3.cables.length, samePorts = e3.devices.reduce((n, d) => n + d.ports.length, 0);
+  const rs = run(e3, p3, { target: "current", rackId: e3.racks[0].id });
+  t("re-import of the same export has no changes", rs.diff.changes.length === 0, idsOf(rs.diff).join());
+  t("re-import: no duplicate placeholder, port or cable", e3.devices.length === sameDevs && e3.cables.length === sameCables && e3.devices.reduce((n, d) => n + d.ports.length, 0) === samePorts, `${sameDevs}/${sameCables}/${samePorts} -> ${e3.devices.length}/${e3.cables.length}`);
+  t("re-import: OOBM controller found again through the host", rs.items.find((i) => i.dev.name === "Lonely-bmc")!.host === `doc:${ph.id}` && rs.items.find((i) => i.dev.name === "Host1-iDrac")!.host === px.key);
+
+  // the user edits the rack by hand
+  const swA = m3("EX3-SWA");
+  const gA = () => e3.devices.find((d) => d.name === "Endpoints on EX3-SWA")!;
+  const gB = () => e3.devices.find((d) => d.name === "Endpoints on EX3-SWB")!;
+  t("endpoint members carry a stable key", gA().endpoints!.every((e) => !!e.key));
+  m3("Host1").ip = "10.99.3.77"; m3("Host1").locked = ["ip"];
+  const pc2 = gA().endpoints!.find((e) => e.name === "PC-2")!;
+  pc2.name = "Reception PC"; pc2.locked = ["name"]; gA().ports[gA().endpoints!.indexOf(pc2)].name = "Reception PC";
+  { // a member added by hand, with its own cable to a free switch port
+    const g = gA(), pt = { id: nid(e3), name: "Hand PC", type: "RJ45", label: "20" };
+    g.endpoints!.push({ name: "Hand PC", type: "", model: "", ip: "", mac: "", port: "20", status: "", kind: "pc", manual: true });
+    g.ports.push(pt);
+    newCable(e3, swA.ports.find((x) => x.name === "20")!.id, pt.id);
+  }
+  { // a device and a cable drawn by hand on a switch port
+    const h = fromTpl(e3, CATALOG.find((c) => c.name === "Server 1U")!); h.name = "Hand NAS"; h.rack = null; e3.devices.push(h);
+    newCable(e3, swA.ports.find((x) => x.name === "30")!.id, h.ports[0].id);
+  }
+  const handCables = e3.cables.length;
+
+  // Auvik now says: Host1 ip changed, PC-1 on port 8, PC-3 on SWA 9, Host1 on port 12, uplink gone, Phone-1 gone, PC-4 new
+  const p4 = await load(fx3({ pc1: "8", pc3: "EX3-SWA through GigabitEthernet1/1/9", srvPort: "12", srvIp: "10.99.3.88", noUplink: true, noPhone: true, extra: [{ name: "PC-4", type: "Workstation", conn: "EX3-SWA through GigabitEthernet1/1/13" }] }));
+  const k3 = (n: string) => it3.find((i) => i.dev.name === n)!.key;
+  const before4 = clone(e3);
+  const items4 = buildItems(p4, hostCtxOf(e3));
+  const plan4 = resolvePlan(p4, items4);
+  const df = computeDiff(e3, plan4, items4);
+  const ch = (id: string) => df.changes.find((c) => c.id === id);
+  const idOf = (pre: string, title: string) => df.changes.find((c) => c.id.startsWith(pre) && c.title === title);
+  t("diff: new member", !!ch(`newm:g:${k3("EX3-SWA")}|${p4.devices.length ? items4.find((i) => i.dev.name === "PC-4")!.key : ""}`) && ch(`newm:g:${k3("EX3-SWA")}|${items4.find((i) => i.dev.name === "PC-4")!.key}`)!.defaultOn);
+  t("diff: changed IP is ticked unless locked, locked one is kept and unticked", (() => { const c = ch(`fld:${k3("Host1")}:ip`); return !!c && !!c.locked && !c.defaultOn && c.to === "10.99.3.88" && c.from === "10.99.3.77"; })());
+  t("diff: member port moved within a switch", (() => { const c = df.changes.find((x) => x.cat === "moved" && x.title === "PC-1"); return !!c && c.defaultOn && /5/.test(c.from!) && /8/.test(c.to!); })());
+  t("diff: member moved to another switch", (() => { const c = df.changes.find((x) => x.cat === "moved" && x.title === "PC-3"); return !!c && /EX3-SWB/.test(c.from!) && /EX3-SWA/.test(c.to!) && /moves to Endpoints on EX3-SWA/.test(c.detail || ""); })());
+  t("diff: server on another port is a move", (() => { const c = df.changes.find((x) => x.cat === "moved" && x.title === "Host1"); return !!c && /10/.test(c.from!) && /12/.test(c.to!); })());
+  t("diff: gone cable is unticked", (() => { const c = df.changes.find((x) => x.cat === "gone"); return !!c && !c.defaultOn && /EX3-SWA/.test(c.title) && /EX3-SWB/.test(c.title); })());
+  t("diff: only the uplink is gone; hand-made and manual cables are not listed", df.changes.filter((x) => x.cat === "gone").length === 1);
+  t("diff: member missing from the export is unticked, manual member is not listed", df.changes.some((x) => x.cat === "missingMember" && x.title === "Phone-1" && !x.defaultOn) && !df.changes.some((x) => x.title === "Hand PC"));
+  t("diff: locked member name is shown as kept, unticked", df.changes.some((x) => x.id.startsWith("fldm:") && x.detail === "name" && x.locked === true && !x.defaultOn && x.from === "Reception PC" && x.to === "PC-2"));
+  void idOf;
+
+  // apply only what is ticked: nothing ticked changes nothing
+  const dn0 = clone(e3);
+  applyInPlace(dn0, plan4, { target: "current", rackId: dn0.racks[0].id }, items4, new Set());
+  t("apply with nothing ticked keeps cables, devices and values", dn0.cables.length === before4.cables.length && dn0.devices.length === before4.devices.length && dn0.devices.find((d) => d.name === "Host1")!.ip === "10.99.3.77" &&
+    !dn0.devices.some((d) => d.name === "Endpoints on EX3-SWA" && d.endpoints!.some((e) => e.name === "PC-4")));
+
+  // apply the defaults
+  applyInPlace(e3, plan4, { target: "current", rackId: e3.racks[0].id }, items4);
+  const pt = (d: Device, name: string) => d.ports.find((x) => x.name === name)!;
+  const otherEnd = (pid: number) => { const c = cableAt(e3, pid)!; return portOf(e3, c.a === pid ? c.b : c.a)!; };
+  const swAn = m3("EX3-SWA"), swBn = m3("EX3-SWB");
+  const memberOnPort = (g: Device, name: string) => g.ports[g.endpoints!.findIndex((e) => e.name === name)];
+  t("apply: locked IP kept, no lock lost", m3("Host1").ip === "10.99.3.77" && m3("Host1").locked?.join() === "ip");
+  t("apply: PC-1 cable moved to port 8 on the same port object", (() => { const pp = memberOnPort(gA(), "PC-1"); const c = cableAt(e3, pp.id); return !!c && portOf(e3, c.a === pp.id ? c.b : c.a)!.p.name === "8" && !cableAt(e3, pt(swAn, "5").id); })());
+  t("apply: PC-3 now in the SWA group with a cable on port 9, SWB group has no PC-3", (() => { const pp = memberOnPort(gA(), "PC-3"); return !!pp && !!cableAt(e3, pp.id) && portOf(e3, otherEnd(pp.id).p.id) !== null && otherEnd(pp.id).p.name === "9" && otherEnd(pp.id).d.id === swAn.id && !gB().endpoints!.some((e) => e.name === "PC-3"); })());
+  t("apply: moved cable keeps its colour and type", (() => { const pp = memberOnPort(gA(), "PC-3"); return cableAt(e3, pp.id)!.type === "Cat6"; })());
+  t("apply: server cable moved to port 12", otherEnd(pt(m3("Host1"), "NIC1").id).p.name === "12" || e3.cables.some((c) => { const a = portOf(e3, c.a)!, b = portOf(e3, c.b)!; return (a.d.name === "Host1" && b.p.name === "12" && b.d.id === swAn.id) || (b.d.name === "Host1" && a.p.name === "12" && a.d.id === swAn.id); }));
+  t("apply: new member added", gA().endpoints!.some((e) => e.name === "PC-4" && !!e.key));
+  t("apply: locked member name kept", gA().endpoints!.some((e) => e.name === "Reception PC" && e.locked?.join() === "name") && gA().endpoints!.length === gA().ports.length);
+  t("apply: manual member and its cable kept", (() => { const pp = memberOnPort(gA(), "Hand PC"); return !!pp && otherEnd(pp.id).p.name === "20" && gA().endpoints!.find((e) => e.name === "Hand PC")!.manual === true; })());
+  t("apply: hand-made device cable kept", e3.devices.some((d) => d.name === "Hand NAS") && otherEnd(m3("Hand NAS").ports[0].id).p.name === "30");
+  t("apply: unticked gone cable still there, missing member kept", e3.cables.some((c) => { const a = portOf(e3, c.a)!, b = portOf(e3, c.b)!; return a.d.name.startsWith("EX3-SW") && b.d.name.startsWith("EX3-SW"); }) && gA().endpoints!.some((e) => e.name === "Phone-1"));
+  t("apply: unchanged members keep their port ids", (() => { const old = before4.devices.find((d) => d.name === "Endpoints on EX3-SWA")!; const o = old.ports[old.endpoints!.findIndex((e) => e.name === "PC-2" || e.name === "Reception PC")].id; return memberOnPort(gA(), "Reception PC").id === o; })());
+  t("apply: cable count = before + new member + 0 net moves", e3.cables.length === handCables + 1 - 0 + 0 && true, `${handCables} -> ${e3.cables.length}`);
+
+  // now tick the rest: gone cable, missing member, locked IP
+  const p5 = p4, items5 = buildItems(p5, hostCtxOf(e3)), plan5 = resolvePlan(p5, items5);
+  const df5 = computeDiff(e3, plan5, items5);
+  const sel5 = new Set(df5.changes.filter((c) => c.cat === "gone" || c.cat === "missingMember" || c.id === `fld:${k3("Host1")}:ip`).map((c) => c.id));
+  t("second diff lists only what was left", df5.changes.length === 4 && sel5.size === 3 && df5.changes.every((c) => sel5.has(c.id) || c.detail === "name"), idsOf(df5).join());
+  applyInPlace(e3, plan5, { target: "current", rackId: e3.racks[0].id }, items5, sel5);
+  t("ticked: locked IP replaced and unlocked", m3("Host1").ip === "10.99.3.88" && !m3("Host1").locked);
+  t("ticked: gone cable removed, missing member removed, manual member still there", !e3.cables.some((c) => { const a = portOf(e3, c.a)!, b = portOf(e3, c.b)!; return a.d.name.startsWith("EX3-SW") && b.d.name.startsWith("EX3-SW"); }) && !gA().endpoints!.some((e) => e.name === "Phone-1") && gA().endpoints!.some((e) => e.manual));
+  t("ticked: hand-made device cable still there", otherEnd(m3("Hand NAS").ports[0].id).p.name === "30");
+  { // tick the kept name: Auvik's value wins and the lock goes
+    const nameId = df5.changes.find((c) => c.detail === "name")!.id;
+    const pl = resolvePlan(p5, items5);
+    applyInPlace(e3, pl, { target: "current", rackId: e3.racks[0].id }, items5, new Set([nameId]));
+    const g = e3.devices.find((d) => d.name === "Endpoints on EX3-SWA")!;
+    t("ticking a kept field takes the Auvik value and clears the lock", g.endpoints!.some((e) => e.name === "PC-2" && !e.locked) && g.ports.some((x) => x.name === "PC-2"));
+  }
+
+  // the same flow through the plain default apply (no selection) is the "Apply" of the dialog with defaults
+  const dflt = empty(); run(dflt, p3, { target: "new" });
+  run(dflt, p4, { target: "current", rackId: dflt.racks[0].id });
+  t("default apply on a fresh import moves and adds, removes nothing", dflt.devices.find((d) => d.name === "Endpoints on EX3-SWA")!.endpoints!.some((e) => e.name === "PC-4") && dflt.devices.some((d) => d.name === "Endpoints on EX3-SWA" && d.endpoints!.some((e) => e.name === "Phone-1")));
 
   const small = empty();
   run(small, p, { target: "new", rackU: 12 });

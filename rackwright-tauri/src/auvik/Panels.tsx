@@ -6,27 +6,7 @@ export const StatusChip = ({ s }: { s: string }) => (
   <span style={{ padding: "0 6px", borderRadius: 8, fontSize: 11, background: isDown(s) ? "#5a1d1d" : "#1d3a2a", color: isDown(s) ? "#ff7b72" : "#7ee787", border: `1px solid ${isDown(s) ? "#f85149" : "#2ea043"}` }}>{s || "Up"}</span>
 );
 
-/** Compact member table for the selected "Endpoints on ..." device. */
-export function EndpointTable({ dev }: { dev: Device }) {
-  const rows = dev.endpoints;
-  if (!rows?.length) return null;
-  const th = { textAlign: "left", fontWeight: 600, padding: "1px 3px", opacity: 0.7 } as const;
-  const td = { padding: "1px 3px", borderTop: "1px solid #2c2f35", overflowWrap: "anywhere" } as const;
-  const ports = rows.some((r) => r.port);
-  const kinds: Record<string, string> = { pc: "PC", phone: "Phone", iot: "IoT", printer: "Printer", vm: "VM", other: "Other" };
-  return (
-    <div style={{ margin: "8px 0", fontSize: 10.5 }}>
-      <b style={{ fontSize: 12 }}>{dev.type === "Virtual machines" ? "Virtual machines" : "Endpoints"} ({rows.length})</b>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 3 }}>
-        <thead><tr><th style={th}>Name</th><th style={th}>Kind</th><th style={th}>Type</th><th style={th}>IP</th>{ports && <th style={th}>Port</th>}<th style={th}>Status</th></tr></thead>
-        <tbody>{rows.map((r, i) => (
-          <tr key={i}><td style={td}>{r.name}</td><td style={td}>{r.kind ? kinds[r.kind] ?? r.kind : ""}</td><td style={td}>{r.type}</td><td style={td}>{r.ip}</td>{ports && <td style={td}>{r.port.replace(/^.*Ethernet/i, "") || "?"}</td>}
-            <td style={{ ...td, color: isDown(r.status) ? "#ff7b72" : undefined }}>{r.status}</td></tr>
-        ))}</tbody>
-      </table>
-    </div>
-  );
-}
+export { EndpointTable } from "./EndpointEditor";
 
 export function UnplacedDialog({ items, onClose }: { items: { name: string; type: string; model: string; ip: string; status: string; reason: string }[]; onClose: () => void }) {
   return (

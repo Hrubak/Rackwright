@@ -3,7 +3,10 @@ export interface Device {
   id: number; name: string; type: string; u_size: number; rack: number | null; u: number; side: number;
   half: boolean; rows: number; fx: number; fy: number; face: string; color?: string; ports: Port[]; plate?: any; model?: string; ip?: string; serial?: string; notes?: string;
   auvik_id?: string; auvik_name?: string; auvik_macs?: string[]; auvik_model?: string;
-  endpoints?: { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; kind?: "pc" | "phone" | "iot" | "printer" | "vm" | "other" }[];
+  endpoints?: { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; kind?: "pc" | "phone" | "iot" | "printer" | "vm" | "other"; key?: string; locked?: string[]; manual?: boolean }[];
+  mac?: string;
+  locked?: string[]; // fields edited by hand (name, type, model, ip, serial, notes, mac); an Auvik import leaves them alone
+  oobm?: { name: string; ip: string; mac: string; key: string; portId?: number }; // iDRAC / iLO / BMC shown on this server's rear port
   vm_host?: number; // "Virtual machines" box: id of the device the VMs run on
 }
 export interface Rack {
