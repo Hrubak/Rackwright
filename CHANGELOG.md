@@ -2,6 +2,17 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.4.0 — 2026-11-16
+Desktop app 2.2.0 has the same changes.
+- **Import Auvik.** Build a rack from an Auvik device export (`.xlsx`). A review screen lists every device. You choose how each one comes in: in the rack, off-rack, as an endpoint, or skipped. You also pick a new layout (and its rack model) or the rack you have open. Import adds the devices and the cables Auvik saw between them, on the switch ports it reported.
+- What goes where by default: firewalls, switches, servers, hypervisors, storage and UPSs go in the rack, with the UPS at the bottom. Access points and iDRAC/iLO cards go off-rack. Known models (Ruckus ICX, SonicWall TZ, APC Smart-UPS and more) use their real faceplates; others get a generic one of the right size.
+- A switch stack becomes one switch per stack unit, kept together. A port such as `GigabitEthernet3/1/22` lands on unit 3, port 22. Devices listed twice by Auvik are merged.
+- Desktops, phones, printers and other LAN devices are not drawn one by one. Each switch gets an "Endpoints on ..." box next to the rack, with a port per device on the switch port it uses. Select it to see the list. Devices Auvik could not tie to a switch port are in the Unplaced endpoints list in the side panel. Virtual appliances (such as a virtual wireless controller) are listed but not drawn.
+- The importer adds a 1U cable manager below each switch and firewall, and below every second server, while the rack has room. The routed cables then have something to hang on.
+- **Import again to update.** Devices are matched by serial number, MAC address or name. Matched devices keep their place and get new IPs, models and notes; new devices are added. The review screen lists devices that are missing from the newer export. They stay in the rack; nothing is deleted.
+- Cables to off-rack items no longer warn "nothing to support it". An off-rack item cannot have a cable manager.
+- The export is read in your browser or the desktop app. Nothing is uploaded until you save the rack.
+
 ## 2.3.0 — 2026-11-16
 Desktop app 2.1.0 has the same changes; they are in the shared front end.
 - **New rack picker.** New and + Rack open a list of real racks: 4-post cabinets (APC NetShelter SX, Eaton RA, Tripp Lite SmartRack), 4-post open frames, 2-post relay racks, wall-mount cabinets and small desktop racks, each with its U height and footprint. Search, filter by kind, or pick a generic rack of any height from 4U to 52U. New used to leave an empty canvas; it now starts with the rack you pick, and Cancel keeps what you had. Sizes marked "approximate" could not be fully confirmed from spec sheets.
