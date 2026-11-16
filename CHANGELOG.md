@@ -2,6 +2,9 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.9.1 — 2026-11-16
+- **Up-to-date desktop app for Windows.** `Rackwright.exe` in the repository was last built for desktop 2.0 and had none of the newer features. A new GitHub Actions workflow, Desktop exe, now builds it whenever the desktop version changes. It publishes it as a download on the release `desktop-v<version>` and also replaces `Rackwright.exe` in the repository. The first build is desktop 2.6.0, with everything up to web 2.9.0: Auvik import, PDF and Visio export, the Infrastructure, Switch and Endpoints views, editing with locks, HE250/HE150, rear mounting and the KVM models. The web-only parts (sign-in, Users, shared racks, Update server) are not in the desktop app.
+
 ## 2.9.0 — 2026-11-16
 Desktop app 2.6.0 has the same changes.
 - **Rear mounting.** "Mounted" in the properties panel now works for every device, including firewalls and switches with a faceplate. Pick one of:

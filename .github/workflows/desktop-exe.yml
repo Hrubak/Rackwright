@@ -1,0 +1,85 @@
+name: Desktop exe
+
+# Builds the Windows desktop app (Rackwright.exe) and:
+#   1. publishes it on a GitHub release "desktop-v<version>" (version from src-tauri/tauri.conf.json),
+#   2. commits it over Rackwright.exe on the branch it was built from.
+# Runs when the desktop version changes on `web`, or from Actions -> Desktop exe -> Run workflow.
+# The commit is made with GITHUB_TOKEN, so it starts no other workflows. Pull before your next push.
+on:
+  push:
+    branches: [web]
+    paths: [rackwright-tauri/src-tauri/tauri.conf.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-exe-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rackwright-tauri/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rackwright-tauri/src-tauri
+      - name: Build (front end embedded, no installer)
+        working-directory: rackwright-tauri
+        run: |
+          npm ci
+          npx tauri build --no-bundle
+      - name: Version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=$(node -p "require('./rackwright-tauri/src-tauri/tauri.conf.json').version")
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          cp rackwright-tauri/src-tauri/target/release/rackwright.exe Rackwright.exe
+          ls -l Rackwright.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rackwright-${{ steps.v.outputs.version }}
+          path: Rackwright.exe
+      - name: Publish release desktop-v${{ steps.v.outputs.version }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="desktop-v${VER}"
+          notes="Rackwright desktop ${VER} for Windows, built from ${GITHUB_SHA::7}. Download Rackwright.exe and run it; it needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 already have. See CHANGELOG.md for what changed."
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" Rackwright.exe --clobber
+            gh release edit "$tag" --notes "$notes"
+          else
+            gh release create "$tag" Rackwright.exe --target "$GITHUB_SHA" --title "Rackwright desktop ${VER}" --notes "$notes"
+          fi
+      - name: Commit Rackwright.exe
+        shell: bash
+        env:
+          VER: ${{ steps.v.outputs.version }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add Rackwright.exe
+          if git diff --cached --quiet; then echo "Rackwright.exe unchanged."; exit 0; fi
+          git commit -m "Rackwright.exe: desktop ${VER} (built by the Desktop exe workflow)"
+          for i in 1 2 3; do
+            if git push origin "HEAD:${BRANCH}"; then exit 0; fi
+            git pull --rebase origin "$BRANCH"
+          done
+          echo "::error::Could not push Rackwright.exe to ${BRANCH}."
+          exit 1

@@ -32,6 +32,9 @@ Imports match by model (e.g. "SonicWall NSa 2700", "Catalyst 9300-48P", "ICX7150
 - Multi-select: Shift/Ctrl-click or drag a marquee, then drag to move the group.
 - Modern dark UI theme.
 
+## Desktop app (Windows)
+`Rackwright.exe` is the Tauri desktop app with the same screens as the web version (no sign-in; racks are saved as `.rack.json` files). Download the newest one from the repository's Releases page (`desktop-v...`) or use `Rackwright.exe` in this folder. It needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 already have. GitHub Actions rebuilds both whenever the desktop version changes.
+
 ## Web version (Proxmox LXC)
 
 On the **Proxmox host** shell (not inside a VM). The repo is public, so no token is needed.

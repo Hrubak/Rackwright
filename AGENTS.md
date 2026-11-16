@@ -13,7 +13,7 @@ Rackwright designs network racks: rack and logical views, real equipment facepla
 - `web/server/` — Rust axum server, SQLite (`rusqlite` bundled), argon2 passwords, cookie sessions. Tests in `web/server/tests/api.rs`.
 - `Homelab.rack.json` — synthetic example rack. The router's unit tests read it. Keep it realistic and free of real names, addresses and serials.
 - `proxmox/ct/rackwright.sh` (Proxmox host; also the `update` command inside the LXC) and `proxmox/install/rackwright-install.sh` (inside the LXC).
-- `.github/workflows/web.yml` (CI), `.github/workflows/sync-upstream.yml` (forks only, see below).
+- `.github/workflows/web.yml` (CI), `.github/workflows/desktop-exe.yml` (builds the Windows `Rackwright.exe`, see below), `.github/workflows/sync-upstream.yml` (forks only, see below).
 - `docs/adr/` — decisions. Read them; flag a conflict instead of silently overriding.
 
 ## Run and test
@@ -44,6 +44,7 @@ Server environment: `RW_DATA`, `RW_HOST`, `RW_PORT`, `RW_STATIC` (see `web/API.m
 1. Every push or pull request adds an entry to `CHANGELOG.md`. CI fails without one.
 2. The web version lives in `web/server/Cargo.toml` (`version = "x.y.z"`). The top changelog heading is `## x.y.z — YYYY-MM-DD` and must match it, or be `## Unreleased` while a pull request is open. The desktop version lives in `rackwright-tauri/package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`; bump all three together when the desktop app changes.
 3. Bump: patch for fixes, minor for new features, major for breaking data or deployment changes.
+   A push to `web` that changes the desktop version in `tauri.conf.json` starts **Desktop exe** (`desktop-exe.yml`, Windows runner). It builds `Rackwright.exe`, publishes it on the release `desktop-v<version>`, and commits it over `Rackwright.exe` on `web` as github-actions[bot]. Pull before your next push. Run it by hand from Actions → Desktop exe → Run workflow to rebuild the same version.
 4. Write entries for the people who use it: plain sentences that say what changed and what to do. Mention commits by short sha when they come from somewhere else.
 
 ## Forks and upstream
