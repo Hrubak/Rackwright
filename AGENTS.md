@@ -7,8 +7,8 @@ Rackwright designs network racks: rack and logical views, real equipment facepla
 | Branch    | What it is | Who changes it |
 |-----------|------------|----------------|
 | `desktop` | Exact mirror of upstream `master`: the Tauri 2.0 app (`rackwright-tauri/`) and the Python/tkinter app (`rackwright.py`). | Only Sync upstream (fast-forward). Never commit here. |
-| `master`  | Same mirror (kept because it is the fork's default branch and the base for upstream pull requests). | Only Sync upstream. Never commit here. |
-| `web`     | `desktop` plus the web version, CI, Proxmox scripts, CHANGELOG, this file. The LXC installs and updates from `web`. | All fork work goes here, through feature branches and pull requests. |
+| `master`  | Same mirror (kept so the fork's `master` matches upstream's; handy as the base for upstream pull requests). | Only Sync upstream. Never commit here. |
+| `web` (default) | `desktop` plus the web version, CI, Proxmox scripts, CHANGELOG, this file. The LXC installs and updates from `web`. | All fork work goes here, through feature branches and pull requests. |
 
 Rules that keep upstream merges painless:
 - Do not commit to `desktop` or `master`. Sync upstream fails if they have commits that are not upstream.

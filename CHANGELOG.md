@@ -7,6 +7,7 @@ Newest first. Every push to `web` adds an entry here (CI checks it). The web ver
 - AGENTS.md tells people and coding agents how the branches work, how to run, test and release, and how to pull upstream changes. CLAUDE.md points to it.
 - Sync upstream runs every day and on demand. It moves `desktop` and `master` forward to hast3/Rackwright `master`, then opens a pull request that merges the new upstream commits into `web`, with the changelog entry already written and CI started. If the merge conflicts, it opens an issue that lists the files.
 - CI uses the current checkout and Node setup actions.
+- `web` is now the fork's default branch, so the scheduled Sync upstream can run (GitHub runs schedules only from the default branch).
 
 ## 2.0.0 — 2026-11-16
 First web version. Same rack editor as the desktop app, in the browser, installed in a Proxmox LXC.
