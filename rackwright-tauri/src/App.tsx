@@ -22,6 +22,7 @@ import PortsEditor from "./PortsEditor";
 import ModelPicker from "./ModelPicker";
 import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
+import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
@@ -144,6 +145,32 @@ export default function App({ web }: { web?: WebProps } = {}) {
     });
     setSel(null);
   }, [sel, edit]);
+
+  // Unsaved-changes safety: warn before leaving, and keep a recovery draft (see unsaved.ts).
+  const who = IS_WEB ? `web${web?.user.id ?? 0}` : "desktop";
+  const [offer, setOffer] = useState<Draft | null>(() => readDraft(who));
+  useLeaveGuard(dirty);
+  const draftFail = useRef(false);
+  useEffect(() => {
+    if (offer) return; // the restore prompt is still open: keep the old draft until it is answered
+    if (!dirty) { clearDraft(who); return; }
+    const t = window.setTimeout(() => {
+      const ok = writeDraft(who, { doc, path, cur });
+      if (!ok && !draftFail.current) say("Could not keep a recovery copy (browser storage is full). Save often.", true);
+      draftFail.current = !ok;
+    }, 1000);
+    return () => window.clearTimeout(t);
+  }, [doc, dirty, path, cur, offer, who, say]);
+  const restoreDraft = () => {
+    if (!offer) return;
+    reset(offer.doc, offer.path, offer.cur); setDirty(true); setOffer(null);
+    say("Restored your unsaved changes. Save them when you are ready.");
+  };
+  const discardDraft = () => { clearDraft(who); setOffer(null); };
+  const webGuarded: WebProps | undefined = web && {
+    ...web,
+    signOut: () => { if (dirty && !confirm(LEAVE_TEXT)) return; clearDraft(who); web.signOut(); },
+  };
 
   const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(upgradeDoc(d)); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
   const doNew = () => { if (!dirty || confirm("Discard unsaved changes?")) setPicker("new"); };
@@ -428,7 +455,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8 }}>
           {IS_WEB ? (cur ? `${cur.name} (v${cur.version})` : "unsaved rack") : (path ?? "no file")} | {doc.racks.length}R {doc.devices.length}D {doc.cables.length}C {msg}
         </span>
-        {IS_WEB && web && <UserBar web={web} />}
+        {IS_WEB && webGuarded && <UserBar web={webGuarded} />}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: "#1b1d21", borderRight: "1px solid #2c2f35", flexDirection: "column", fontSize: 12 }}>
@@ -590,6 +617,20 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {pdrag && pdrag.active && (
         <div style={{ position: "fixed", left: pdrag.x + 12, top: pdrag.y + 8, pointerEvents: "none", background: "#2a3a52", border: "1px solid #5b8bd0",
           borderRadius: 4, padding: "2px 8px", fontSize: 12, zIndex: 50 }}>{icon(pdrag.i)} {CATALOG[pdrag.i].name}</div>
+      )}
+      {offer && (
+        <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120 }}>
+          <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 460, maxWidth: "94vw", border: "1px solid #3a3d42", color: "#e6e8eb", fontSize: 13 }}>
+            <b style={{ fontSize: 14 }}>Restore unsaved changes?</b>
+            <div style={{ margin: "10px 0 12px" }}>
+              Rackwright closed before <b>{draftName(offer)}</b> was saved. The last changes are from {new Date(offer.at).toLocaleString()}
+              {" "}({offer.doc.racks.length} racks, {offer.doc.devices.length} devices, {offer.doc.cables.length} cables).
+              {offer.cur ? " If someone saved this rack since then, saving will ask whose version to keep." : ""}
+            </div>
+            <button style={btn} onClick={restoreDraft}>Restore</button>
+            <button style={{ ...btn, marginRight: 0 }} onClick={discardDraft}>Discard</button>
+          </div>
+        </div>
       )}
       {IS_WEB && showRacks && <RackList currentId={cur?.id ?? null} onClose={() => setShowRacks(false)} onOpen={(m) => loadShared(m.id)} />}
       {IS_WEB && nameAsk && <NamePrompt title={nameAsk.title} initial={nameAsk.initial} onOk={nameAsk.cb} onCancel={() => setNameAsk(null)} />}

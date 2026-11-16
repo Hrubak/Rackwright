@@ -42,9 +42,9 @@ Server environment: `RW_DATA`, `RW_HOST`, `RW_PORT`, `RW_STATIC` (see `web/API.m
 ## Changelog and versions — every push
 
 1. Every push or pull request adds an entry to `CHANGELOG.md`. CI fails without one.
-2. The web version lives in `web/server/Cargo.toml` (`version = "x.y.z"`). The top changelog heading is `## x.y.z — YYYY-MM-DD` and must match it, or be `## Unreleased` while a pull request is open. The desktop version lives in `rackwright-tauri/package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`; bump all three together when the desktop app changes.
+2. Web and desktop share one version (since 3.0.0). It lives in `web/server/Cargo.toml`, `rackwright-tauri/package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and their lock files. Set them all with `node scripts/version.mjs x.y.z`; CI runs `node scripts/version.mjs --check` and fails if they differ. The top changelog heading is `## x.y.z — YYYY-MM-DD` and must match, or be `## Unreleased` while a pull request is open.
 3. Bump: patch for fixes, minor for new features, major for breaking data or deployment changes.
-   A push to `web` that changes the desktop version in `tauri.conf.json` starts **Desktop exe** (`desktop-exe.yml`, Windows runner). It builds `Rackwright.exe`, publishes it on the release `desktop-v<version>`, and commits it over `Rackwright.exe` on `web` as github-actions[bot]. Pull before your next push. Run it by hand from Actions → Desktop exe → Run workflow to rebuild the same version.
+   A push to `web` that changes the version in `tauri.conf.json` starts **Desktop exe** (`desktop-exe.yml`, Windows runner). It builds `Rackwright.exe`, publishes it on the release `desktop-v<version>`, and commits it over `Rackwright.exe` on `web` as github-actions[bot]. Pull before your next push. Run it by hand from Actions → Desktop exe → Run workflow to rebuild the same version.
 4. Write entries for the people who use it: plain sentences that say what changed and what to do. Mention commits by short sha when they come from somewhere else.
 
 ## Forks and upstream

@@ -1,6 +1,12 @@
 # Changelog
 
-Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
+Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
+
+## 3.0.0 — 2026-11-16
+The web app and the desktop app now have the same version number, starting at 3.0.0. A new desktop exe is built for this release.
+- **One version for web and desktop.** Before this, the web server was 2.9.1 and the desktop app was 2.6.0. Both are now 3.0.0 and move together. `node scripts/version.mjs 3.1.0` sets every version file at once, and CI fails if any of them differ.
+- **Warning before you lose changes.** With unsaved changes, the web app now asks before the tab is reloaded or closed and before Sign out. The desktop app asks before the window closes. New, Open and Import already asked.
+- **Recovery copy.** While a rack has unsaved changes, the app keeps a copy in the browser or app storage, updated about a second after each edit. If the tab, the window or the PC closes before you save, the next start offers to restore it (Restore or Discard). Saving, or opening another rack, removes the copy. The copy stays on that computer and is kept separately for each signed-in user. On the web, if someone else saved the same rack in the meantime, saving a restored copy asks whose version to keep, as before.
 
 ## 2.9.1 — 2026-11-16
 - **Up-to-date desktop app for Windows.** `Rackwright.exe` in the repository was last built for desktop 2.0 and had none of the newer features. A new GitHub Actions workflow, Desktop exe, now builds it whenever the desktop version changes. It publishes it as a download on the release `desktop-v<version>` and also replaces `Rackwright.exe` in the repository. The first build is desktop 2.6.0, with everything up to web 2.9.0: Auvik import, PDF and Visio export, the Infrastructure, Switch and Endpoints views, editing with locks, HE250/HE150, rear mounting and the KVM models. The web-only parts (sign-in, Users, shared racks, Update server) are not in the desktop app.

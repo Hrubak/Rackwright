@@ -44,6 +44,8 @@ jobs:
             exit 1
           fi
           echo "CHANGELOG.md changed."
+      - name: Web and desktop versions match
+        run: node scripts/version.mjs --check
       - name: CHANGELOG version matches Cargo.toml
         run: |
           set -euo pipefail
