@@ -192,6 +192,11 @@ export function matchTemplate(d: Pick<AuvikDevice, "model" | "name" | "type">, k
     const hit = orig(catalogMatch(text, 1));
     if (hit && hit.type === (kind === "server" ? "Server" : "Storage")) return { tpl: clone(hit), generic: false };
   }
+  // Scale Computing edge nodes only when the text names the SNUC hardware; Pegatron-built Scale rack nodes stay generic.
+  if (kind === "server" && /\bhe[-\s]?(150|250)\b|nuc13ox|nuc24oxg|\bonyx\b/i.test(full)) {
+    const hc = ret(byShort(/\bhe[-\s]?150\b|nuc13ox/i.test(full) ? "HE150" : "HE250"));
+    if (hc) return hc;
+  }
   const hit = poolMatch(text, KIND_TYPES[kind] || []);
   if (hit) return { tpl: clone(hit), generic: false };
 
@@ -398,7 +403,7 @@ export function stripOobm(name: string): string {
 export function oobmPortName(d: Pick<AuvikDevice, "name" | "model" | "description">): string {
   const t = `${d.model} ${d.name} ${d.description}`;
   if (/idrac|dell/i.test(t)) return "iDRAC";
-  if (/ilo|ilo\d|hpe|hewlett|hp/i.test(t)) return "iLO";
+  if (/\bilo\b|ilo\d|hpe|hewlett|\bhp\b/i.test(t)) return "iLO";
   if (/bmc|supermicro|ipmi/i.test(t)) return "BMC";
   return "OOBM";
 }

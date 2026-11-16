@@ -19,6 +19,8 @@ import RackPicker, { PickResult } from "./RackPicker";
 import { RACK_MODELS, genericDefaultU, kindLabel, dimsText, specOf, modelById } from "./racks";
 import { AuvikInfo, EndpointTable, UnplacedDialog } from "./auvik/Panels";
 import PortsEditor from "./PortsEditor";
+import ModelPicker from "./ModelPicker";
+import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 import {
@@ -80,6 +82,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
+  const [modelFor, setModelFor] = useState<number | null>(null);
   const [picker, setPicker] = useState<"new" | "add" | null>(null);
   const [importText, setImportText] = useState("");
   const [importH, setImportH] = useState("0");
@@ -551,6 +554,12 @@ export default function App({ web }: { web?: WebProps } = {}) {
                   <option>front</option><option>rear</option><option>both</option>
                 </select></label>
             </div>}
+            <div style={{ display: "flex", gap: 8, margin: "6px 0", fontSize: 12, alignItems: "flex-end" }}>
+              <label>Height (U)<br /><input type="number" style={{ ...inp, width: 56 }} value={selDev.u_size} min={1} max={selDev.rack != null ? doc.racks.find((r) => r.id === selDev.rack)?.u : undefined}
+                onChange={(e) => { const n = parseInt(e.target.value); if (n >= 1) edit((d) => { const x = resizeDevice(d, selDev.id, n); return x.ok ? x.msg : "!" + x.msg; }, `hu${selDev.id}`); }} /></label>
+              {!selDev.plate && <label><input type="checkbox" checked={!!selDev.half} onChange={(e) => edit((d) => { const x = resizeDevice(d, selDev.id, selDev.u_size, e.target.checked); return x.ok ? x.msg : "!" + x.msg; })} /> Half width</label>}
+            </div>
+            <button style={btn} onClick={() => setModelFor(selDev.id)}>Change model…</button>
             <div style={{ fontSize: 12, margin: "6px 0", opacity: 0.7 }}>
               {selDev.u_size}U, {selDev.ports.length} ports ({portsCabled(selDev)} cabled). Drag to move; click a port, then another, to cable.
             </div>
@@ -585,6 +594,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {IS_WEB && showRacks && <RackList currentId={cur?.id ?? null} onClose={() => setShowRacks(false)} onOpen={(m) => loadShared(m.id)} />}
       {IS_WEB && nameAsk && <NamePrompt title={nameAsk.title} initial={nameAsk.initial} onOk={nameAsk.cb} onCancel={() => setNameAsk(null)} />}
       {IS_WEB && conflict && <ConflictDialog by={conflict.by} onTheirs={conflictTheirs} onMine={conflictMine} onCancel={() => setConflict(null)} />}
+      {modelFor != null && (() => { const dv = doc.devices.find((x) => x.id === modelFor); return dv ? (
+        <ModelPicker dev={dv} onCancel={() => setModelFor(null)} onPick={(t) => { if (edit((d) => { const x = swapModel(d, dv.id, t); return x.ok ? x.msg : "!" + x.msg; })) setModelFor(null); }} />
+      ) : null; })()}
       {picker && <RackPicker title={picker === "new" ? "New rack" : "Add a rack"} okLabel={picker === "new" ? "Create" : "Add rack"}
         defaultName={picker === "new" ? "Rack 1" : `Rack ${doc.racks.length + 1}`} onPick={onPick} onCancel={() => setPicker(null)} />}
       {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}

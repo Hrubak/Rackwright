@@ -2,6 +2,14 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.7.0 — 2026-11-16
+Desktop app 2.5.0 has the same changes.
+- **Change a device's height.** Select a device in a rack and set Height (U), for example to turn an imported 1U server into a 2U one. The top edge stays where it is when there is room, otherwise the bottom edge. If the new size does not fit, nothing changes and the message says what is in the way. Devices without a fixed faceplate also get a Half width box.
+- **Change model.** "Change model..." in the properties panel swaps a device for another catalog model. Name, IP, MAC, serial, notes, the iDRAC/iLO link and endpoints are kept. Cables move to the new model's ports with the same name, then the same type. Cables with no match stay on extra ports you can move. Changing an imported device's type or model locks those fields so the next Auvik import keeps your choice.
+- **Scale Computing HyperCore nodes.** New catalog models HE250 (SNUC NUC24OXGv9 / Onyx Pro) and HE150 (SNUC NUC13OXi7 / Onyx), with front and rear faceplates drawn from the real units. HE250 ports: SFP+1, SFP+2, LAN1, LAN2, DC in. HE150 ports: LAN1, DC in. They are 2U, half width, and stand on a shelf: two fit side by side on one 1U shelf. Changing a racked server to one of them adds a shelf under it when needed. Auvik import matches them by HE150/HE250, NUC13OX, NUC24OXG or Onyx in the model or name.
+- Shelf gear can now be taller than its shelf (a 2U unit on a 1U shelf), and the importer puts 2U shelf gear on shelves instead of leaving it off-rack. Shelves are drawn behind the gear standing on them, on screen and in Visio export.
+- The device list now says a shelf model fits when a shelf in the rack has room for it, instead of always "off-rack".
+
 ## 2.6.0 — 2026-11-16
 Desktop app 2.4.0 has the same changes.
 - **Edit devices.** The properties panel adds a MAC field. A Ports list lets you rename ports, change their type, add ports and delete them. Deleting a port that has a cable asks first and removes the cable.

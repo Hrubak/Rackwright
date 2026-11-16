@@ -97,7 +97,8 @@ function rackPage(doc: Doc, data: ExportData, face: Face): Page {
     const b = rackBox(r);
     pg.rect(r.name, b.l, b.t, b.r - b.l, b.b - b.t, "#1d2025", "#3a3d42", r.name, { size: 14, top: true });
   }
-  for (const d of doc.devices) {
+  // Shelves first, so gear standing on a shelf is drawn in front of it.
+  for (const d of [...doc.devices].sort((a, b) => (a.type === "Shelf" ? 0 : 1) - (b.type === "Shelf" ? 0 : 1))) {
     if (!visibleOn(d, face)) continue;
     const q = devRect(doc, d), fill = deviceFill(d);
     pg.rect(d.name, q.l, q.t, q.w, q.h, fill, "#222222", q.h >= 22 && d.model ? `${d.name}\n${d.model}` : d.name, { size: q.h >= 22 ? 8 : 7 });

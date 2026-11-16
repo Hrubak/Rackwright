@@ -167,7 +167,8 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
             })}
           </g>
         ))}
-        {doc.devices.filter(vis).map((d) => {
+        {/* Shelves first, so gear standing on a shelf (a 2U unit on a 1U shelf) is drawn in front of it. */}
+        {doc.devices.filter(vis).sort((a, b) => (a.type === "Shelf" ? 0 : 1) - (b.type === "Shelf" ? 0 : 1)).map((d) => {
           const q = devRect(doc, d);
           const l = q.l, t = q.t, r = q.l + q.w, b = q.t + q.h;
           const isSel = selected?.kind === "dev" && selected.id === d.id;

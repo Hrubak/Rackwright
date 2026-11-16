@@ -83,7 +83,8 @@ export function checkPlace(doc: Doc, d: Device, r: Rack, u: number, side: number
     const fa = o.face || "front", fb = d.face || "front";
     if (!(fa === fb || fa === "both" || fb === "both")) continue;
     if (o.u > hi || o.u + o.u_size - 1 < lo) continue;
-    if (off && o.type === "Shelf" && o.u <= lo && o.u + o.u_size - 1 >= hi) { shelf = true; continue; }
+    // A desktop unit stands on a shelf with its bottom U; a taller unit (2U) rises above the shelf into free U.
+    if (off && o.type === "Shelf" && o.u <= lo && o.u + o.u_size - 1 >= lo) { shelf = true; continue; }
     if (o.half && d.half && o.side !== side) continue;
     return no(`U${Math.max(lo, o.u)} is taken by ${o.name}`);
   }
@@ -91,6 +92,42 @@ export function checkPlace(doc: Doc, d: Device, r: Rack, u: number, side: number
   let warn: string | undefined;
   if (isHeavy(d) && lo > r.u / 2) warn = `${d.name} is heavy: normally mounted in the lower half`;
   return { ok: true, warn };
+}
+
+/**
+ * Put desktop gear `d` (plate.off) on a shelf in rack `r`. Tries a shelf that already has room, else adds a 1U Shelf.
+ * The unit stands on the shelf with its bottom U and may rise above it (2U units). Sets d.rack/u/side and
+ * returns true; d is NOT added to doc.devices (the caller does that, unless it is in there already).
+ * `near` = U to stay close to (a unit being swapped); without it the search runs from the top of the rack.
+ * Detach `d` from the rack first when it is already in the document, so its old slot counts as free.
+ */
+export function placeOnShelf(doc: Doc, d: Device, r: Rack, near?: number): boolean {
+  const tplShelf = CATALOG.find((c) => c.type === "Shelf");
+  if (!tplShelf) return false;
+  const shelves = doc.devices.filter((x) => x.rack === r.id && x.type === "Shelf");
+  const sides = d.half ? [0, 1] : [0];
+  const maxU = Math.max(0, r.u - d.u_size + 1);
+  const us = Array.from({ length: maxU }, (_, i) => maxU - i); // top down
+  if (near != null) us.sort((a, b) => Math.abs(a - near) - Math.abs(b - near) || b - a);
+  const useExisting = () => {
+    const list = near == null ? shelves : shelves.slice().sort((a, b) => Math.abs(a.u - near) - Math.abs(b.u - near));
+    for (const sh of list) for (const side of sides)
+      if (checkPlace(doc, { ...d, rack: r.id, u: sh.u }, r, sh.u, side).ok) { d.rack = r.id; d.u = sh.u; d.side = side; return true; }
+    return false;
+  };
+  const addShelf = (u: number) => {
+    const shelf = fromTpl(doc, tplShelf); shelf.face = "front"; shelf.name = "Shelf";
+    if (!checkPlace(doc, shelf, r, u, 0).ok) return false;
+    shelf.rack = r.id; shelf.u = u; shelf.side = 0; doc.devices.push(shelf);
+    for (const side of sides) if (checkPlace(doc, d, r, u, side).ok) { d.rack = r.id; d.u = u; d.side = side; return true; }
+    doc.devices.pop();
+    return false;
+  };
+  if (near != null && near >= 1 && near <= maxU && addShelf(near)) return true; // a shelf right under it
+  
+  if (useExisting()) return true;
+  for (const u of us) if (addShelf(u)) return true;
+  return false;
 }
 
 export type Target =
@@ -123,9 +160,10 @@ export function protoOf(t: Tpl): Device {
   return fromTpl({ v: 1, nid: 1_000_000_000, racks: [], devices: [], cables: [] }, t);
 }
 export function tplRackStatus(doc: Doc, rack: Rack | undefined, t: Tpl): "ok" | "off" | "full" | "none" {
-  if (t.plate?.off) return "off";
-  if (!rack) return "none";
+  if (!rack) return t.plate?.off ? "off" : "none";
   const d = { ...protoOf(t), face: t.plate ? "both" : "front" } as Device;
+  // Desktop gear fits when a shelf has room for it; otherwise it goes off-rack (or onto a new shelf).
+  if (t.plate?.off) return findFree(doc, rack, d) ? "ok" : "off";
   return findFree(doc, rack, d) ? "ok" : "full";
 }
 

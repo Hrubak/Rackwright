@@ -1,5 +1,5 @@
 // Apply an ImportPlan to a document (mutates the doc it is given; call it inside one edit() for a single undo step).
-import { CATALOG, addRack, applySpec, checkPlace, clone, deleteDevice, findFree, fromTpl, isHeavy, newCable, nid } from "../edit";
+import { CATALOG, addRack, applySpec, checkPlace, clone, deleteDevice, findFree, fromTpl, isHeavy, newCable, nid, placeOnShelf } from "../edit";
 import { Device, Doc, Rack, RW } from "../types";
 import { RACK_MODELS, RackSpec, modelById, specOf } from "../racks";
 import { ImportPlan, PlanGroup, PlanItem, PlanUnit, PortRef, groupTemplate, locatePort, summarize } from "./plan";
@@ -105,21 +105,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     }
   };
   const placeShelf = (d: Device): boolean => {
-    for (const r of racks) {
-      for (const sh of doc.devices.filter((x) => x.rack === r.id && x.type === "Shelf")) {
-        for (const side of d.half ? [0, 1] : [0]) {
-          const p = { ...d, rack: r.id, u: sh.u };
-          if (checkPlace(doc, p, r, sh.u, side).ok) { d.rack = r.id; d.u = sh.u; d.side = side; doc.devices.push(d); return true; }
-        }
-      }
-      const shelf = fromTpl(doc, CATALOG.find((c) => c.type === "Shelf")!);
-      shelf.face = "front";
-      const f = findFree(doc, r, shelf);
-      if (f) {
-        shelf.rack = r.id; shelf.u = f[0]; shelf.side = 0; shelf.name = "Shelf"; doc.devices.push(shelf);
-        d.rack = r.id; d.u = f[0]; d.side = 0; doc.devices.push(d); return true;
-      }
-    }
+    for (const r of racks) if (placeOnShelf(doc, d, r)) { doc.devices.push(d); return true; }
     return false;
   };
   // Cable managers: the router wants one within 3U of every port whose cable runs sideways. Put a 1U manager
@@ -149,12 +135,11 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     d.face = d.plate ? "both" : "front";
     restU = Math.max(0, restU - d.u_size);
     for (let tries = 0; tries < 2; tries++) {
-      if (d.plate?.off) { if (d.u_size === 1 && placeShelf(d)) { const r = racks.find((x) => x.id === d.rack); if (r && network) addMgr(r, d.u - 1); return; } }
+      if (d.plate?.off) { if (placeShelf(d)) { const r = racks.find((x) => x.id === d.rack); if (r && network) addMgr(r, d.u - 1); return; } }
       else for (const r of racks) {
         const s = findFree(doc, r, d);
         if (s) { d.rack = r.id; d.u = s[0]; d.side = s[1]; doc.devices.push(d); afterPlace(d, r, network, midStack); return; }
       }
-      if (d.plate?.off && d.u_size !== 1) break;
       if (d.u_size > rackU) break;
       mkRack();
     }

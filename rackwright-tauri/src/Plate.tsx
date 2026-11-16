@@ -159,6 +159,45 @@ export function drawPlate(d: Device, l: number, t: number, r: number, b: number,
       rc(pl, t + 3, r - 3, b - 4, back, "#3a3d42");
       return done(l + 10, Math.max(50, room - 10), lab);
     }
+    if (st === "nuc") {
+      // Scale Computing edge node on a shelf (SNUC chassis). SFP+/LAN/DC-in sockets come from the port grid on the right;
+      // all other front and rear I/O here is decorative art.
+      const he250 = p.nuc === "he250", ax = l + 104, ae = pl - 2;
+      rc(l + 1, t + 1, r - 1, b - 1, "#17181b", "#4a4e54"); rc(l + 1, b - 4, r - 1, b - 1, "#0f1012");
+      const usbA = (x: number, y: number, c: string) => { rc(x, y - 3, x + 9, y + 3, "#0c0d0f", "#6b717a"); rc(x + 1, y - 0.5, x + 8, y + 1.5, c); };
+      const usbC = (x: number, y: number) => rc(x, y - 2, x + 8, y + 2, "#0c0d0f", "#8b9097");
+      const hdmi = (x: number, y: number) => rc(x, y - 2.5, x + 13, y + 2.5, "#0c0d0f", "#8b9097");
+      const jack = (x: number, y: number) => ov(x, y, 2.6, "#0c0d0f", "#8b9097");
+      const slots = (x0: number, y0: number, x1: number, y1: number) => { for (let x = x0; x < x1; x += 4) ln(x, y1, Math.min(x + 6, x1), y0, "#2f3237"); };
+      if (!rear) {
+        tx(ax, t + 8, p.brand, 4.8, "#9aa0a6", true); tx(ax, t + 16, p.mdl, 6, bc, true);
+        const y = b - 9;
+        if (he250) {
+          rc(ax, y - 4, ax + 12, y + 4, "#14151a", "#c9ced4"); ov(ax + 6, y, 1.2, "#3ddc5b"); // power button
+          jack(ax + 19, y); usbA(ax + 25, y, "#2a6fdb"); usbA(ax + 36, y, "#2b2e33"); usbA(ax + 47, y, "#2b2e33");
+          slots(ax + 60, t + 5, ae, b - 6);                                                  // diagonal vent grille
+        } else {
+          ov(ax + 3, y, 1.4, "#3ddc5b"); ln(ax + 8, y, ax + 12, y, "#6b717a");                 // LED and icons
+          usbA(ax + 16, y, "#2b2e33"); usbA(ax + 27, y, "#2a6fdb"); jack(ax + 43, y);
+          rc(ax + 50, y - 4, ax + 62, y + 4, "#14151a", "#c9ced4"); ov(ax + 56, y, 1.2, "#3ddc5b"); // power button
+        }
+        return done(l + 8, 94, lab);
+      }
+      const y1 = t + 12, y2 = t + 22, y3 = b - 9;
+      if (he250) {
+        rc(ax, t + 5, ax + 38, t + 11, "#25272b", "#4a4e54");                                // PCIe slot cover
+        for (let gx = ae - 26; gx < ae; gx += 5) for (let gy = t + 5; gy < t + 14; gy += 4) rc(gx, gy, gx + 2.5, gy + 2.2, "#0c0d0f"); // vent grid
+        usbC(ax, y3 - 3); usbC(ax, y3 + 3); hdmi(ax + 12, y3);
+        usbA(ax + 29, y3 - 3.5, "#2a6fdb"); usbA(ax + 29, y3 + 3.5, "#2a6fdb");
+      } else {
+        rc(ax, t + 4, ax + 6, t + 8, "#0c0d0f", "#8b9097");                                  // Kensington slot
+        usbC(ax + 10, y1); hdmi(ax + 10, y2 + 1);
+        usbA(ax + 26, y1, "#2a6fdb"); usbA(ax + 26, y2 + 1, "#2a6fdb");
+        usbC(ax + 40, y1); hdmi(ax + 40, y2 + 1);
+        rc(ax, b - 10, ae, b - 6, "#25272b", "#4a4e54");                                     // blank expansion plate
+      }
+      return done(l + 8, 94, lab);
+    }
     if (st === "ap") {
       if (!rear) { ov(l + 15, cy, 9.5, "#ffffff", "#9aa0a6"); ov(l + 15, cy, 6.5, body, bc); ov(l + 15, cy, 2, bc); return done(l + 30, 150, lab); }
       ov(l + 15, cy, 9.5, shade(body, -20), "#8b9097"); for (const ax of [-4, 4]) ov(l + 15 + ax, cy, 1.4, "#6b717a");
