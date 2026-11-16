@@ -115,6 +115,9 @@ async function main() {
   t("stack becomes 3 unit devices", [1, 2, 3].every((n) => doc.devices.some((d) => d.name === `EX-SW-STACK unit ${n}`)));
   const u3 = dn("EX-SW-STACK unit 3"), u1 = dn("EX-SW-STACK unit 1"), u2 = dn("EX-SW-STACK unit 2");
   t("stack units adjacent", u1.rack === u2.rack && u2.rack === u3.rack && u1.u - u2.u === 1 && u2.u - u3.u === 1, `${u1.u},${u2.u},${u3.u}`);
+  const mgrs = doc.devices.filter((d) => d.type === "Cable manager");
+  t("cable managers added", mgrs.length > 0 && res.managers === mgrs.length, `${mgrs.length}`);
+  t("manager below the stack", mgrs.some((m) => m.rack === u3.rack && m.u === u3.u - 1));
   const land = (name: string, port: string) => { const pt = dn(name).ports.find((x) => x.name === port); return !!pt && doc.cables.some((c) => (c.a === pt.id || c.b === pt.id)); };
   const cableTo = (name: string, port: string) => {
     const pt = dn(name).ports.find((x) => x.name === port)!;
@@ -147,14 +150,14 @@ async function main() {
 
   // re-import: one IP changed, EX-AP2 removed, EX-SRV3 new
   const before = clone(doc);
-  const posBefore = new Map(before.devices.map((d) => [d.name, `${d.rack}/${d.u}/${d.side}/${d.fx}/${d.fy}`]));
+  const posBefore = new Map(before.devices.map((d) => [d.id, `${d.rack}/${d.u}/${d.side}/${d.fx}/${d.fy}`]));
   const p2 = await load(devices([{ name: "EX-SRV3", type: "Server", model: "Generic server", conn: "EX-SW-02 through 16" }], ["EX-AP2"], { "EX-SRV2": "10.99.1.201" }));
   const it2 = buildItems(p2);
   t("removed device flagged missing", findMissing(doc, it2).map((d) => d.name).join() === "EX-AP2", findMissing(doc, it2).map((d) => d.name).join());
   const r2 = run(doc, p2, { target: "current", rackId: doc.racks[0].id });
   t("IP updated", dn("EX-SRV2").ip === "10.99.1.201");
   t("new device added", doc.devices.filter((d) => d.name === "EX-SRV3").length === 1 && r2.res.added === 1, `added ${r2.res.added}`);
-  t("positions kept", [...posBefore].every(([n, pos]) => { const d = doc.devices.find((x) => x.name === n)!; return `${d.rack}/${d.u}/${d.side}/${d.fx}/${d.fy}` === pos; }));
+  t("positions kept", [...posBefore].every(([n, pos]) => { const d = doc.devices.find((x) => x.id === n)!; return `${d.rack}/${d.u}/${d.side}/${d.fx}/${d.fy}` === pos; }));
   t("removed device not deleted", doc.devices.some((d) => d.name === "EX-AP2") && r2.res.missing.join() === "EX-AP2");
   t("one new cable only", doc.cables.length === before.cables.length + 1, `${before.cables.length} -> ${doc.cables.length}`);
   const ports2 = doc.cables.flatMap((c) => [c.a, c.b]);

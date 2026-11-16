@@ -1,5 +1,5 @@
 // Apply an ImportPlan to a document (mutates the doc it is given; call it inside one edit() for a single undo step).
-import { CATALOG, addRack, applySpec, checkPlace, clone, findFree, fromTpl, newCable, nid, portOf } from "../edit";
+import { CATALOG, addRack, applySpec, checkPlace, clone, findFree, fromTpl, isHeavy, newCable, nid, portOf } from "../edit";
 import { Device, Doc, Rack, RW } from "../types";
 import { RACK_MODELS, RackSpec, modelById, specOf } from "../racks";
 import { ImportPlan, PlanGroup, PlanItem, PlanUnit, PortRef, identOf, locatePort, matchesDevice } from "./plan";
@@ -10,7 +10,7 @@ export interface ApplyOptions {
   spec?: RackSpec; rackU?: number;   // for "new": the rack model
   rackId?: number | null;            // for "current": preferred rack
 }
-export interface ApplyResult { added: number; updated: number; groups: number; cablesAdded: number; cablesSkipped: number; racksAdded: number; missing: string[]; message: string }
+export interface ApplyResult { managers: number; added: number; updated: number; groups: number; cablesAdded: number; cablesSkipped: number; racksAdded: number; missing: string[]; message: string }
 
 type X = Device & { auvik_id?: string; auvik_name?: string; auvik_macs?: string[]; auvik_model?: string; endpoints?: unknown[] };
 
@@ -58,7 +58,7 @@ function rackSpecOf(r: Rack): RackSpec | undefined {
 }
 
 export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, items: PlanItem[] = []): ApplyResult {
-  const res: ApplyResult = { added: 0, updated: 0, groups: 0, cablesAdded: 0, cablesSkipped: 0, racksAdded: 0, missing: [], message: "" };
+  const res: ApplyResult = { managers: 0, added: 0, updated: 0, groups: 0, cablesAdded: 0, cablesSkipped: 0, racksAdded: 0, missing: [], message: "" };
   const devOf = new Map<string, Device>();
   const used = new Set<number>();
   const existing = doc.devices as X[];
@@ -114,14 +114,37 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     }
     return false;
   };
-  const placeRack = (d: Device) => {
+  // Cable managers: the router wants one within 3U of every port whose cable runs sideways. Put a 1U manager
+  // below each piece of network gear, and below every second other device, while the rack has U to spare
+  // for the rest of the import. Off-rack and shelf gear is left alone.
+  let restU = 0;                      // U still needed by rack devices not placed yet
+  const sinceMgr = new Map<number, number>();
+  const usedU = (r: Rack) => doc.devices.filter((x) => x.rack === r.id).reduce((n, x) => n + (x.half ? 0.5 : x.u_size), 0);
+  const addMgr = (r: Rack, u: number) => {
+    if (u < 1 || u > r.u || r.u - usedU(r) - 1 < restU) return false;
+    const m = fromTpl(doc, CATALOG.find((c) => c.type === "Cable manager" && c.u_size === 1)!);
+    m.name = "Cable manager"; m.face = "both";
+    if (!checkPlace(doc, m, r, u, 0).ok) return false;
+    m.rack = r.id; m.u = u; m.side = 0; doc.devices.push(m); res.managers++; sinceMgr.set(r.id, 0);
+    return true;
+  };
+  const afterPlace = (d: Device, r: Rack, network: boolean, midStack: boolean) => {
+    if (!d.ports.length || midStack) return;   // stack members stay together; the manager goes below the last one
+    const n = (sinceMgr.get(r.id) ?? 0) + 1;
+    sinceMgr.set(r.id, n);
+    if (!network && n < 2 && !isHeavy(d)) return;
+    // heavy gear fills from the bottom, so its manager goes above it; everything else fills from the top
+    if (isHeavy(d)) addMgr(r, d.u + d.u_size); else addMgr(r, d.u - 1);
+  };
+  const placeRack = (d: Device, network = false, midStack = false) => {
     needRack();
     d.face = d.plate ? "both" : "front";
+    restU = Math.max(0, restU - d.u_size);
     for (let tries = 0; tries < 2; tries++) {
-      if (d.plate?.off) { if (d.u_size === 1 && placeShelf(d)) return; }
+      if (d.plate?.off) { if (d.u_size === 1 && placeShelf(d)) { const r = racks.find((x) => x.id === d.rack); if (r && network) addMgr(r, d.u - 1); return; } }
       else for (const r of racks) {
         const s = findFree(doc, r, d);
-        if (s) { d.rack = r.id; d.u = s[0]; d.side = s[1]; doc.devices.push(d); return; }
+        if (s) { d.rack = r.id; d.u = s[0]; d.side = s[1]; doc.devices.push(d); afterPlace(d, r, network, midStack); return; }
       }
       if (d.plate?.off && d.u_size !== 1) break;
       if (d.u_size > rackU) break;
@@ -141,6 +164,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   // --- devices
   const kindsHeavyFirst = plan.units.filter((u) => u.item.kind === "ups" || u.item.kind === "storage");
   const order = [...kindsHeavyFirst, ...plan.units.filter((u) => !kindsHeavyFirst.includes(u))];
+  restU = order.filter((u) => u.mode === "rack").reduce((n, u) => n + u.tpl.u_size, 0);
   for (const u of order) {
     const id = identOf(u.item.dev, u.item.key);
     const found = existing.find((d) => !used.has(d.id) && !d.auvik_id?.startsWith("g:") && (u.unit != null
@@ -156,7 +180,11 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     fill(d, u.key, u.item, u.name, u.tpl.model || "");
     d.auvik_name = u.name;
     devOf.set(u.key, d);
-    if (u.mode === "off") { d.face = d.plate ? "both" : "front"; putOff(d); } else placeRack(d);
+    if (u.mode === "off") { d.face = d.plate ? "both" : "front"; putOff(d); }
+    else {
+      const next = order[order.indexOf(u) + 1];
+      placeRack(d, ["switch", "firewall", "router"].includes(u.item.kind), u.unit != null && next?.itemKey === u.itemKey);
+    }
     res.added++;
   }
 
@@ -207,6 +235,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   (doc as any).auvik = { site: plan.site, imported: new Date().toISOString().slice(0, 10), unplaced: plan.unplaced, virtual: plan.virtual };
   res.missing = items.length ? findMissing(doc, items).map((d) => d.name) : [];
   res.message = `Imported from Auvik: ${res.added} added, ${res.updated} updated, ${res.groups} endpoint group(s), ${res.cablesAdded} cable(s)` +
+    (res.managers ? `, ${res.managers} cable manager(s)` : "") +
     (res.missing.length ? `, ${res.missing.length} missing from this export` : "");
   return res;
 }
