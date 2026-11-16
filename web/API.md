@@ -90,18 +90,40 @@ It only works where the app is a git checkout in `RW_APP_DIR` (default `/opt/rac
 
 ## Racks (shared: every signed-in user sees and edits all of them)
 
-`RackMeta` = `{"id": int, "name": str, "version": int, "updated_at": str, "updated_by": str /* user name */}`
+`RackMeta` = `{"id": int, "name": str, "version": int, "updated_at": str, "updated_by": str /* user name */, "site_id": int|null, "site": str /* site name, "" when none */, "client_id": int|null, "client": str /* client name, "" when none */}`
 
 | Method & path            | Body                          | Result |
 |--------------------------|-------------------------------|--------|
 | `GET /api/racks`         | —                             | `[RackMeta]`, newest `updated_at` first |
-| `POST /api/racks`        | `{name, doc}`                 | `RackMeta` (version 1) |
+| `POST /api/racks`        | `{name, doc, site_id?}`       | `RackMeta` (version 1). `site_id` (optional, int or null) puts it in a site; 404 if that site does not exist |
 | `GET /api/racks/:id`     | —                             | `RackMeta` + `"doc": Doc` |
 | `PUT /api/racks/:id`     | `{name, doc, version}`        | `RackMeta` with version+1. If `version` ≠ stored version → 409 `{"error": "...", "version": current, "updated_by": name}` |
 | `DELETE /api/racks/:id`  | —                             | `{}` |
+| `PUT /api/racks/:id/site` | `{site_id}` (int or null)    | `RackMeta`. Moves the rack to another site (null = no site). Does not change `version`. 404 if the rack or site does not exist |
 
 `doc` is the same `.rack.json` document the desktop app saves. The server stores the JSON text as received
 (after checking it parses as the `Doc` model) so unknown fields survive.
+
+## Clients and sites (shared like racks: every signed-in user sees and edits all of them)
+
+An MSP client has sites; each site holds shared racks (`racks.site_id`). A rack with no site is "Unassigned".
+
+`ClientMeta` = `{"id": int, "name": str, "notes": str, "sites": int /* count */, "racks": int /* count */, "updated_at": str}`
+`Site` = `{"id": int, "client_id": int, "name": str, "address": str, "notes": str, "updated_at": str}`
+
+| Method & path                  | Body                                   | Result |
+|--------------------------------|----------------------------------------|--------|
+| `GET /api/clients`             | —                                      | `[ClientMeta]`, by name (case-insensitive) |
+| `POST /api/clients`            | `{name, notes?}`                       | `ClientMeta`. 409 if another client has the same name (case-insensitive) |
+| `GET /api/clients/:id`         | —                                      | `ClientMeta` + `"sites": [Site + "racks": [RackMeta]]` (sites by name, racks by name) |
+| `PATCH /api/clients/:id`       | `{name?, notes?}`                      | `ClientMeta`. 409 on a duplicate name |
+| `DELETE /api/clients/:id`      | —                                      | `{}`. 409 `{"error": "Delete or move its sites first."}` while it has sites |
+| `POST /api/clients/:id/sites`  | `{name, address?, notes?}`             | `Site`. 409 if the client already has a site with that name |
+| `PATCH /api/sites/:id`         | `{name?, address?, notes?, client_id?}` | `Site`. `client_id` moves the site (and its racks) to another client |
+| `DELETE /api/sites/:id`        | —                                      | `{}`. Its racks are kept and become Unassigned (`site_id` null) |
+
+Names are trimmed and must not be empty (400), max 200 characters. `notes` and `address` max 10 000 characters.
+Deleting a client or site never deletes racks.
 
 ## Compute (same as the desktop Tauri commands)
 

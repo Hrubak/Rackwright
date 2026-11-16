@@ -2,7 +2,7 @@
 import { Doc } from "./types";
 
 export interface User { id: number; email: string; name: string; is_admin: boolean }
-export interface RackMeta { id: number; name: string; version: number; updated_at: string; updated_by: string }
+export interface RackMeta { id: number; name: string; version: number; updated_at: string; updated_by: string; site_id?: number | null; site?: string; client_id?: number | null; client?: string }
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body: any = {}) { super(message); }
@@ -55,7 +55,20 @@ export const startUpdate = () => api("POST", "/api/admin/update");
 
 export const listRacks = () => api<RackMeta[]>("GET", "/api/racks");
 export const getRack = (id: number) => api<RackMeta & { doc: Doc }>("GET", `/api/racks/${id}`);
-export const createRack = (name: string, doc: Doc) => api<RackMeta>("POST", "/api/racks", { name, doc });
+export const createRack = (name: string, doc: Doc, site_id: number | null = null) => api<RackMeta>("POST", "/api/racks", { name, doc, site_id });
+export const setRackSite = (id: number, site_id: number | null) => api<RackMeta>("PUT", `/api/racks/${id}/site`, { site_id });
+
+export interface ClientMeta { id: number; name: string; notes: string; sites: number; racks: number; updated_at: string }
+export interface SiteRow { id: number; client_id: number; name: string; address: string; notes: string; updated_at: string }
+export type ClientFull = Omit<ClientMeta, "sites"> & { sites: (SiteRow & { racks: RackMeta[] })[] };
+export const listClients = () => api<ClientMeta[]>("GET", "/api/clients");
+export const getClient = (id: number) => api<ClientFull>("GET", `/api/clients/${id}`);
+export const createClient = (name: string, notes = "") => api<ClientMeta>("POST", "/api/clients", { name, notes });
+export const patchClient = (id: number, p: { name?: string; notes?: string }) => api<ClientMeta>("PATCH", `/api/clients/${id}`, p);
+export const deleteClient = (id: number) => api("DELETE", `/api/clients/${id}`);
+export const createSite = (clientId: number, s: { name: string; address?: string; notes?: string }) => api<SiteRow>("POST", `/api/clients/${clientId}/sites`, s);
+export const patchSite = (id: number, p: { name?: string; address?: string; notes?: string; client_id?: number }) => api<SiteRow>("PATCH", `/api/sites/${id}`, p);
+export const deleteSite = (id: number) => api("DELETE", `/api/sites/${id}`);
 export const updateRack = (id: number, name: string, doc: Doc, version: number) => api<RackMeta>("PUT", `/api/racks/${id}`, { name, doc, version });
 export const deleteRack = (id: number) => api("DELETE", `/api/racks/${id}`);
 

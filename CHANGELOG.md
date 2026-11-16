@@ -2,6 +2,14 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.1.0 — 2026-11-16
+Web and desktop.
+- **Clients and sites.** A new Clients button opens a screen for MSP clients. Add a client, then its sites (name, address, notes), then put racks in each site. Each site shows small drawings of its racks with racks, U used, device and cable counts; the client header adds them up. Click a rack to open it.
+- **Web:** clients and sites are shared by everyone, like racks. Add saved racks lists the racks that are in no site yet. If the open rack is not saved yet, Save the open rack here saves it straight into that site. The Open list now shows each rack's client and site. Racks you already have show as Unassigned until you add them to a site. Deleting a site keeps its racks; a client can be deleted only when it has no sites.
+- **Desktop:** each client is a `.client.json` file that lists its sites and their `.rack.json` files. New client asks where to save it; Open client file adds an existing one to the list. Racks in the client file's folder are stored with relative paths, so the folder can be moved or synced (OneDrive, a share). Add rack files and Add the open rack put racks in a site.
+- CI now runs the front-end test files too.
+- Coming next: search and totals across a client's sites, site-to-site links, and Auvik import into a client.
+
 ## 3.0.0 — 2026-11-16
 The web app and the desktop app now have the same version number, starting at 3.0.0. A new desktop exe is built for this release.
 - **One version for web and desktop.** Before this, the web server was 2.9.1 and the desktop app was 2.6.0. Both are now 3.0.0 and move together. `node scripts/version.mjs 3.1.0` sets every version file at once, and CI fails if any of them differ.

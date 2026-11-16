@@ -220,17 +220,17 @@ export function RackList({ currentId, onOpen, onClose }: { currentId: number | n
   };
   const td = { padding: "4px 6px", borderTop: "1px solid #24272c" } as const;
   return (
-    <Modal title="Shared racks" onClose={onClose} width={640}>
+    <Modal title="Shared racks" onClose={onClose} width={760}>
       {err && <div style={errStyle}>{err}</div>}
       {list && !list.length && <div style={{ opacity: 0.7 }}>No racks saved yet. Use Save to add the current one.</div>}
       {!list && !err && <div style={{ opacity: 0.7 }}>Loading...</div>}
       {list && list.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead><tr>{["Name", "Updated by", "When", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "3px 6px", opacity: 0.7 }}>{h}</th>)}</tr></thead>
+          <thead><tr>{["Name", "Client / site", "Updated by", "When", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "3px 6px", opacity: 0.7 }}>{h}</th>)}</tr></thead>
           <tbody>
             {list.map((m) => (
               <tr key={m.id} style={{ background: m.id === currentId ? "#2a3a52" : undefined }}>
-                <td style={td}>{m.name}</td><td style={td}>{m.updated_by}</td>
+                <td style={td}>{m.name}</td><td style={{ ...td, opacity: m.site ? 1 : 0.55 }}>{m.site ? `${m.client} / ${m.site}` : "Unassigned"}</td><td style={td}>{m.updated_by}</td>
                 <td style={td}>{new Date(m.updated_at).toLocaleString()}</td>
                 <td style={{ ...td, whiteSpace: "nowrap" }}>
                   <button style={{ ...btn, padding: "2px 8px", marginRight: 3 }} onClick={() => onOpen(m)}>Open</button>

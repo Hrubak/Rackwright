@@ -9,6 +9,7 @@ pub mod geom;
 #[path = "../../../rackwright-tauri/src-tauri/src/router.rs"]
 pub mod router;
 
+mod clients;
 mod update;
 
 use std::path::Path as FsPath;
@@ -459,6 +460,10 @@ struct RackMeta {
     version: i64,
     updated_at: String,
     updated_by: String,
+    site_id: Option<i64>,
+    site: String,
+    client_id: Option<i64>,
+    client: String,
 }
 
 #[derive(Serialize)]
@@ -468,14 +473,31 @@ struct RackFull {
     version: i64,
     updated_at: String,
     updated_by: String,
+    site_id: Option<i64>,
+    site: String,
+    client_id: Option<i64>,
+    client: String,
     doc: Box<RawValue>,
 }
 
-const RACK_SELECT: &str = "SELECT r.id, r.name, r.version, r.updated_at, COALESCE(u.name, '') \
-                           FROM racks r LEFT JOIN users u ON u.id = r.updated_by_user_id";
+const RACK_SELECT: &str = "SELECT r.id, r.name, r.version, r.updated_at, COALESCE(u.name, ''), \
+                           r.site_id, COALESCE(s.name, ''), s.client_id, COALESCE(c.name, '') \
+                           FROM racks r LEFT JOIN users u ON u.id = r.updated_by_user_id \
+                           LEFT JOIN sites s ON s.id = r.site_id \
+                           LEFT JOIN clients c ON c.id = s.client_id";
 
 fn row_meta(r: &rusqlite::Row) -> rusqlite::Result<RackMeta> {
-    Ok(RackMeta { id: r.get(0)?, name: r.get(1)?, version: r.get(2)?, updated_at: r.get(3)?, updated_by: r.get(4)? })
+    Ok(RackMeta {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        version: r.get(2)?,
+        updated_at: r.get(3)?,
+        updated_by: r.get(4)?,
+        site_id: r.get(5)?,
+        site: r.get(6)?,
+        client_id: r.get(7)?,
+        client: r.get(8)?,
+    })
 }
 
 fn get_meta(conn: &Connection, id: i64) -> Result<Option<RackMeta>, ApiError> {
@@ -504,6 +526,8 @@ async fn list_racks(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
 struct NewRackReq {
     name: String,
     doc: Box<RawValue>,
+    #[serde(default)]
+    site_id: Option<i64>,
 }
 
 async fn create_rack(State(st): State<Shared>, headers: HeaderMap, body: Bytes) -> ApiResult {
@@ -512,9 +536,14 @@ async fn create_rack(State(st): State<Shared>, headers: HeaderMap, body: Bytes) 
     let name = norm_name(&req.name)?;
     check_doc(&req.doc)?;
     let conn = st.db();
+    if let Some(sid) = req.site_id {
+        if !clients::site_exists(&conn, sid)? {
+            return Err(ApiError::new(StatusCode::NOT_FOUND, "Site not found"));
+        }
+    }
     conn.execute(
-        "INSERT INTO racks (name, doc, version, updated_at, updated_by_user_id) VALUES (?1, ?2, 1, ?3, ?4)",
-        params![name, req.doc.get(), now_rfc3339(), me.id],
+        "INSERT INTO racks (name, doc, version, updated_at, updated_by_user_id, site_id) VALUES (?1, ?2, 1, ?3, ?4, ?5)",
+        params![name, req.doc.get(), now_rfc3339(), me.id, req.site_id],
     )?;
     let meta = get_meta(&conn, conn.last_insert_rowid())?.ok_or_else(rack_not_found)?;
     Ok(json_ok(&meta))
@@ -533,6 +562,10 @@ async fn get_rack(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<i
         version: meta.version,
         updated_at: meta.updated_at,
         updated_by: meta.updated_by,
+        site_id: meta.site_id,
+        site: meta.site,
+        client_id: meta.client_id,
+        client: meta.client,
         doc,
     }))
 }
@@ -645,6 +678,7 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
     let conn = Connection::open(data_dir.join("rackwright.db")).map_err(|e| format!("cannot open database: {e}"))?;
     conn.execute_batch("PRAGMA journal_mode = WAL;").map_err(|e| format!("database setup failed: {e}"))?;
     conn.execute_batch(SCHEMA).map_err(|e| format!("database setup failed: {e}"))?;
+    clients::migrate(&conn).map_err(|e| format!("database migration failed: {e}"))?;
 
     let state: Shared = Arc::new(AppState { db: Mutex::new(conn), update: update::UpdateCfg::new(data_dir) });
     let spa = ServeDir::new(static_dir).fallback(ServeFile::new(static_dir.join("index.html")));
@@ -660,6 +694,14 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
         .route("/api/users/:id", axum::routing::patch(patch_user).delete(delete_user))
         .route("/api/racks", get(list_racks).post(create_rack))
         .route("/api/racks/:id", get(get_rack).put(put_rack).delete(delete_rack))
+        .route("/api/racks/:id/site", axum::routing::put(clients::put_rack_site))
+        .route("/api/clients", get(clients::list_clients).post(clients::create_client))
+        .route(
+            "/api/clients/:id",
+            get(clients::get_client).patch(clients::patch_client).delete(clients::delete_client),
+        )
+        .route("/api/clients/:id/sites", post(clients::create_site))
+        .route("/api/sites/:id", axum::routing::patch(clients::patch_site).delete(clients::delete_site))
         .route("/api/route_cables", post(route_cables))
         .route("/api/port_positions", post(port_positions))
         .route("/api/admin/update", get(update::get_update).post(update::post_update))

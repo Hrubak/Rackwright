@@ -116,6 +116,12 @@ jobs:
       - name: Build (web)
         working-directory: rackwright-tauri
         run: npm run build:web
+      - name: Front-end tests (scripts/*.test.ts)
+        working-directory: rackwright-tauri
+        shell: bash
+        run: |
+          set -euo pipefail
+          for t in scripts/*.test.ts; do echo "== $t"; npx tsx "$t"; done
 
   desktop:
     # Type-checks the Tauri crate. It needs the webkit/gtk dev packages and the built front end (../dist).

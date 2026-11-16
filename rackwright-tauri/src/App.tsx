@@ -22,6 +22,8 @@ import PortsEditor from "./PortsEditor";
 import ModelPicker from "./ModelPicker";
 import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
+import ClientsPanel from "./clients/ClientsPanel";
+import { RackItem, clientStore } from "./clients/store";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 import {
@@ -82,6 +84,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [fitTick, setFitTick] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
+  const [clientsOpen, setClientsOpen] = useState(false);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [modelFor, setModelFor] = useState<number | null>(null);
   const [picker, setPicker] = useState<"new" | "add" | null>(null);
@@ -222,6 +225,21 @@ export default function App({ web }: { web?: WebProps } = {}) {
       if (p) { setPath(p); setDirty(false); say("Saved"); }
     } catch (e) { say(String(e), true); }
   }, [path, cur, doc, say, saveShared]);
+
+  /** Clients screen: open a rack from a site. */
+  const openFromClient = async (r: RackItem) => {
+    if (dirty && !confirm("Discard unsaved changes?")) return;
+    if (IS_WEB) { if (r.id != null) { await loadShared(r.id); setClientsOpen(false); } return; }
+    try { const d = await clientStore().loadDoc(r); reset(d, r.path ?? null); setMsg(""); setClientsOpen(false); } catch (e) { say(errText(e), true); }
+  };
+  /** Web, Clients screen: save the open rack (not saved yet) as a new shared rack in a site. */
+  const saveCurrentTo = async (siteId: number) => {
+    const name = prompt("Name for this rack:", doc.racks[0]?.name ?? "")?.trim();
+    if (!name) return false;
+    const m = await A.createRack(name, doc, siteId);
+    setCur({ id: m.id, name: m.name, version: m.version }); setDirty(false); say("Saved");
+    return true;
+  };
 
   const conflictTheirs = async () => { setConflict(null); if (cur) await loadShared(cur.id); };
   const conflictMine = async () => {
@@ -430,6 +448,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: "#e6e8eb", fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
       <div style={{ minHeight: 42, padding: "6px 10px", background: "#1b1d21", borderBottom: "1px solid #2c2f35", boxSizing: "border-box", display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 4, whiteSpace: "nowrap" }}>
         <button style={btn} onClick={doNew}>New</button>
+        <button style={btn} onClick={() => setClientsOpen(true)} title="Clients, their sites and the racks in each">Clients</button>
         <button style={btn} onClick={doOpen}>Open</button>
         <button style={btn} onClick={() => doSave()}>Save{dirty ? " *" : ""}</button>
         <button style={btn} onClick={() => doSave(true)}>Save as</button>
@@ -631,6 +650,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <button style={{ ...btn, marginRight: 0 }} onClick={discardDraft}>Discard</button>
           </div>
         </div>
+      )}
+      {clientsOpen && (
+        <ClientsPanel onClose={() => setClientsOpen(false)} onOpenRack={openFromClient}
+          current={{ label: cur?.name ?? (path ? path.split(/[\\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
+          saveCurrentTo={IS_WEB && !cur && doc.racks.length > 0 ? saveCurrentTo : undefined} />
       )}
       {IS_WEB && showRacks && <RackList currentId={cur?.id ?? null} onClose={() => setShowRacks(false)} onOpen={(m) => loadShared(m.id)} />}
       {IS_WEB && nameAsk && <NamePrompt title={nameAsk.title} initial={nameAsk.initial} onOk={nameAsk.cb} onCancel={() => setNameAsk(null)} />}

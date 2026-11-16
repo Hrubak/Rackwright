@@ -7,13 +7,14 @@ Rackwright designs network racks: rack and logical views, real equipment facepla
 
 ## Layout
 
-- `rackwright-tauri/src/` — React front end for both. `backend.ts` picks Tauri or HTTP by `import.meta.env.VITE_TARGET` (`IS_WEB`). `api.ts` is the HTTP client. `web.tsx` and `WebShell.tsx` are the web-only screens (sign-in, Users, rack list, save conflict).
+- `rackwright-tauri/src/` — React front end for both. `backend.ts` picks Tauri or HTTP by `import.meta.env.VITE_TARGET` (`IS_WEB`). `api.ts` is the HTTP client. `web.tsx` and `WebShell.tsx` are the web-only screens (sign-in, Users, rack list, save conflict). `clients/` is the Clients and sites screen; `clients/store.ts` talks to the server on the web and to `.client.json` files on the desktop. `unsaved.ts` holds the leave warning and recovery drafts.
 - `rackwright-tauri/src-tauri/` — desktop Rust: Tauri commands (`lib.rs`), document model (`model.rs`), geometry (`geom.rs`), cable router (`router.rs`).
 - `web/API.md` — the HTTP contract. Change it first when changing an endpoint.
 - `web/server/` — Rust axum server, SQLite (`rusqlite` bundled), argon2 passwords, cookie sessions. Tests in `web/server/tests/api.rs`.
 - `Homelab.rack.json` — synthetic example rack. The router's unit tests read it. Keep it realistic and free of real names, addresses and serials.
 - `proxmox/ct/rackwright.sh` (Proxmox host; also the `update` command inside the LXC) and `proxmox/install/rackwright-install.sh` (inside the LXC).
 - `.github/workflows/web.yml` (CI), `.github/workflows/desktop-exe.yml` (builds the Windows `Rackwright.exe`, see below), `.github/workflows/sync-upstream.yml` (forks only, see below).
+- `docs/roadmap.md` — what is planned next and the product direction.
 - `docs/adr/` — decisions. Read them; flag a conflict instead of silently overriding.
 
 ## Run and test
@@ -24,7 +25,7 @@ Needs Node 22+ and Rust stable. CI always builds and tests both, so a PC without
 cd rackwright-tauri && npm ci
 npm run build          # desktop type-check + build (must keep passing)
 npm run build:web      # web build -> ../web/dist
-npx tsx scripts/edit.test.ts
+npx tsx scripts/edit.test.ts   # also auvik, bundles, vsdx, views, editing, swap, mount, clients
 npm run tauri dev      # desktop app (needs the Tauri prerequisites)
 cd ../web/server && cargo test   # API tests + the desktop router tests (shared code)
 cargo run              # http://127.0.0.1:8080, data in ./data

@@ -257,6 +257,176 @@ async fn racks_crud_and_conflict() {
 }
 
 #[tokio::test]
+async fn clients_sites_and_racks() {
+    let (app, _d) = make_app();
+    let mut a = Client::new(&app);
+
+    // signed out
+    let mut anon = Client::new(&app);
+    assert_eq!(anon.get("/api/clients").await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anon.post("/api/clients", json!({"name": "X"})).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anon.patch("/api/sites/1", json!({"name": "X"})).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anon.put("/api/racks/1/site", json!({"site_id": null})).await.0, StatusCode::UNAUTHORIZED);
+
+    setup_admin(&mut a).await;
+    assert_eq!(a.get("/api/clients").await.1, json!([]));
+
+    // clients: validation, create, duplicate (case-insensitive)
+    assert_eq!(a.post("/api/clients", json!({"name": "   "})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post("/api/clients", json!({"name": "n".repeat(201)})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post("/api/clients", json!({"name": "Big", "notes": "x".repeat(10_001)})).await.0, StatusCode::BAD_REQUEST);
+    let (s, acme) = a.post("/api/clients", json!({"name": "  Acme Dental ", "notes": "Dentist group"})).await;
+    assert_eq!(s, StatusCode::OK, "{acme}");
+    assert_eq!(acme["name"], "Acme Dental");
+    assert_eq!(acme["notes"], "Dentist group");
+    assert_eq!(acme["sites"], 0);
+    assert_eq!(acme["racks"], 0);
+    let acme_id = acme["id"].as_i64().unwrap();
+    assert_eq!(a.post("/api/clients", json!({"name": "ACME dental"})).await.0, StatusCode::CONFLICT);
+    let (s, beta) = a.post("/api/clients", json!({"name": "beta Logistics"})).await;
+    assert_eq!(s, StatusCode::OK, "{beta}");
+    assert_eq!(beta["notes"], "");
+    let beta_id = beta["id"].as_i64().unwrap();
+
+    // list sorted by name, case-insensitive
+    let (_, list) = a.get("/api/clients").await;
+    let names: Vec<&str> = list.as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap()).collect();
+    assert_eq!(names, vec!["Acme Dental", "beta Logistics"]);
+
+    // patch
+    let (s, v) = a.patch(&format!("/api/clients/{acme_id}"), json!({"notes": "Updated"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["notes"], "Updated");
+    assert_eq!(v["name"], "Acme Dental");
+    assert_eq!(a.patch(&format!("/api/clients/{acme_id}"), json!({"name": "BETA logistics"})).await.0, StatusCode::CONFLICT);
+    // renaming to its own name in another case is fine
+    let (s, v) = a.patch(&format!("/api/clients/{acme_id}"), json!({"name": "ACME Dental"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["name"], "ACME Dental");
+    assert_eq!(a.patch("/api/clients/9999", json!({"name": "Z"})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.get("/api/clients/9999").await.0, StatusCode::NOT_FOUND);
+
+    // sites
+    assert_eq!(a.post("/api/clients/9999/sites", json!({"name": "S"})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.post(&format!("/api/clients/{acme_id}/sites"), json!({"name": ""})).await.0, StatusCode::BAD_REQUEST);
+    let (s, main) = a
+        .post(&format!("/api/clients/{acme_id}/sites"), json!({"name": "Main Office", "address": "1 Example Street"}))
+        .await;
+    assert_eq!(s, StatusCode::OK, "{main}");
+    assert_eq!(main["client_id"], acme_id);
+    assert_eq!(main["address"], "1 Example Street");
+    assert_eq!(main["notes"], "");
+    let main_id = main["id"].as_i64().unwrap();
+    assert_eq!(
+        a.post(&format!("/api/clients/{acme_id}/sites"), json!({"name": "main office"})).await.0,
+        StatusCode::CONFLICT
+    );
+    let (s, branch) = a.post(&format!("/api/clients/{acme_id}/sites"), json!({"name": "Branch"})).await;
+    assert_eq!(s, StatusCode::OK, "{branch}");
+    let branch_id = branch["id"].as_i64().unwrap();
+    // same name under another client is fine
+    let (s, beta_main) = a.post(&format!("/api/clients/{beta_id}/sites"), json!({"name": "Main Office"})).await;
+    assert_eq!(s, StatusCode::OK, "{beta_main}");
+    let beta_main_id = beta_main["id"].as_i64().unwrap();
+
+    // delete client with sites -> 409
+    let (s, v) = a.delete(&format!("/api/clients/{acme_id}")).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(v["error"], "Delete or move its sites first.");
+
+    // racks: create with and without a site
+    assert_eq!(
+        a.post("/api/racks", json!({"name": "Bad", "doc": sample_doc(), "site_id": 9999})).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (s, r1) = a.post("/api/racks", json!({"name": "Rack B", "doc": sample_doc(), "site_id": main_id})).await;
+    assert_eq!(s, StatusCode::OK, "{r1}");
+    assert_eq!(r1["site_id"], main_id);
+    assert_eq!(r1["site"], "Main Office");
+    assert_eq!(r1["client_id"], acme_id);
+    assert_eq!(r1["client"], "ACME Dental");
+    assert_eq!(r1["version"], 1);
+    let r1_id = r1["id"].as_i64().unwrap();
+    let (s, r2) = a.post("/api/racks", json!({"name": "Rack A", "doc": sample_doc()})).await;
+    assert_eq!(s, StatusCode::OK, "{r2}");
+    assert_eq!(r2["site_id"], Value::Null);
+    assert_eq!(r2["site"], "");
+    assert_eq!(r2["client_id"], Value::Null);
+    assert_eq!(r2["client"], "");
+    let r2_id = r2["id"].as_i64().unwrap();
+
+    // GET /api/racks and GET /api/racks/:id carry the new fields
+    let (_, racks) = a.get("/api/racks").await;
+    let found = racks.as_array().unwrap().iter().find(|r| r["id"] == r1_id).unwrap().clone();
+    assert_eq!(found["site"], "Main Office");
+    assert_eq!(found["client"], "ACME Dental");
+    let (_, full) = a.get(&format!("/api/racks/{r1_id}")).await;
+    assert_eq!(full["site_id"], main_id);
+    assert_eq!(full["client"], "ACME Dental");
+    assert_eq!(full["doc"]["custom_field"], "keep me");
+
+    // PUT /site moves a rack without changing its version
+    assert_eq!(a.put(&format!("/api/racks/{r2_id}/site"), json!({"site_id": 9999})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.put("/api/racks/9999/site", json!({"site_id": main_id})).await.0, StatusCode::NOT_FOUND);
+    let (s, m) = a.put(&format!("/api/racks/{r2_id}/site"), json!({"site_id": branch_id})).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["site"], "Branch");
+    assert_eq!(m["version"], 1);
+    let (s, m) = a.put(&format!("/api/racks/{r2_id}/site"), json!({"site_id": null})).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["site_id"], Value::Null);
+    assert_eq!(m["version"], 1);
+    a.put(&format!("/api/racks/{r2_id}/site"), json!({"site_id": branch_id})).await;
+
+    // counts and nested detail (sites and racks by name)
+    let (s, detail) = a.get(&format!("/api/clients/{acme_id}")).await;
+    assert_eq!(s, StatusCode::OK, "{detail}");
+    assert_eq!(detail["sites"].as_array().unwrap().len(), 2);
+    assert_eq!(detail["racks"], 2);
+    assert_eq!(detail["sites"][0]["name"], "Branch");
+    assert_eq!(detail["sites"][0]["racks"][0]["name"], "Rack A");
+    assert_eq!(detail["sites"][1]["name"], "Main Office");
+    assert_eq!(detail["sites"][1]["racks"][0]["name"], "Rack B");
+    let (_, list) = a.get("/api/clients").await;
+    assert_eq!(list[0]["sites"], 2);
+    assert_eq!(list[0]["racks"], 2);
+
+    // PATCH site: fields, duplicates, moving to another client
+    let (s, v) = a.patch(&format!("/api/sites/{main_id}"), json!({"address": "2 Example Street", "notes": "n"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["address"], "2 Example Street");
+    assert_eq!(v["name"], "Main Office");
+    assert_eq!(a.patch(&format!("/api/sites/{main_id}"), json!({"name": "BRANCH"})).await.0, StatusCode::CONFLICT);
+    assert_eq!(a.patch(&format!("/api/sites/{main_id}"), json!({"client_id": 9999})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.patch("/api/sites/9999", json!({"name": "Z"})).await.0, StatusCode::NOT_FOUND);
+    // moving "Main Office" to beta collides with beta's own "Main Office"
+    assert_eq!(a.patch(&format!("/api/sites/{main_id}"), json!({"client_id": beta_id})).await.0, StatusCode::CONFLICT);
+    // moving "Branch" works and takes its rack along
+    let (s, v) = a.patch(&format!("/api/sites/{branch_id}"), json!({"client_id": beta_id})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["client_id"], beta_id);
+    let (_, m) = a.get(&format!("/api/racks/{r2_id}")).await;
+    assert_eq!(m["client"], "beta Logistics");
+    assert_eq!(m["site"], "Branch");
+
+    // delete a site: its rack stays, becomes unassigned
+    let (s, _) = a.delete(&format!("/api/sites/{main_id}")).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(a.delete(&format!("/api/sites/{main_id}")).await.0, StatusCode::NOT_FOUND);
+    let (s, m) = a.get(&format!("/api/racks/{r1_id}")).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["site_id"], Value::Null);
+    assert_eq!(m["site"], "");
+    assert_eq!(m["client"], "");
+
+    // acme has no sites now: delete works; beta (with sites) still refuses
+    assert_eq!(a.delete(&format!("/api/clients/{acme_id}")).await.0, StatusCode::OK);
+    assert_eq!(a.get(&format!("/api/clients/{acme_id}")).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.delete(&format!("/api/clients/{beta_id}")).await.0, StatusCode::CONFLICT);
+    assert_eq!(a.delete(&format!("/api/sites/{beta_main_id}")).await.0, StatusCode::OK);
+}
+
+#[tokio::test]
 async fn compute_endpoints() {
     let (app, _d) = make_app();
     let mut a = Client::new(&app);
