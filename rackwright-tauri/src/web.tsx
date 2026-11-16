@@ -33,7 +33,7 @@ export function UserBar({ web }: { web: WebProps }) {
   const [pw, setPw] = useState(false);
   const [users, setUsers] = useState(false);
   return (
-    <span style={{ float: "right", fontSize: 12 }}>
+    <span style={{ marginLeft: "auto", paddingLeft: 12, fontSize: 12, display: "inline-flex", alignItems: "center" }}>
       <span style={{ opacity: 0.8, marginRight: 8 }}>{web.user.name}{web.user.is_admin ? " (admin)" : ""}</span>
       <button style={btn} onClick={() => setPw(true)}>Change password</button>
       {web.user.is_admin && <button style={btn} onClick={() => setUsers(true)}>Users</button>}

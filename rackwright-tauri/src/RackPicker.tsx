@@ -1,20 +1,42 @@
 import { useMemo, useState } from "react";
-import RackFrame from "./RackFrame";
 import { GENERIC_MAX_U, GENERIC_MIN_U, KINDS, RACK_MODELS, RackKind, RackModel, dimsText, kindLabel } from "./racks";
-import { RAIL, RW } from "./types";
 
 const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
 
-export function FramePreview({ kind }: { kind: string }) {
-  const w = RW + 2 * RAIL, h = 640;
-  return (
-    <svg width={38} height={46} viewBox={`0 0 ${w} ${h}`} style={{ flex: "none" }}>
-      <rect x={0} y={0} width={w} height={h} rx={14} fill="#1d2025" stroke="#3a3d42" strokeWidth={8} />
-      <RackFrame kind={kind} x={0} y={0} w={w} h={h} />
-      <rect x={RAIL - 3} y={46} width={RW + 6} height={h - 70} fill="#0b0c0e" stroke="#2c2f35" strokeWidth={4} />
-    </svg>
-  );
+/** Small icon for the picker list: the outline of each rack kind, with its height scaled to U (52U fills the box). */
+export function FramePreview({ kind, u = 42 }: { kind: string; u?: number }) {
+  const W = 38, H = 46, frame = "#9aa1ab", post = "#c3c8cf", slot = "#4a4f58", inside = "#262a31";
+  const h = Math.max(10, Math.round((Math.min(u, 52) / 52) * (H - 4))), w = 26;
+  const x = (W - w) / 2, y = H - 2 - h, r = x + w, b = y + h;
+  const slots = [];
+  const step = Math.max(2, h / Math.max(2, Math.round(u / 4)));
+  for (let yy = y + 3 + step; yy < b - 3; yy += step) slots.push(<line key={yy} x1={x + 4} x2={r - 4} y1={yy} y2={yy} stroke={slot} strokeWidth={0.8} />);
+  let body;
+  switch (kind) {
+    case "open4":
+      body = <><rect x={x + 3} y={y + 1} width={w - 6} height={h - 2} fill={inside} />{slots}
+        <rect x={x} y={y} width={3} height={h} fill={post} /><rect x={r - 3} y={y} width={3} height={h} fill={post} />
+        <rect x={x} y={y} width={w} height={2} fill={frame} /><rect x={x} y={b - 2} width={w} height={2} fill={frame} /></>;
+      break;
+    case "twopost":
+      body = <>{slots}<rect x={x + 2} y={y} width={3} height={h} fill={post} /><rect x={r - 5} y={y} width={3} height={h} fill={post} />
+        <rect x={x - 2} y={b - 2} width={9} height={2} fill={frame} /><rect x={r - 7} y={b - 2} width={9} height={2} fill={frame} /></>;
+      break;
+    case "wall":
+      body = <><rect x={x - 3} y={y + 2} width={2} height={h - 4} fill={post} />
+        <rect x={x} y={y} width={w} height={h} rx={2} fill={inside} stroke={frame} strokeWidth={1.4} />{slots}
+        <rect x={r - 4} y={y + h / 2 - 3} width={2} height={6} rx={1} fill={post} /></>;
+      break;
+    case "desktop":
+      body = <><rect x={x} y={y} width={w} height={h} rx={1.5} fill={inside} stroke={frame} strokeWidth={1.4} />{slots}
+        <path d={`M${x + 5} ${y} v-3 h${w - 10} v3`} fill="none" stroke={post} strokeWidth={1.4} /></>;
+      break;
+    default: // cabinet
+      body = <><rect x={x} y={y} width={w} height={h} rx={2} fill={inside} stroke={frame} strokeWidth={1.4} />{slots}
+        <rect x={x} y={y} width={w} height={3} rx={1} fill={frame} /></>;
+  }
+  return <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ flex: "none" }}>{body}</svg>;
 }
 
 export interface PickResult { model: RackModel; u: number; name: string }
@@ -79,7 +101,7 @@ export default function RackPicker({ title, okLabel, defaultName, onPick, onCanc
               <div key={m.id} onClick={() => { setSelId(m.id); if (m.generic) setGu(String(m.u)); }} onDoubleClick={ok}
                 ref={(el) => { if (el && on) el.scrollIntoView({ block: "nearest" }); }}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 8px", cursor: "pointer", background: on ? "#2a3a52" : "transparent", borderBottom: "1px solid #22252b" }}>
-                <FramePreview kind={m.kind} />
+                <FramePreview kind={m.kind} u={m.generic ? (Number(gu) || m.u) : m.u} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div>{m.name}</div>
                   <div style={{ fontSize: 11, opacity: 0.65 }}>{kindLabel(m.kind)}{m.approx ? " (size approximate)" : ""}</div>

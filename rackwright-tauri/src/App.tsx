@@ -347,8 +347,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: "#e6e8eb", fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
-      <div style={{ height: 42, padding: "6px 10px", background: "#1b1d21", borderBottom: "1px solid #2c2f35", boxSizing: "border-box", whiteSpace: "nowrap", overflow: "hidden" }}>
-        {IS_WEB && web && <UserBar web={web} />}
+      <div style={{ minHeight: 42, padding: "6px 10px", background: "#1b1d21", borderBottom: "1px solid #2c2f35", boxSizing: "border-box", display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 4, whiteSpace: "nowrap" }}>
         <button style={btn} onClick={doNew}>New</button>
         <button style={btn} onClick={doOpen}>Open</button>
         <button style={btn} onClick={() => doSave()}>Save{dirty ? " *" : ""}</button>
@@ -368,6 +367,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8 }}>
           {IS_WEB ? (cur ? `${cur.name} (v${cur.version})` : "unsaved rack") : (path ?? "no file")} | {doc.racks.length}R {doc.devices.length}D {doc.cables.length}C {msg}
         </span>
+        {IS_WEB && web && <UserBar web={web} />}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <div style={{ width: 270, background: "#1b1d21", borderRight: "1px solid #2c2f35", display: "flex", flexDirection: "column", fontSize: 12 }}>
