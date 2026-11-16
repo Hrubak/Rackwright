@@ -17,6 +17,11 @@ fn save_doc(path: String, doc: Doc) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn save_bytes(path: String, data: Vec<u8>) -> Result<(), String> {
+    std::fs::write(path, data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn route_cables(doc: Doc, face: String) -> router::RouteResult {
     router::route_all(&doc, &face)
 }
@@ -34,7 +39,7 @@ fn port_positions(doc: Doc) -> Vec<(i64, f64, f64, f64)> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_doc, save_doc, route_cables, port_positions])
+        .invoke_handler(tauri::generate_handler![open_doc, save_doc, save_bytes, route_cables, port_positions])
         .run(tauri::generate_context!())
         .expect("error while running Rackwright");
 }

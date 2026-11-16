@@ -11,6 +11,8 @@ export interface Backend {
   openDoc(): Promise<{ path: string; doc: Doc } | null>;
   /** Desktop: save to `path`, or ask with a Save dialog when null. Returns the path used, or null if cancelled. */
   saveDoc(path: string | null, doc: Doc): Promise<string | null>;
+  /** Save binary data (PDF, .vsdx): a browser download on the web, a Save dialog on the desktop. Returns false if cancelled. */
+  saveBytes(suggestedName: string, mime: string, bytes: Uint8Array): Promise<boolean>;
 }
 
 const filters = [{ name: "Rack", extensions: ["json"] }];
@@ -33,6 +35,13 @@ function tauriBackend(): Backend {
       await (await core()).invoke("save_doc", { path: p, doc });
       return p;
     },
+    async saveBytes(name, _mime, bytes) {
+      const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
+      const p = await (await dialog()).save({ defaultPath: name, filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : undefined });
+      if (!p) return false;
+      await (await core()).invoke("save_bytes", { path: p, data: Array.from(bytes) });
+      return true;
+    },
   };
 }
 
@@ -42,6 +51,14 @@ function webBackend(): Backend {
     portPositions: (doc) => api<PortPos[]>("POST", "/api/port_positions", { doc }),
     async openDoc() { throw new Error("openDoc is desktop-only"); },
     async saveDoc() { throw new Error("saveDoc is desktop-only"); },
+    async saveBytes(name, mime, bytes) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      return true;
+    },
   };
 }
 
