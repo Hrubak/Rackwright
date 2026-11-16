@@ -2,12 +2,12 @@
 # Copyright (c) 2026 Hrubak
 # Author: Hrubak
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
-# Source: https://github.com/Hrubak/Rackwright
+# Source: https://github.com/hast3/Rackwright
 #
 # Community-scripts style installer for Rackwright.
 # Run on the Proxmox HOST (not inside a VM):
 #
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/Hrubak/Rackwright/web/proxmox/ct/rackwright.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/hast3/Rackwright/master/proxmox/ct/rackwright.sh)"
 #
 # Or copy this folder to the host and:  bash proxmox/ct/rackwright.sh
 #
@@ -32,8 +32,8 @@ export var_port
 # Where this script installs from. Change these two lines only; everything else derives from them.
 # Inside an existing LXC, `update` follows the repo and branch the container was installed from
 # (git origin and current branch). Set var_repo / var_branch to override that.
-RW_DEFAULT_REPO="https://github.com/Hrubak/Rackwright.git"
-RW_DEFAULT_BRANCH="web"
+RW_DEFAULT_REPO="https://github.com/hast3/Rackwright.git"
+RW_DEFAULT_BRANCH="master"
 
 YW=$'\033[33m'
 GN=$'\033[1;92m'

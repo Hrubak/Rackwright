@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Hrubak
 # Author: Hrubak
 # License: MIT
-# Source: https://github.com/Hrubak/Rackwright
+# Source: https://github.com/hast3/Rackwright
 #
 # Runs INSIDE the LXC. Debian templates have no curl or git — install packages first.
 # The `update` command sources this file with --functions-only to reuse build_app.
@@ -102,8 +102,8 @@ msg_ok "Installed base packages"
 
 # The host script (proxmox/ct/rackwright.sh) passes var_repo / var_branch. These fallbacks only
 # apply when this file is run by hand; keep them equal to RW_DEFAULT_REPO / RW_DEFAULT_BRANCH there.
-REPO="${var_repo:-https://github.com/Hrubak/Rackwright.git}"
-BRANCH="${var_branch:-web}"
+REPO="${var_repo:-https://github.com/hast3/Rackwright.git}"
+BRANCH="${var_branch:-master}"
 PORT="${var_port:-8080}"
 
 msg_info "Installing Node.js 22"

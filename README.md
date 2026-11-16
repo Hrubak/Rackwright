@@ -1,7 +1,5 @@
 # Rackwright
 
-> **Branches.** `desktop` holds the desktop apps (the Tauri app and the tkinter app). `web` is everything on `desktop` plus the browser version, described under "Web version (Proxmox LXC)" below.
-
 Standalone desktop app (Python 3.11+, tkinter only, no installs) for designing network racks.
 Separate from CompAIre.
 
@@ -37,7 +35,7 @@ Imports match by model (e.g. "SonicWall NSa 2700", "Catalyst 9300-48P", "ICX7150
 On the **Proxmox host** shell (not inside a VM). The repo is public, so no token is needed.
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/Hrubak/Rackwright/web/proxmox/ct/rackwright.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/hast3/Rackwright/master/proxmox/ct/rackwright.sh)"
 ```
 
 Default LXC: Debian 13, 2 CPU, 2 GB RAM, 8 GB disk, unprivileged, DHCP on `vmbr0`, port 8080. Choose **No** on the first prompt for Advanced (CTID, VLAN, storage, and the rest). The container builds Rackwright itself, so the first install takes several minutes.
@@ -50,7 +48,7 @@ When it finishes it prints `http://<ct-ip>:8080`. The first person to open that 
 update
 ```
 
-That pulls the `web` branch, rebuilds, and restarts `rackwright.service`. Data stays in `/var/lib/rackwright` (SQLite file `rackwright.db`) and an update never touches it.
+That pulls the branch the container was installed from (`master` by default), rebuilds, and restarts `rackwright.service`. Data stays in `/var/lib/rackwright` (SQLite file `rackwright.db`) and an update never touches it.
 
 Keep it on the LAN (or Tailscale). Do not publish this URL.
 
