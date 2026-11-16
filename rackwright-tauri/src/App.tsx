@@ -3,6 +3,7 @@ import { backend, IS_WEB } from "./backend";
 import * as A from "./api";
 import { ConflictDialog, NamePrompt, RackList, UserBar, WebProps } from "./web";
 import RackView, { Resolver, Sel } from "./RackView";
+import ExportMenu from "./export/ExportMenu";
 import { Device, Doc, PortPos, RouteResult } from "./types";
 import {
   CATALOG, addRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
@@ -170,6 +171,15 @@ export default function App({ web }: { web?: WebProps } = {}) {
     } catch (e) { say(errText(e), true); }
   };
   const doExportFile = () => A.exportFile(cur?.name ?? "rack", doc);
+  const exportName = () => cur?.name ?? (path ? path.split(/[\\/]/).pop()!.replace(/\.rack\.json$|\.json$/i, "") : undefined);
+  const doExport = async (kind: "pdf" | "visio") => {
+    say(kind === "pdf" ? "Making the PDF..." : "Making the Visio file...");
+    try {
+      const x = await import("./export");
+      const saved = await (kind === "pdf" ? x.exportPdf(doc, exportName()) : x.exportVisio(doc, exportName()));
+      if (saved) say("Export saved");
+    } catch (e) { say(errText(e), true); }
+  };
 
   const onPort = (pid: number) => {
     if (pending == null) { setPending(pid); say("Click a second port to connect"); return; }
@@ -335,7 +345,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <button style={btn} onClick={doRedo} disabled={!redo.length}>Redo</button>
         <button style={btn} onClick={() => edit((d) => { const r = addRack(d); setSel({ kind: "rack", id: r.id }); })}>+ Rack</button>
         {IS_WEB && <button style={btn} onClick={doImportFile} title="Load a .rack.json file from this computer">Import file</button>}
-        {IS_WEB && <button style={btn} onClick={doExportFile} title="Download as .rack.json">Export file</button>}
+        <ExportMenu items={[
+          { label: "Export PDF", run: () => doExport("pdf"), disabled: !doc.racks.length, hint: doc.racks.length ? undefined : "Add a rack first" },
+          { label: "Export Visio (.vsdx)", run: () => doExport("visio"), disabled: !doc.racks.length, hint: doc.racks.length ? undefined : "Add a rack first" },
+          ...(IS_WEB ? [{ label: "Export file (.rack.json)", run: doExportFile }] : []),
+        ]} />
         <button style={btn} onClick={() => setImportOpen(true)}>Import list</button>
         <button style={btn} onClick={() => setFitTick((n) => n + 1)} title="Home">Fit</button>
         <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>

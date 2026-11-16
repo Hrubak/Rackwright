@@ -1,6 +1,6 @@
 name: CI
 
-# The desktop crate (rackwright-tauri/src-tauri) is not built here: it needs webkit.
+# The `desktop` job only runs cargo check on the Tauri crate (no bundle).
 on:
   push:
     branches: [web, master]
@@ -114,6 +114,31 @@ jobs:
       - name: Build (web)
         working-directory: rackwright-tauri
         run: npm run build:web
+
+  desktop:
+    # Type-checks the Tauri crate. It needs the webkit/gtk dev packages and the built front end (../dist).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rackwright-tauri/package-lock.json
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev build-essential pkg-config
+      - name: Build front end (tauri embeds ../dist)
+        working-directory: rackwright-tauri
+        run: npm ci && npm run build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rackwright-tauri/src-tauri
+      - name: cargo check
+        working-directory: rackwright-tauri/src-tauri
+        run: cargo check --locked
 
   shell:
     runs-on: ubuntu-latest
