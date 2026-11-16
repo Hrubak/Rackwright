@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Doc } from "../types";
 import { Stats, addStats, docStats, statText, zero } from "./util";
+import Inventory from "./Inventory";
 import { ClientItem, ClientListItem, RackItem, SiteItem, clientStore } from "./store";
 
 const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
@@ -21,7 +22,8 @@ export interface ClientsPanelProps {
   current: CurrentRack;
   /** Web: save the open (unsaved) rack as a new shared rack in this site. */
   saveCurrentTo?: (siteId: number) => Promise<boolean>;
-  onOpenRack: (r: RackItem) => void;
+  /** Open a rack; with `devId`, select that device. */
+  onOpenRack: (r: RackItem, devId?: number) => void;
   onClose: () => void;
 }
 
@@ -61,6 +63,8 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
   const [busy, setBusy] = useState(false);
   const [siteForm, setSiteForm] = useState<{ id: number | null; name: string; address: string; notes: string } | null>(null);
   const [picker, setPicker] = useState<{ siteId: number; items: RackItem[] | null } | null>(null);
+  const [tab, setTab] = useState<"sites" | "inventory">(() => { try { return localStorage.getItem("rw.clientTab") === "inventory" ? "inventory" : "sites"; } catch { return "sites"; } });
+  useEffect(() => { try { localStorage.setItem("rw.clientTab", tab); } catch { /* ignore */ } }, [tab]);
 
   const reloadList = useCallback(async () => { try { setList(await store.list()); } catch (e) { setErr(errOf(e)); setList([]); } }, [store]);
   const reloadClient = useCallback(async (k: string | null) => {
@@ -168,9 +172,16 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>{client.sites.length} site{client.sites.length === 1 ? "" : "s"}, {statText(total)}{!store.web && <> · <span title={client.key}>{client.key}</span></>}</div>
                 <textarea key={`t${client.key}`} style={{ ...inp, width: "100%", maxWidth: 800, minHeight: 44, boxSizing: "border-box", marginBottom: 10 }} placeholder="Notes about this client (contacts, contract, escalation...)"
                   defaultValue={client.notes} onBlur={(e) => { if (e.target.value !== client.notes) run(() => store.update(client.key, { notes: e.target.value }), refresh); }} />
-                <div style={{ marginBottom: 12 }}>
-                  <button style={btn} onClick={() => setSiteForm({ id: null, name: "", address: "", notes: "" })}>Add site</button>
+                <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #2c2f35", marginBottom: 12 }}>
+                  {([["sites", "Sites"], ["inventory", "Inventory and search"]] as const).map(([id, label]) => (
+                    <button key={id} onClick={() => setTab(id)} style={{ background: "none", color: tab === id ? "#e6e8eb" : "#9aa0a8", border: "none", cursor: "pointer", fontSize: 13,
+                      padding: "6px 12px", borderBottom: tab === id ? "2px solid #5b8bd0" : "2px solid transparent", marginBottom: -1 }}>{label}</button>
+                  ))}
+                  <span style={{ flex: 1 }} />
+                  {tab === "sites" && <button style={{ ...btn, marginBottom: 4 }} onClick={() => setSiteForm({ id: null, name: "", address: "", notes: "" })}>Add site</button>}
                 </div>
+                {tab === "inventory" && <Inventory client={client} docs={docs} onOpen={onOpenRack} />}
+                {tab === "sites" && <>
                 {siteForm && (
                   <div style={{ border: "1px solid #3a3d42", borderRadius: 6, padding: 10, marginBottom: 12, maxWidth: 520, background: "#202328" }}>
                     <b>{siteForm.id == null ? "New site" : "Edit site"}</b>
@@ -241,6 +252,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                     );
                   })}
                 </div>
+                </>}
               </>
             )}
           </div>

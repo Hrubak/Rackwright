@@ -227,10 +227,16 @@ export default function App({ web }: { web?: WebProps } = {}) {
   }, [path, cur, doc, say, saveShared]);
 
   /** Clients screen: open a rack from a site. */
-  const openFromClient = async (r: RackItem) => {
+  const openFromClient = async (r: RackItem, devId?: number) => {
     if (dirty && !confirm("Discard unsaved changes?")) return;
-    if (IS_WEB) { if (r.id != null) { await loadShared(r.id); setClientsOpen(false); } return; }
-    try { const d = await clientStore().loadDoc(r); reset(d, r.path ?? null); setMsg(""); setClientsOpen(false); } catch (e) { say(errText(e), true); }
+    if (IS_WEB) {
+      if (r.id == null) return;
+      await loadShared(r.id);
+    } else {
+      try { const d = await clientStore().loadDoc(r); reset(d, r.path ?? null); setMsg(""); } catch (e) { say(errText(e), true); return; }
+    }
+    setClientsOpen(false);
+    if (devId != null) { setView("rack"); setSel({ kind: "dev", id: devId }); }
   };
   /** Web, Clients screen: save the open rack (not saved yet) as a new shared rack in a site. */
   const saveCurrentTo = async (siteId: number) => {

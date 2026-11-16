@@ -5,7 +5,7 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
 ## Clients and sites (in progress)
 
 - 3.1.0: clients, sites and the racks in each (web database, desktop `.client.json`). Done.
-- 3.2.0: client totals and search: every device across a client's sites, found by name, IP, MAC, serial or model, opening the rack with the device selected.
+- 3.2.0: client inventory and search across sites, type totals, CSV export. Done.
 - 3.3.0: site-to-site links: a diagram of a client's sites joined by WAN links (VPN, MPLS, fiber, internet, wireless), with provider, circuit ID and bandwidth, ending on a firewall or router in a site's rack.
 - 3.4.0: Auvik import into a client, split into sites.
 

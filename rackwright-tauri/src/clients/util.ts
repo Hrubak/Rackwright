@@ -34,3 +34,60 @@ export const addStats = (a: Stats, b: Stats): Stats => ({ racks: a.racks + b.rac
 export const zero: Stats = { racks: 0, devices: 0, cables: 0, ports: 0, usedU: 0, totalU: 0 };
 export const statText = (s: Stats) => `${s.racks} rack${s.racks === 1 ? "" : "s"}, ${s.usedU}/${s.totalU}U used, ${s.devices} devices, ${s.cables} cables`;
 
+
+// ---------------------------------------------------------------- inventory (3.2.0)
+
+/** One line of a client's inventory: a device, or an endpoint seen on a device's port (Auvik). */
+export interface InvRow {
+  siteId: number; site: string; rackKey: string; rackFile: string;
+  devId: number; kind: "device" | "endpoint";
+  name: string; type: string; model: string; ip: string; mac: string; serial: string;
+  /** Where it is: "MDF U12", "off-rack", or "on SW1 port 7" for endpoints. */
+  where: string;
+  notes: string;
+}
+
+export function inventoryRows(siteId: number, site: string, rackKey: string, rackFile: string, doc: Doc, endpoints = false): InvRow[] {
+  const rackName = new Map(doc.racks.map((r) => [r.id, r.name]));
+  const out: InvRow[] = [];
+  for (const d of doc.devices) {
+    const where = d.rack != null && rackName.has(d.rack) ? `${rackName.get(d.rack)} U${d.u}${d.u_size > 1 ? `-${d.u + d.u_size - 1}` : ""}` : "off-rack";
+    out.push({
+      siteId, site, rackKey, rackFile, devId: d.id, kind: "device",
+      name: d.name || "", type: d.type || "", model: d.model || d.auvik_model || "", ip: d.ip || "", mac: d.mac || (d.auvik_macs ?? []).join(", "),
+      serial: d.serial || "", where, notes: d.notes || "",
+    });
+    if (endpoints) for (const e of d.endpoints ?? []) {
+      out.push({
+        siteId, site, rackKey, rackFile, devId: d.id, kind: "endpoint",
+        name: e.name || "", type: e.type || e.kind || "", model: e.model || "", ip: e.ip || "", mac: e.mac || "", serial: "",
+        where: `on ${d.name || "device"}${e.port ? ` port ${e.port}` : ""}`, notes: e.status || "",
+      });
+    }
+  }
+  return out;
+}
+
+const normMac = (s: string) => s.toLowerCase().replace(/[^0-9a-f]/g, "");
+/** Every word of the query must appear somewhere in the row. MACs match with or without separators. */
+export function matchRow(r: InvRow, q: string): boolean {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = [r.name, r.type, r.model, r.ip, r.mac, r.serial, r.where, r.site, r.rackFile, r.notes].join(" ").toLowerCase();
+  const macs = normMac(r.mac);
+  return words.every((w) => hay.includes(w) || (normMac(w).length >= 4 && macs.includes(normMac(w))));
+}
+
+/** Count of rows per type, most common first. */
+export function typeTotals(rows: InvRow[]): [string, number][] {
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(r.type || "Other", (m.get(r.type || "Other") || 0) + 1);
+  return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+const csvCell = (s: string) => (/[",\r\n]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? "'" : "") + s.replace(/"/g, '""')}"` : s);
+export function inventoryCsv(rows: InvRow[]): string {
+  const head = ["Site", "Rack file", "Kind", "Name", "Type", "Model", "IP", "MAC", "Serial", "Location", "Notes"];
+  const lines = [head, ...rows.map((r) => [r.site, r.rackFile, r.kind, r.name, r.type, r.model, r.ip, r.mac, r.serial, r.where, r.notes])];
+  return lines.map((l) => l.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}

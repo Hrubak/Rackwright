@@ -2,6 +2,15 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.2.0 — 2026-11-16
+Web and desktop.
+- **Inventory and search for a client.** The Clients screen has a new tab, Inventory and search. It lists every device in every rack of the client's sites, with site, rack, name, type, model, IP, MAC, serial and where it sits (rack and U, or off-rack).
+  - Type to search. Every word must match somewhere, so `north switch` finds switches at the North site. MAC addresses match with or without colons or dashes.
+  - Filter by site, or click a type count (Switch 12, Firewall 2...) to show only that type.
+  - Include endpoints adds the PCs, phones, printers and other endpoints from an Auvik import, under the device they were seen on.
+  - Click a row to open that rack with the device selected.
+  - Export CSV saves what is shown, for a client report or a spreadsheet.
+
 ## 3.1.1 — 2026-11-16
 - Fixes the web server build in 3.1.0, which failed to compile, so `update` could not install it. Use this version for Clients and sites. The desktop app has no changes beyond the version number.
 
