@@ -1,11 +1,11 @@
-name: web
+name: CI
 
 # The desktop crate (rackwright-tauri/src-tauri) is not built here: it needs webkit.
 on:
   push:
-    branches: [web]
+    branches: [web, master]
   pull_request:
-    branches: [web]
+    branches: [web, master]
   workflow_dispatch:
 
 jobs:

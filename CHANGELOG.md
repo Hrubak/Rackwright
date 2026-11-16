@@ -2,6 +2,12 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.2.0 — 2026-11-16
+- `Homelab.rack.json` is a synthetic example rack (two racks, 21 devices, 25 network and power cables, front and rear, two off-rack access points). The desktop router's unit tests read it, so they run again in CI through the server's `cargo test`. Open it in either app to try things out.
+- Known router issue, found while making the example: two cables that leave the same port column for the same cable manager sit 3 px apart, and the router's own test wants at least 4.5 px. The example avoids it. Denser real racks can show cables drawn on top of each other there.
+- `update` in the LXC follows the repository and branch the container was installed from, so the same scripts work for this fork and for hast3/Rackwright. `var_repo=... var_branch=... update` points a container somewhere else. Update and install print the version.
+- AGENTS.md describes the project for anyone working on it, with the fork-and-upstream rules in their own section. CI runs on `master` as well as `web`. Sync upstream does nothing in hast3/Rackwright itself.
+
 ## 2.1.0 — 2026-11-16
 - CHANGELOG.md covers the whole history, including the desktop app before the web version. CI fails a push or pull request to `web` that does not add an entry, or whose top version does not match `web/server/Cargo.toml`.
 - AGENTS.md tells people and coding agents how the branches work, how to run, test and release, and how to pull upstream changes. CLAUDE.md points to it.
@@ -18,7 +24,7 @@ First web version. Same rack editor as the desktop app, in the browser, installe
 - Import file and Export file move `.rack.json` files between the desktop and web apps.
 - Proxmox LXC installer in the same shape as CW Compare: run one line on the Proxmox host to create a Debian 13 container (2 CPU, 2 GB RAM, 8 GB disk, port 8080). Type `update` in the container console to pull `web` and rebuild. Data stays in `/var/lib/rackwright`.
 - CI builds and tests the server, builds both front ends, and checks the install scripts.
-- The server does not build the desktop router's own unit tests, because they read a sample file (`Homelab.rack.json`) that is not in the repository.
+- The server did not build the desktop router's own unit tests at first, because they read a sample file (`Homelab.rack.json`) that was not in the repository (added in 2.2.0).
 
 ## Desktop history (hast3/Rackwright, before the web version)
 

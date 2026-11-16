@@ -27,9 +27,13 @@ var_os="${var_os:-debian}"
 var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 var_port="${var_port:-8080}"
-export var_repo="${var_repo:-https://github.com/Hrubak/Rackwright.git}"
-export var_branch="${var_branch:-web}"
 export var_port
+
+# Where this script installs from. Change these two lines only; everything else derives from them.
+# Inside an existing LXC, `update` follows the repo and branch the container was installed from
+# (git origin and current branch). Set var_repo / var_branch to override that.
+RW_DEFAULT_REPO="https://github.com/Hrubak/Rackwright.git"
+RW_DEFAULT_BRANCH="web"
 
 YW=$'\033[33m'
 GN=$'\033[1;92m'
@@ -56,6 +60,11 @@ EOF
 msg_info() { echo -e "${YW}→${CL} $1"; }
 msg_ok() { echo -e "${CM} $1"; }
 msg_error() { echo -e "${CROSS} ${RD}$1${CL}"; }
+
+# Version from web/server/Cargo.toml in the given app dir (empty if unknown).
+rw_version() {
+  sed -n 's/^version *= *"\(.*\)"/\1/p' "$1/web/server/Cargo.toml" 2>/dev/null | head -n 1
+}
 
 is_pve_host() { [[ -d /etc/pve ]] && command -v pct >/dev/null 2>&1; }
 
@@ -95,10 +104,30 @@ update_script() {
   systemctl stop rackwright || true
   msg_ok "Stopped"
 
-  msg_info "Pulling latest from ${var_branch}"
   cd /opt/rackwright
-  git fetch --depth 1 origin "${var_branch}"
-  git reset --hard "origin/${var_branch}"
+  # Follow what this container was installed from. var_repo / var_branch override when set.
+  local repo branch
+  repo="${var_repo:-}"
+  if [[ -z "$repo" ]]; then
+    repo="$(git remote get-url origin 2>/dev/null || true)"
+  fi
+  repo="${repo:-$RW_DEFAULT_REPO}"
+  branch="${var_branch:-}"
+  if [[ -z "$branch" ]]; then
+    branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [[ -z "$branch" || "$branch" == "HEAD" ]]; then
+      branch="$RW_DEFAULT_BRANCH"
+    fi
+  fi
+  if [[ "$(git remote get-url origin 2>/dev/null || true)" != "$repo" ]]; then
+    git remote set-url origin "$repo" 2>/dev/null || git remote add origin "$repo"
+  fi
+
+  msg_info "Pulling latest from ${branch} (${repo})"
+  # Explicit refspec: a shallow --branch clone is single-branch, so be explicit about the ref.
+  git fetch --depth 1 origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+  git checkout -f -B "$branch" "origin/${branch}"
+  git reset --hard "origin/${branch}"
   msg_ok "Updated source"
 
   msg_info "Updating Rust"
@@ -115,7 +144,9 @@ update_script() {
   msg_info "Starting ${APP}"
   systemctl daemon-reload
   systemctl start rackwright
-  msg_ok "Updated successfully"
+  local ver
+  ver="$(rw_version /opt/rackwright)"
+  msg_ok "Updated successfully${ver:+ (version ${ver})}"
   if [[ ! -x /usr/bin/update ]]; then
     cat <<'EOF' >/usr/bin/update
 #!/usr/bin/env bash
@@ -143,6 +174,10 @@ EOF
 if ! is_pve_host; then
   update_script
 fi
+
+# Host path: apply the defaults (update_script above must not see them)
+export var_repo="${var_repo:-$RW_DEFAULT_REPO}"
+export var_branch="${var_branch:-$RW_DEFAULT_BRANCH}"
 
 # Host path: create the LXC
 header_info
@@ -195,10 +230,11 @@ run_guest_install() {
 }
 
 finish() {
-  local ip
+  local ip ver
   ip="$(pct exec "$CTID" -- hostname -I | awk '{print $1}')"
+  ver="$(pct exec "$CTID" -- sed -n 's/^version *= *"\(.*\)"/\1/p' /opt/rackwright/web/server/Cargo.toml 2>/dev/null | head -n 1 || true)"
   echo
-  echo -e "${GN}${APP} setup has been successfully initialized!${CL}"
+  echo -e "${GN}${APP}${ver:+ ${ver}} setup has been successfully initialized!${CL}"
   echo -e "${YW}Access it using the following URL:${CL}"
   echo -e "  ${BGN}http://${ip}:${var_port}${CL}"
   echo

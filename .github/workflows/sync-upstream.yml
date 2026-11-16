@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   sync:
+    # Only forks sync from hast3/Rackwright; the upstream repo itself has nothing to pull.
+    if: github.repository != 'hast3/Rackwright'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

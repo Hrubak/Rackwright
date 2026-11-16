@@ -100,6 +100,8 @@ sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null 
 locale-gen en_US.UTF-8 >/dev/null 2>&1 || true
 msg_ok "Installed base packages"
 
+# The host script (proxmox/ct/rackwright.sh) passes var_repo / var_branch. These fallbacks only
+# apply when this file is run by hand; keep them equal to RW_DEFAULT_REPO / RW_DEFAULT_BRANCH there.
 REPO="${var_repo:-https://github.com/Hrubak/Rackwright.git}"
 BRANCH="${var_branch:-web}"
 PORT="${var_port:-8080}"
