@@ -35,7 +35,9 @@ build_app() {
   msg_info "Building the server (Rust, release)"
   (
     cd "${APP_DIR}/web/server"
-    if [[ -f Cargo.lock ]]; then
+    # --locked only for a Cargo.lock that comes from the repository. A lock file that an
+    # earlier build wrote here is not tracked and may be out of date, so cargo may refresh it.
+    if git -C "${APP_DIR}" ls-files --error-unmatch web/server/Cargo.lock >/dev/null 2>&1; then
       cargo build --release --locked
     else
       cargo build --release

@@ -2,6 +2,10 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). The web version number lives in one place: `version` in `web/server/Cargo.toml`. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 2.2.1 — 2026-11-16
+- `update` failed at "Building the server" with "cannot update the lock file ... because --locked was passed", and left the service stopped. The first install had written its own `Cargo.lock`, which went out of date when the version changed. The build now uses `--locked` only for a `Cargo.lock` that comes from the repository. If an update already failed this way, run `rm /opt/rackwright/web/server/Cargo.lock && update`.
+- `web/server/Cargo.lock` is in the repository, so every container builds the same dependency versions that CI tested. CI builds and tests with `--locked`.
+
 ## 2.2.0 — 2026-11-16
 - `Homelab.rack.json` is a synthetic example rack, kept in git as the only exception to the `*.rack.json` ignore rule (two racks, 21 devices, 25 network and power cables, front and rear, two off-rack access points). The desktop router's unit tests read it, so they run again in CI through the server's `cargo test`. Open it in either app to try things out.
 - Known router issue, found while making the example: two cables that leave the same port column for the same cable manager sit 3 px apart, and the router's own test wants at least 4.5 px. The example avoids it. Denser real racks can show cables drawn on top of each other there.
