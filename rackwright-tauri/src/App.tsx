@@ -1,4 +1,5 @@
 import { v } from "./theme";
+import pkg from "../package.json";
 import { About } from "./About";
 import { Logo } from "./Logo";
 import { CableOverlay, CableColorMode } from "./Cables";
@@ -35,6 +36,7 @@ import { Breadcrumb } from "./Breadcrumb";
 import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
 import { UpdateBanner } from "./version/UpdateBanner";
+import { useDesktopUpdates } from "./version/useDesktopUpdates";
 import { useWebUpdates } from "./version/useWebUpdates";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
@@ -198,6 +200,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
     signOut: () => { if (dirty && !confirm(LEAVE_TEXT)) return; clearDraft(who); web.signOut(); },
   };
 
+  const deskUpd = useDesktopUpdates();
+  const checkUpdates = async () => {
+    const r = await deskUpd.checkNow();
+    say(!r.ok ? "Could not check for updates. Check your internet connection." : r.offer ? `Rackwright ${r.offer.version} is available.` : `You have the newest version (${pkg.version}).`);
+  };
   const webUpd = useWebUpdates(IS_WEB && !!web, !!web?.user.is_admin);
 
   const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(upgradeDoc(d)); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
@@ -536,6 +543,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     { label: "Help", items: [
       { label: "Keyboard shortcuts…", run: () => setHelpDlg("shortcuts") },
       { label: "What's new…", run: () => setHelpDlg("news") },
+      ...(IS_WEB ? [] : [{ label: "Check for updates…", run: checkUpdates }]),
       { label: "About Rackwright…", run: () => setAboutOpen(true) },
     ] },
   ];
@@ -624,6 +632,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         {!IS_WEB && <button style={{ ...btn, padding: "5px 9px", marginLeft: 6, marginRight: 0 }} title="Settings" aria-label="Settings" onClick={() => setSettingsTab("profile")}>{"⚙"}</button>}
         {IS_WEB && webGuarded && <UserBar web={webGuarded} openSettings={setSettingsTab} />}
       </div>
+      {!IS_WEB && deskUpd.offer && <UpdateBanner kind="desktop" text={`Rackwright ${deskUpd.offer.version} is available.`} primary="Download" secondary="Skip this version" onPrimary={deskUpd.download} onSecondary={deskUpd.skip} onClose={deskUpd.hide} />}
       {IS_WEB && webUpd.reload && <UpdateBanner kind="reload" text={`Rackwright was updated to ${webUpd.reload}. Reload to use the new version.`} primary="Reload" onPrimary={() => location.reload()} />}
       {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>

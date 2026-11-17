@@ -50,6 +50,7 @@ fn port_positions(doc: Doc) -> Vec<(i64, f64, f64, f64)> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![open_doc, save_doc, save_bytes, read_text, write_text, route_cables, port_positions])
         .run(tauri::generate_context!())
         .expect("error while running Rackwright");
