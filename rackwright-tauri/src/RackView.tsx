@@ -7,6 +7,8 @@ import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import Cables, { CableColorMode } from "./Cables";
 import type { CableOpts } from "./cableView";
 import VmLinks from "./VmLinks";
+import { fmtW, type PowerBudget } from "./power/model";
+import type { IpEntry } from "./attention/model";
 import { Doc, Device, PortPos, RouteResult, UH, RW, RAIL, HDR, PADB, PORT_COLORS } from "./types";
 
 function devRect(doc: Doc, d: Device) {
@@ -57,7 +59,7 @@ export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
 export type Resolver = (dev: Device, clientX: number, clientY: number) => Target;
 
-export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, onOpen, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own", cableOpts }: {
+export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, onOpen, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own", cableOpts, budget, clashes }: {
   doc: Doc; face: "front" | "rear"; routes: RouteResult;
   /** Provisional document while an existing device is dragged (device drawn at its target; routes/ports props then belong to it). */
   liveDoc?: Doc | null; onDragTarget?: (id: number, t: Target) => void; onDragEnd?: (committed: boolean) => void; ports: PortPos[];
@@ -65,6 +67,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
   onMoveDevice: (id: number, rack: number | null, u: number, side: number, fx: number, fy: number) => void;
   onReject: (why: string) => void;
   drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number; cableColor?: CableColorMode; cableOpts?: CableOpts;
+  budget?: PowerBudget; clashes?: Map<string, IpEntry[]>;
 }) {
   const doc = liveDoc ?? committed; // what is drawn; hit-testing and edits use `committed`
   const [hovDev, setHovDev] = useState<number | null>(null);
@@ -112,6 +115,16 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
   const pp = useMemo(() => new Map(ports.map((p) => [p[0], p])), [ports]);
   const vis = (d: Device) => d.rack == null || d.face === face || d.face === "both";
 
+  const rackWatts = (id: number) => {
+    const rp = budget?.racks.find((x) => x.rackId === id);
+    return rp && rp.w > 0 ? ` · ${fmtW(rp.w, rp.unknown)}` : "";
+  };
+  const clashOf = (devId: number): string => {
+    const list = clashes?.get(`current:${devId}`);
+    if (!list?.length) return "";
+    const ips = [...new Set(list.map((o) => o.ip))];
+    return ips.map((ip) => `IP ${ip} is also used by ${list.filter((o) => o.ip === ip).map((o) => o.name).join(", ")}`).join(" | ");
+  };
   return (
     <svg ref={svgRef} style={{ width: "100%", height: "100%", background: v("bg"), cursor: drag ? "copy" : undefined }}
       onWheel={(e) => {
@@ -154,7 +167,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
             <rect stroke={selected?.kind === "rack" && selected.id === r.id ? v("select") : v("border")} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill={v("rack-body")} />
             {r.kind && <RackFrame kind={r.kind} x={r.x} y={r.y} w={RW + 2 * RAIL} h={HDR + r.u * UH + PADB} />}
             <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill={v("rack-title")} fontSize={16} fontWeight={600}>{r.name}</text>
-            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill={v("rack-subtitle")} fontSize={10.5}>{r.kind ? `${r.model_name || kindLabel(r.kind)} · ${r.u}U · ${rackUsage(doc, r).used}U used, ${rackUsage(doc, r).free}U free` : `${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill={v("rack-subtitle")} fontSize={10.5}>{(r.kind ? `${r.model_name || kindLabel(r.kind)} · ${r.u}U · ${rackUsage(doc, r).used}U used, ${rackUsage(doc, r).free}U free` : `${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`) + rackWatts(r.id)}</text>
             <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill={v("rack-well")} stroke={v("rack-well-edge")} />
             {Array.from({ length: r.u }, (_, i) => {
               const y = r.y + HDR + (r.u - i - 1) * UH;
@@ -218,6 +231,11 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
               })}
               {/* Rear-mounted (turned around): a yellow stripe on the left edge, clear of labels and ports. */}
               {d.rack != null && d.rev && <rect x={l + 1} y={t + 1} width={3} height={q.h - 2} fill={v("select")} style={{ pointerEvents: "none" }} />}
+              {clashOf(d.id) && <g style={{ pointerEvents: "none" }}>
+                <rect x={r - 28} y={t + 3} width={24} height={13} rx={4} fill={v("danger")} />
+                <text x={r - 16} y={t + 9.5} textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight={700} fill={v("on-accent")}>IP!</text>
+                <title>{clashOf(d.id)}</title>
+              </g>}
               <title>{d.name}{d.rack != null && mountOf(d).startsWith("rear") ? " (rear mounted)" : ""}</title>
             </g>
           );

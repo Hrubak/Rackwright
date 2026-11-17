@@ -21,7 +21,8 @@ export const UPS_FIELDS: SpecField[] = [
   { key: "battery_date", label: "Battery installed", kind: "date" }, { key: "rated_w", label: "Rated (W)", kind: "number" },
 ];
 /** Fields to show for a device: UPS units also get battery date and rating. */
-export const specFieldsFor = (d: Device): SpecField[] => (d.type === "UPS" ? [...SPEC_FIELDS, ...UPS_FIELDS] : SPEC_FIELDS);
+export const specFieldsFor = (d: Device): SpecField[] =>
+  d.type === "UPS" ? [...SPEC_FIELDS, ...UPS_FIELDS] : d.type === "PDU" ? [...SPEC_FIELDS, UPS_FIELDS[1]] : SPEC_FIELDS;
 
 export function setField(d: Device, key: keyof Device, value: string | number | undefined): void {
   const r = d as any;

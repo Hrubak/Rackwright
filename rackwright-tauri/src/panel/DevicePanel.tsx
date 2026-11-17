@@ -5,6 +5,8 @@ import type { Device, Doc, Service } from "../types";
 import { STATUSES, statusOf, specFieldsFor, setField, connectedTo, powerPath, copyAsText } from "../device/info";
 import PortsEditor from "../PortsEditor";
 import { EndpointTable } from "../auvik/Panels";
+import { deviceAlerts, type IpEntry } from "../attention/model";
+import { devWatts, feedFor, fmtW, isPdu, isUps, type PowerBudget } from "../power/model";
 
 type Edit = (fn: (d: Doc) => string | void, key?: string) => boolean;
 const TABS = ["overview", "specs", "ports", "services", "notes"] as const;
@@ -19,7 +21,8 @@ function loadTab(): Tab {
   return "overview";
 }
 
-export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose, onLocate, onDuplicate, onChangeModel, onDelete, onCopied, placement, lockIcon, devSet }: {
+export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose, onLocate, onDuplicate, onChangeModel, onDelete, onCopied, placement, lockIcon, devSet, budget, clashes }: {
+  budget: PowerBudget; clashes: Map<string, IpEntry[]>;
   doc: Doc; dev: Device; edit: Edit; epFocus: number | null;
   onSelect: (id: number) => void; onClose: () => void; onLocate: () => void; onDuplicate: () => void;
   onChangeModel: () => void; onDelete: () => void; onCopied: (ok: boolean) => void;
@@ -47,6 +50,8 @@ export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose
   const tabLabel: Record<Tab, string> = {
     overview: "Overview", specs: "Specs", ports: `Ports ${dev.ports.length}`, services: `Services ${services.length}`, notes: "Notes",
   };
+  const alerts = deviceAlerts(doc, dev, new Date().toLocaleDateString("en-CA"), clashes.get(`current:${dev.id}`) ?? []);
+  const own = devWatts(dev), feed = isUps(dev) || isPdu(dev) ? feedFor(budget, dev.id) : undefined;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -77,6 +82,13 @@ export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose
         ))}
       </div>
       {tab === "overview" && <div>
+        {alerts.length > 0 && <div style={{ marginBottom: 4 }}>
+          {alerts.map((a, i) => <div key={i} style={{ color: a.level === "critical" ? v("danger") : a.level === "warning" ? v("warn") : v("text-dim") }}>{a.msg}</div>)}
+        </div>}
+        <div style={sub}>Power</div>
+        <div>{own != null ? `${own.toLocaleString("en-US")} W` : <span style={{ opacity: 0.7 }}>Unknown {"—"} set Power (W) in Specs</span>}</div>
+        {feed && <div>Load: {fmtW(feed.loadW, feed.unknown)}{feed.ratedW ? ` of ${feed.ratedW.toLocaleString("en-US")} W${feed.pct != null ? ` (${feed.pct}%)` : ""}` : ""}</div>}
+        {feed && dev.specs?.runtime && <div>Runtime: {String(dev.specs.runtime)}</div>}
         <div style={sub}>Connected to</div>
         {conns.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {conns.map((c) => <button key={c.dev.id} style={{ ...btn, borderRadius: 10, padding: "1px 8px" }} onClick={() => onSelect(c.dev.id)}>{c.dev.name} {"×"}{c.links}</button>)}

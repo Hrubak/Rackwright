@@ -39,6 +39,10 @@ import { Breadcrumb } from "./Breadcrumb";
 import Dashboard, { type ClientTab } from "./home/Dashboard";
 import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
+import { powerBudget, fmtW } from "./power/model";
+import RackPowerInfo from "./power/RackPowerInfo";
+import { ipClashes, ipEntries } from "./attention/model";
+import { useClientIps } from "./attention/useClientIps";
 import { UpdateBanner } from "./version/UpdateBanner";
 import { useDesktopUpdates } from "./version/useDesktopUpdates";
 import { useWebUpdates } from "./version/useWebUpdates";
@@ -580,6 +584,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
   }, [IS_WEB ? cur?.id : path, clientRev]); // eslint-disable-line react-hooks/exhaustive-deps
   // A rack that belongs to a client opens inside that client's Racks tab.
   useEffect(() => { if (screen.kind === "editor" && loc && loc !== "unassigned") setScreen({ kind: "client", key: loc.clientKey, tab: "racks" }); }, [loc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const otherIps = useClientIps(loc, (r) => (IS_WEB ? r.id === cur?.id : !!r.path && !!path && sameFile(r.path, path)), clientRev);
+  const budget = useMemo(() => powerBudget(doc), [doc]);
+  const clashes = useMemo(() => ipClashes([...otherIps, ...ipEntries("current", doc)]), [otherIps, doc]);
   const hasLoc = !!loc && loc !== "unassigned";
   const barKey = screen.kind === "client" ? screen.key : screen.kind === "editor" && hasLoc ? (loc as RackLocation).clientKey : null;
   const barTab: ClientTab = screen.kind === "client" ? screen.tab : "racks";
@@ -683,7 +690,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
           <RackView doc={doc} liveDoc={live?.doc ?? null} onDragTarget={onDragTarget} onDragEnd={onDragEnd} face={face}
             routes={live ? live.routes : routes} ports={live ? live.ports : ports} selected={sel} onSelect={pick} onOpen={openPanel}
             pendingPort={pending} onPort={onPort} onMoveDevice={onMoveDevice} onReject={(w) => say(w, true)}
-            drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} cableOpts={cableOpts} />
+            drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} cableOpts={cableOpts} budget={budget} clashes={clashes} />
           <CableOverlay cables={legendCables} opts={cableOpts} onOpts={(o) => { setCableOpts(o); saveOpts(o); }} mode={cableColor} onMode={(m) => { setCableColor(m); try { localStorage.setItem("rw.cableColor", m); } catch { /* ignore */ } }} />
           </div>
           {toast && (
@@ -699,6 +706,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
               {doc.racks.length} rack(s), {sum.used}/{sum.total}U used<br />
               {doc.devices.length} devices ({sum.off} off-rack)<br />
               {doc.cables.length} cables<br />
+              Power: {doc.devices.length ? (budget.w === 0 && budget.unknown === 0 ? "none" : fmtW(budget.w, budget.unknown)) : "none"}<br />
               <span style={{ opacity: 0.6 }}>Double-click a device, rack or cable to edit it. Arrow keys nudge a selected device, Ctrl+D duplicates, Home fits the view.</span>
             </div>
             <AuvikInfo doc={doc} onOpen={() => setUnplacedOpen(true)} />
@@ -732,8 +740,14 @@ export default function App({ web }: { web?: WebProps } = {}) {
               </select></label>
             {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {fmtDims(selRack.width_mm, selRack.depth_mm, settings.prefs.units ?? "mm")}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
+            {field("Circuit", selRack.circuit ?? "", (val) => edit((d) => { const r = d.racks.find((x) => x.id === selRack.id)!; if (val) r.circuit = val; else delete r.circuit; }, `rc${selRack.id}`))}
+            <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Voltage<br />
+              <select style={{ ...inp, width: "100%" }} value={selRack.volts === 208 ? 208 : 120} onChange={(e) => edit((d) => {
+                const r = d.racks.find((x) => x.id === selRack.id)!; if (e.target.value === "208") r.volts = 208; else delete r.volts;
+              })}><option value={120}>120 V</option><option value={208}>208 V</option></select></label>
+            <RackPowerInfo doc={doc} rack={selRack} budget={budget} />
           </>}
-          {selDev && <DevicePanel doc={doc} dev={selDev} edit={edit} epFocus={epFocus?.dev === selDev.id ? epFocus.idx : null}
+          {selDev && <DevicePanel doc={doc} dev={selDev} budget={budget} clashes={clashes} edit={edit} epFocus={epFocus?.dev === selDev.id ? epFocus.idx : null}
             onSelect={(id) => setSel({ kind: "dev", id })} onClose={() => setPanelOpen(false)} onLocate={() => { setView("rack"); setFitTick((k) => k + 1); }}
             onDuplicate={doDuplicate} onChangeModel={() => setModelFor(selDev.id)} onDelete={del} onCopied={(ok) => say(ok ? "Copied" : "Could not copy", !ok)}
             lockIcon={(k) => lockIcon(selDev, k)} devSet={(k, val) => devSet(selDev, k, val)}
