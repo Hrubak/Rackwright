@@ -78,6 +78,19 @@ pub(crate) fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if !has_report {
         conn.execute_batch("ALTER TABLE clients ADD COLUMN report TEXT NOT NULL DEFAULT '{}';")?;
     }
+    let mut has_rooms = false;
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(sites)")?;
+        let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
+        for n in names {
+            if n? == "rooms" {
+                has_rooms = true;
+            }
+        }
+    }
+    if !has_rooms {
+        conn.execute_batch("ALTER TABLE sites ADD COLUMN rooms TEXT NOT NULL DEFAULT '[]';")?;
+    }
     conn.execute_batch("CREATE INDEX IF NOT EXISTS racks_site ON racks(site_id);")
 }
 
@@ -217,14 +230,21 @@ struct Site {
     name: String,
     address: String,
     notes: String,
+    rooms: Value,
     updated_at: String,
 }
 
-const SITE_SELECT: &str = "SELECT id, client_id, name, address, notes, updated_at FROM sites";
+const SITE_SELECT: &str = "SELECT id, client_id, name, address, notes, updated_at, rooms FROM sites";
 
 fn row_site(r: &rusqlite::Row) -> rusqlite::Result<Site> {
-    Ok(Site { id: r.get(0)?, client_id: r.get(1)?, name: r.get(2)?, address: r.get(3)?, notes: r.get(4)?, updated_at: r.get(5)? })
+    Ok(Site { id: r.get(0)?, client_id: r.get(1)?, name: r.get(2)?, address: r.get(3)?, notes: r.get(4)?, updated_at: r.get(5)?, rooms: parse_rooms(&r.get::<_, String>(6)?) })
 }
+
+fn parse_rooms(text: &str) -> Value {
+    serde_json::from_str::<Value>(text).ok().filter(|v| v.is_array()).unwrap_or_else(|| json!([]))
+}
+
+const MAX_ROOMS: usize = 256 * 1024;
 
 fn get_site(conn: &Connection, id: i64) -> Result<Option<Site>, ApiError> {
     Ok(conn.query_row(&format!("{SITE_SELECT} WHERE id = ?1"), params![id], row_site).optional()?)
@@ -379,6 +399,7 @@ struct PatchSiteReq {
     address: Option<String>,
     notes: Option<String>,
     client_id: Option<i64>,
+    rooms: Option<Value>,
 }
 
 pub(crate) async fn patch_site(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<i64>, body: Bytes) -> ApiResult {
@@ -387,6 +408,19 @@ pub(crate) async fn patch_site(State(st): State<Shared>, headers: HeaderMap, Pat
     let name = req.name.as_deref().map(clean_name).transpose()?;
     let address = req.address.as_deref().map(|a| clean_text(a, "Address")).transpose()?;
     let notes = req.notes.as_deref().map(|n| clean_text(n, "Notes")).transpose()?;
+    let rooms_text = match &req.rooms {
+        Some(v) => {
+            if !v.is_array() {
+                return Err(ApiError::bad("Rooms must be a list"));
+            }
+            let t = v.to_string();
+            if t.len() > MAX_ROOMS {
+                return Err(ApiError::bad("Rooms are too large"));
+            }
+            Some(t)
+        }
+        None => None,
+    };
     let conn = st.db();
     let cur = get_site(&conn, id)?.ok_or_else(site_not_found)?;
     let target_client = req.client_id.unwrap_or(cur.client_id);
@@ -412,6 +446,9 @@ pub(crate) async fn patch_site(State(st): State<Shared>, headers: HeaderMap, Pat
             id
         ],
     )?;
+    if let Some(t) = &rooms_text {
+        conn.execute("UPDATE sites SET rooms = ?1 WHERE id = ?2", params![t, id])?;
+    }
     let site = get_site(&conn, id)?.ok_or_else(site_not_found)?;
     Ok(json_ok(&site))
 }

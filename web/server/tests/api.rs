@@ -431,6 +431,30 @@ async fn clients_sites_and_racks() {
 }
 
 #[tokio::test]
+async fn site_rooms_round_trip() {
+    let (app, _d) = make_app();
+    let mut a = Client::new(&app);
+    setup_admin(&mut a).await;
+    let (_, c) = a.post("/api/clients", json!({"name": "Acme Dental"})).await;
+    let c = c["id"].as_i64().unwrap();
+    let (_, s) = a.post(&format!("/api/clients/{c}/sites"), json!({"name": "Main Office"})).await;
+    assert_eq!(s["rooms"], json!([]));
+    let sid = s["id"].as_i64().unwrap();
+    let rooms = json!([{"id": 1, "name": "Server room", "w": 10, "d": 6, "objects": [], "racks": []}]);
+    let (st, _) = a.patch(&format!("/api/sites/{sid}"), json!({"rooms": rooms})).await;
+    assert_eq!(st, StatusCode::OK);
+    let (_, got) = a.get(&format!("/api/clients/{c}")).await;
+    assert_eq!(got["sites"][0]["rooms"], rooms);
+    let (st, _) = a.patch(&format!("/api/sites/{sid}"), json!({"rooms": {}})).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let big: Vec<String> = (0..30).map(|_| "x".repeat(10_000)).collect();
+    let (st, _) = a.patch(&format!("/api/sites/{sid}"), json!({"rooms": big})).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (_, got) = a.get(&format!("/api/clients/{c}")).await;
+    assert_eq!(got["sites"][0]["rooms"], rooms);
+}
+
+#[tokio::test]
 async fn site_links() {
     let (app, _d) = make_app();
     let mut a = Client::new(&app);

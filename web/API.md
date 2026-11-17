@@ -132,7 +132,7 @@ It only works where the app is a git checkout in `RW_APP_DIR` (default `/opt/rac
 An MSP client has sites; each site holds shared racks (`racks.site_id`). A rack with no site is "Unassigned".
 
 `ClientMeta` = `{"id": int, "name": str, "notes": str, "sites": int /* count */, "racks": int /* count */, "updated_at": str}`
-`Site` = `{"id": int, "client_id": int, "name": str, "address": str, "notes": str, "updated_at": str}`
+`Site` = `{"id": int, "client_id": int, "name": str, "address": str, "notes": str, "rooms": [...] /* JSON array, [] by default */, "updated_at": str}`
 
 | Method & path                  | Body                                   | Result |
 |--------------------------------|----------------------------------------|--------|
@@ -144,7 +144,7 @@ An MSP client has sites; each site holds shared racks (`racks.site_id`). A rack 
 | `GET /api/clients/:id/report`  | —                                      | the stored report options (a JSON object, `{}` if none). 404 unknown client |
 | `PUT /api/clients/:id/report`  | a JSON object, at most 64 KB           | the stored object (replaces the old one). 404 unknown client; 400 if not an object or too large |
 | `POST /api/clients/:id/sites`  | `{name, address?, notes?}`             | `Site`. 409 if the client already has a site with that name |
-| `PATCH /api/sites/:id`         | `{name?, address?, notes?, client_id?}` | `Site`. `client_id` moves the site (and its racks) to another client |
+| `PATCH /api/sites/:id`         | `{name?, address?, notes?, client_id?, rooms?}` | `Site`. `client_id` moves the site (and its racks) to another client. `rooms` replaces the floor plans: a JSON array of at most 256 KB, else 400 |
 | `DELETE /api/sites/:id`        | —                                      | `{}`. Its racks are kept and become Unassigned (`site_id` null). Its links are deleted |
 | `POST /api/clients/:id/links`  | `LinkBody`                             | `Link` |
 | `PATCH /api/links/:id`         | any `LinkBody` fields                  | `Link` |

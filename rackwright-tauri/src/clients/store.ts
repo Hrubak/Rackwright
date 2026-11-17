@@ -5,11 +5,12 @@
 import * as A from "../api";
 import { IS_WEB } from "../backend";
 import type { Doc } from "../types";
+import type { Room } from "../rooms/types";
 import type { ReportOptions } from "../report/types";
 import { absPath, baseOf, relPath } from "./util";
 
 export interface RackItem { key: string; name: string; id?: number; path?: string; updated?: string; by?: string }
-export interface SiteItem { id: number; name: string; address: string; notes: string; racks: RackItem[] }
+export interface SiteItem { id: number; name: string; address: string; notes: string; rooms?: Room[]; racks: RackItem[] }
 export type LinkEnd = A.LinkEnd;
 export type LinkBody = A.LinkBody;
 export interface LinkItem { id: number; site_a: number; site_b: number | null; kind: string; provider: string; circuit: string; bandwidth: string; notes: string; a_end: LinkEnd | null; b_end: LinkEnd | null }
@@ -32,6 +33,7 @@ export interface ClientStore {
   updateSite(key: string, siteId: number, p: SitePatch): Promise<void>;
   /** The racks are kept (web: they become Unassigned; desktop: the files stay). */
   removeSite(key: string, siteId: number): Promise<void>;
+  setRooms(key: string, siteId: number, rooms: Room[]): Promise<void>;
   addLink(key: string, body: LinkBody): Promise<void>;
   updateLink(key: string, id: number, body: Partial<LinkBody>): Promise<void>;
   removeLink(key: string, id: number): Promise<void>;
@@ -61,7 +63,7 @@ function webStore(): ClientStore {
       const c = await A.getClient(Number(key));
       return {
         key, name: c.name, notes: c.notes,
-        sites: c.sites.map((s) => ({ id: s.id, name: s.name, address: s.address, notes: s.notes, racks: s.racks.map(rackItem) })),
+        sites: c.sites.map((s) => ({ id: s.id, name: s.name, address: s.address, notes: s.notes, rooms: s.rooms ?? [], racks: s.racks.map(rackItem) })),
         links: (c.links ?? []).map((l) => ({ id: l.id, site_a: l.site_a, site_b: l.site_b, kind: l.kind, provider: l.provider || "", circuit: l.circuit || "", bandwidth: l.bandwidth || "", notes: l.notes || "", a_end: l.a_end ?? null, b_end: l.b_end ?? null })),
       };
     },
@@ -71,6 +73,7 @@ function webStore(): ClientStore {
     async addSite(key, s) { await A.createSite(Number(key), s); },
     async updateSite(_key, id, p) { await A.patchSite(id, p); },
     async removeSite(_key, id) { await A.deleteSite(id); },
+    async setRooms(_key, id, rooms) { await A.patchSite(id, { rooms }); },
     async addLink(key, b) { await A.createLink(Number(key), b); },
     async updateLink(_key, id, b) { await A.patchLink(id, b); },
     async removeLink(_key, id) { await A.deleteLink(id); },
@@ -87,7 +90,7 @@ function webStore(): ClientStore {
 
 interface ClientFile {
   rackwright: "client"; v: 1; name: string; notes: string; nid: number;
-  sites: { id: number; name: string; address: string; notes: string; racks: { path: string; name: string }[] }[];
+  sites: { id: number; name: string; address: string; notes: string; rooms?: Room[]; racks: { path: string; name: string }[] }[];
   links?: LinkItem[];
   report?: unknown;
 }
@@ -130,7 +133,7 @@ function desktopStore(): ClientStore {
       return {
         key, name: f.name, notes: f.notes || "",
         sites: [...f.sites].sort((a, b) => a.name.localeCompare(b.name)).map((s) => ({
-          id: s.id, name: s.name, address: s.address || "", notes: s.notes || "",
+          id: s.id, name: s.name, address: s.address || "", notes: s.notes || "", rooms: s.rooms ?? [],
           racks: s.racks.map((r) => ({ key: r.path, path: absPath(key, r.path), name: r.name || rackName(r.path) })),
         })),
         links: (f.links ?? []).map((l) => ({ ...l, provider: l.provider || "", circuit: l.circuit || "", bandwidth: l.bandwidth || "", notes: l.notes || "", a_end: l.a_end ?? null, b_end: l.b_end ?? null })),
@@ -166,6 +169,7 @@ function desktopStore(): ClientStore {
         Object.assign(s, p);
       });
     },
+    async setRooms(key, id, rooms) { await change(key, (f) => { site(f, id).rooms = rooms; }); },
     async removeSite(key, id) { await change(key, (f) => { f.sites = f.sites.filter((x) => x.id !== id); f.links = (f.links ?? []).filter((l) => l.site_a !== id && l.site_b !== id); }); },
     async addLink(key, b) {
       await change(key, (f) => {
