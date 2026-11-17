@@ -1,10 +1,12 @@
 // Clients screen: pick a client, see its sites and the racks in each, open a rack.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { Doc } from "../types";
 import { Stats, addStats, docStats, statText, zero } from "./util";
 import Inventory from "./Inventory";
 import Links from "./Links";
 import { ClientItem, ClientListItem, RackItem, SiteItem, clientStore } from "./store";
+
+const ImportToClient = lazy(() => import("./ImportToClient"));
 
 const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
 const small = { ...btn, padding: "1px 7px", fontSize: 11 } as const;
@@ -63,6 +65,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [siteForm, setSiteForm] = useState<{ id: number | null; name: string; address: string; notes: string } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [picker, setPicker] = useState<{ siteId: number; items: RackItem[] | null } | null>(null);
   const [tab, setTab] = useState<"sites" | "inventory" | "links">(() => { try { const t = localStorage.getItem("rw.clientTab"); return t === "inventory" || t === "links" ? t : "sites"; } catch { return "sites"; } });
   useEffect(() => { try { localStorage.setItem("rw.clientTab", tab); } catch { /* ignore */ } }, [tab]);
@@ -179,6 +182,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                       padding: "6px 12px", borderBottom: tab === id ? "2px solid #5b8bd0" : "2px solid transparent", marginBottom: -1 }}>{label}</button>
                   ))}
                   <span style={{ flex: 1 }} />
+                  {tab === "sites" && <button style={{ ...btn, marginBottom: 4 }} onClick={() => setImportOpen(true)}>Import Auvik</button>}
                   {tab === "sites" && <button style={{ ...btn, marginBottom: 4 }} onClick={() => setSiteForm({ id: null, name: "", address: "", notes: "" })}>Add site</button>}
                 </div>
                 {tab === "inventory" && <Inventory client={client} docs={docs} onOpen={onOpenRack} />}
@@ -260,6 +264,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
           </div>
         </div>
       </div>
+      {importOpen && client && <Suspense fallback={null}><ImportToClient client={client} onDone={refresh} onClose={() => setImportOpen(false)} /></Suspense>}
     </div>
   );
 }

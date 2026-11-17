@@ -2,6 +2,14 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.4.0 — 2026-11-16
+Web and desktop.
+- **Import Auvik into a client.** On the Clients screen, pick a client and click Import Auvik next to Add site. Choose the Auvik device export (.xlsx); the file stays on your computer.
+  - Pick the main site, or make a new one. Its name is filled in from the export.
+  - Split by network (optional): the export's networks are listed with how many devices are on each. Send a network to another site, or type a new site name. Use this when each office has its own subnets. Devices on networks you leave alone go to the main site.
+  - Each site gets one new rack named "<site> (Auvik)", built with the usual default choices. To review the details or update the rack from a newer export later, open the rack and use Import Auvik there, as before.
+  - On the desktop, the new rack files are saved next to the client file. An existing file is never overwritten; a number is added to the name instead.
+
 ## 3.3.0 — 2026-11-16
 Web and desktop.
 - **Site-to-site links.** The Clients screen has a third tab, Links. It draws the client's sites and the WAN links between them: VPN, MPLS, fiber, internet, wireless, SD-WAN or other. Each type has its own colour and the label shows the bandwidth. A link can also go from a site to the Internet / provider cloud.
