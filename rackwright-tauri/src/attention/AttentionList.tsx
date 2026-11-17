@@ -5,15 +5,19 @@ import type { TaggedAlert } from "./lists";
 
 const dot = { critical: "danger", warning: "warn", info: "text-muted" } as const;
 
-export default function AttentionList({ alerts, clientName, onOpen, max = 50 }: {
-  alerts: TaggedAlert[]; clientName?: string; onOpen: (a: TaggedAlert) => void; max?: number;
+export default function AttentionList({ alerts, clientName, onOpen, max = 50, loading = false }: {
+  alerts: TaggedAlert[]; clientName?: string; loading?: boolean; onOpen: (a: TaggedAlert) => void; max?: number;
 }) {
   const { shown: sh, staleRacks } = groupInfo(alerts);
   const shown = sh as TaggedAlert[];
-  const stale = new Map<string, number>();
-  for (const a of alerts) if (a.level === "info" && a.kind === "stale") { const n = a.clientName ?? clientName ?? ""; stale.set(n, (stale.get(n) ?? 0) + 1); }
+  const stale = new Map<string, { name: string; n: number }>();
+  for (const a of alerts) if (a.level === "info" && a.kind === "stale") {
+    const k = a.clientKey ?? a.clientName ?? clientName ?? "";
+    const e = stale.get(k) ?? { name: a.clientName ?? clientName ?? "", n: 0 };
+    e.n++; stale.set(k, e);
+  }
   const rows = shown.slice(0, max);
-  if (!shown.length && !staleRacks) return <div style={{ fontSize: 13, color: v("text-muted") }}>Nothing needs attention.</div>;
+  if (!shown.length && !staleRacks) return loading ? null : <div style={{ fontSize: 13, color: v("text-muted") }}>Nothing needs attention.</div>;
   return (
     <div style={{ fontSize: 13 }}>
       {rows.map((a, i) => {
@@ -30,8 +34,8 @@ export default function AttentionList({ alerts, clientName, onOpen, max = 50 }: 
         );
       })}
       {shown.length > max && <div style={{ color: v("text-muted"), padding: "3px 4px" }}>and {shown.length - max} more</div>}
-      {[...stale].map(([n, c]) => (
-        <div key={n} style={{ color: v("text-muted"), fontSize: 12, padding: "3px 4px" }}>{n ? `${n}: ` : ""}{c} rack{c === 1 ? "" : "s"} not checked on site in 90 days</div>
+      {[...stale].map(([k, { name: n, n: c }]) => (
+        <div key={k} style={{ color: v("text-muted"), fontSize: 12, padding: "3px 4px" }}>{n ? `${n}: ` : ""}{c} rack{c === 1 ? "" : "s"} not checked on site in 90 days</div>
       ))}
     </div>
   );

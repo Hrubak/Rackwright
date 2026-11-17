@@ -87,7 +87,7 @@ export default function FloorTab({ client, siteId, docs, units, onOpenRack, onSa
   if (room) {
     let w = 0, unk = 0;
     for (const sp of room.racks) { const p = rackWatts(docs, sp); w += p.w; unk += p.unknown; }
-    roomPower = w > 0 ? `Room: ${unk > 0 ? "at least " : ""}${Math.round(w).toLocaleString("en-US")} W · ${btu(w).toLocaleString("en-US")} BTU/hr` : "Power unknown";
+    roomPower = w > 0 ? `Room: ${unk > 0 ? "at least " : ""}${Math.round(w).toLocaleString("en-US")} W · ${btu(w).toLocaleString("en-US")} BTU/hr` : unk > 0 ? "Power unknown" : "";
   }
 
   if (!client.sites.length) return <div style={{ opacity: 0.8 }}>Add a site on the Sites tab to start a floor plan.</div>;

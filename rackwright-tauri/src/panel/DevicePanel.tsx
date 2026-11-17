@@ -5,8 +5,8 @@ import type { Device, Doc, Service } from "../types";
 import { STATUSES, statusOf, specFieldsFor, setField, connectedTo, powerPath, copyAsText } from "../device/info";
 import PortsEditor from "../PortsEditor";
 import { EndpointTable } from "../auvik/Panels";
-import { deviceAlerts, type IpEntry } from "../attention/model";
-import { devWatts, feedFor, fmtW, isPdu, isUps, type PowerBudget } from "../power/model";
+import { deviceAlerts, todayIso, type IpEntry } from "../attention/model";
+import { devWatts, feedFor, fmtLoad, isPdu, isUnpowered, isUps, type PowerBudget } from "../power/model";
 
 type Edit = (fn: (d: Doc) => string | void, key?: string) => boolean;
 const TABS = ["overview", "specs", "ports", "services", "notes"] as const;
@@ -50,7 +50,7 @@ export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose
   const tabLabel: Record<Tab, string> = {
     overview: "Overview", specs: "Specs", ports: `Ports ${dev.ports.length}`, services: `Services ${services.length}`, notes: "Notes",
   };
-  const alerts = deviceAlerts(doc, dev, new Date().toLocaleDateString("en-CA"), clashes.get(`current:${dev.id}`) ?? []);
+  const alerts = deviceAlerts(doc, dev, todayIso(), clashes.get(`current:${dev.id}`) ?? []);
   const own = devWatts(dev), feed = isUps(dev) || isPdu(dev) ? feedFor(budget, dev.id) : undefined;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
@@ -86,8 +86,8 @@ export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose
           {alerts.map((a, i) => <div key={i} style={{ color: a.level === "critical" ? v("danger") : a.level === "warning" ? v("warn") : v("text-dim") }}>{a.msg}</div>)}
         </div>}
         <div style={sub}>Power</div>
-        <div>{own != null ? `${own.toLocaleString("en-US")} W` : <span style={{ opacity: 0.7 }}>Unknown {"—"} set Power (W) in Specs</span>}</div>
-        {feed && <div>Load: {fmtW(feed.loadW, feed.unknown)}{feed.ratedW ? ` of ${feed.ratedW.toLocaleString("en-US")} W${feed.pct != null ? ` (${feed.pct}%)` : ""}` : ""}</div>}
+        {!feed && <div>{own != null ? `${own.toLocaleString("en-US")} W` : isUnpowered(dev) ? "Power: none (no power inlet)" : <span style={{ opacity: 0.7 }}>Unknown {"—"} set Power (W) in Specs</span>}</div>}
+        {feed && <div>Load: {fmtLoad(feed)}</div>}
         {feed && dev.specs?.runtime && <div>Runtime: {String(dev.specs.runtime)}</div>}
         <div style={sub}>Connected to</div>
         {conns.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>

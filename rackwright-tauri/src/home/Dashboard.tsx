@@ -7,8 +7,9 @@ import MiniRack from "../clients/MiniRack";
 import { cardStats, clientToken, initials } from "./cards";
 import { addStats, zero } from "../clients/util";
 import type { RackItem } from "../clients/store";
+import { todayIso } from "../attention/model";
 import AttentionList from "../attention/AttentionList";
-import { allClientAlerts, stillLoading } from "../attention/lists";
+import { alertsByClient, mergeClientAlerts, stillLoading } from "../attention/lists";
 
 const ImportToClient = lazy(() => import("../clients/ImportToClient"));
 
@@ -58,10 +59,11 @@ export default function Dashboard({ onOpen, onOpenRack, importTick }: { onOpen: 
   const totals = useMemo(() => {
     const list = clients ?? [];
     let st = zero;
-    for (const c of list) st = addStats(st, cardStats(c, docs).stats);
+    for (const c of list) st = addStats(st, cardStats(c, docs, []).stats);
     return { clients: list.length, sites: list.reduce((n, c) => n + c.sites.length, 0), racks: list.reduce((n, c) => n + c.sites.reduce((m, s) => m + s.racks.length, 0), 0), devices: st.devices };
   }, [clients, docs]);
-  const attention = useMemo(() => allClientAlerts(clients ?? [], docs, new Date().toLocaleDateString("en-CA")), [clients, docs]);
+  const byClient = useMemo(() => alertsByClient(clients ?? [], docs, todayIso()), [clients, docs]);
+  const attention = useMemo(() => mergeClientAlerts(clients ?? [], byClient), [clients, byClient]);
   const checking = !!clients && stillLoading(clients, docs);
   const openAlert = (a: { clientKey?: string; rackKey?: string; devId?: number; kind: string }) => {
     const c = clients?.find((x) => x.key === a.clientKey);
@@ -96,7 +98,7 @@ export default function Dashboard({ onOpen, onOpenRack, importTick }: { onOpen: 
       {clients && !clients.length && <div style={{ opacity: 0.8, marginBottom: 14, fontSize: 13 }}>No clients yet. Click + New client{store.web ? "" : " or Open client file"} to start.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
         {(clients ?? []).map((c) => {
-          const cs = cardStats(c, docs);
+          const cs = cardStats(c, docs, byClient.get(c.key) ?? []);
           const first = c.notes.split(/\r?\n/).find((l) => l.trim()) ?? "";
           const minis = c.sites.flatMap((s) => s.racks).slice(0, 4);
           const big = (n: string | number, l: string) => <div style={{ textAlign: "center", flex: 1 }}><div style={{ fontSize: 20, fontWeight: 600 }}>{n}</div><div style={{ fontSize: 11, color: v("text-muted") }}>{l}</div></div>;
@@ -115,7 +117,9 @@ export default function Dashboard({ onOpen, onOpenRack, importTick }: { onOpen: 
                 {!minis.length && <span style={{ fontSize: 12, color: v("text-muted") }}>{c.sites.length ? "No racks in these sites yet." : "Add a site to start."}</span>}
               </div>
               <div style={{ display: "flex" }}>{big(cs.stats.racks, "racks")}{big(cs.stats.devices, "devices")}{big(cs.stats.cables, "cables")}{big(`${cs.usedPct}%`, "rack space")}</div>
-              {cs.alerts.critical + cs.alerts.warning > 0
+              {cs.checking
+                ? <div style={{ fontSize: 12, textAlign: "center", color: v("text-muted") }}>Checking racks…</div>
+                : cs.alerts.critical + cs.alerts.warning > 0
                 ? <div style={{ fontSize: 12, textAlign: "center" }}>
                     {cs.alerts.critical > 0 && <span style={{ color: v("danger") }}>{cs.alerts.critical} critical</span>}
                     {cs.alerts.critical > 0 && cs.alerts.warning > 0 && " · "}
@@ -136,7 +140,7 @@ export default function Dashboard({ onOpen, onOpenRack, importTick }: { onOpen: 
       </div>
       <h2 style={{ fontSize: 15, margin: "26px 0 6px" }}>Needs attention across clients</h2>
       {checking && <div style={{ fontSize: 13, color: v("text-muted") }}>Checking racks…</div>}
-      <AttentionList alerts={attention} onOpen={openAlert} />
+      <AttentionList alerts={attention} onOpen={openAlert} loading={checking} />
       {importFor && <Suspense fallback={null}><ImportToClient client={importFor} onDone={load} onClose={() => setImportFor(null)} /></Suspense>}
     </div>
   );

@@ -1,12 +1,12 @@
 // Client page body: Sites, Racks list, Inventory, Cabling and Links for one client (the bar above it lives in ClientBar).
 import { v } from "../theme";
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { Doc } from "../types";
 import { Stats, addStats, docStats, statText, zero } from "./util";
 import MiniRack from "./MiniRack";
 import Inventory from "./Inventory";
 import AttentionList from "../attention/AttentionList";
-import { clientAlerts } from "../attention/model";
+import { clientAlerts, todayIso } from "../attention/model";
 import Links from "./Links";
 import Cabling from "./Cabling";
 import type { RackLocation } from "../location";
@@ -116,6 +116,13 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
   };
   const canAddCurrent = store.web ? current.id != null || !!saveCurrentTo : !!current.path;
 
+  // Alerts run on the whole client (so IP clashes across sites show), then keep the chosen site's racks.
+  const sitesAlerts = useMemo(() => {
+    if (!client) return [];
+    const keys = new Set((siteFilter ? client.sites.filter((s) => s.id === siteFilter) : client.sites).flatMap((s) => s.racks.map((r) => r.key)));
+    return clientAlerts(client, docs, todayIso()).filter((a) => a.rackKey != null && keys.has(a.rackKey));
+  }, [client, docs, siteFilter]);
+
   const siteStats = (s: SiteItem) => s.racks.reduce((a, r) => { const d = docs[r.key]; return typeof d === "object" ? addStats(a, docStats(d)) : a; }, zero);
   const total = client ? client.sites.reduce((a, s) => addStats(a, siteStats(s)), zero) : zero;
 
@@ -133,7 +140,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
       {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px", marginBottom: 10 }}>{err}</div>}
       {busy && <div style={{ opacity: 0.7, marginBottom: 6 }}>Working...</div>}
       {tab === "floor" && <FloorTab client={client} siteId={siteFilter} docs={docs} units={units} onOpenRack={(r) => open(r)} onSaved={refresh} />}
-      {tab === "inventory" && <Inventory client={scoped} docs={docs} onOpen={(r, devId) => open(r, { devId })} />}
+      {tab === "inventory" && <Inventory client={scoped} fullClient={client} docs={docs} onOpen={(r, devId) => open(r, { devId })} />}
       {tab === "cabling" && <Cabling client={scoped} docs={docs} onOpen={(r, cableId) => open(r, { cableId })} />}
       {tab === "links" && <Links client={client} docs={docs} store={store} onChanged={refresh} />}
       {tab === "racks" && (
@@ -165,7 +172,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
           <div style={{ marginBottom: 12 }}>
             <h3 style={{ fontSize: 14, margin: "0 0 4px" }}>Needs attention</h3>
             {sites.some((s) => s.racks.some((r) => docs[r.key] === undefined)) && <div style={{ fontSize: 12, color: v("text-muted") }}>Checking racks…</div>}
-            <AttentionList alerts={clientAlerts(scoped, docs, new Date().toLocaleDateString("en-CA"))} onOpen={(a) => { const r = sites.flatMap((s) => s.racks).find((x) => x.key === a.rackKey); if (r) open(r, { devId: a.kind === "stale" ? undefined : a.devId }); }} />
+            <AttentionList alerts={sitesAlerts} loading={sites.some((s) => s.racks.some((r) => docs[r.key] === undefined))} onOpen={(a) => { const r = sites.flatMap((s) => s.racks).find((x) => x.key === a.rackKey); if (r) open(r, { devId: a.kind === "stale" ? undefined : a.devId }); }} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <input key={`n${client.key}${client.name}`} style={{ ...inp, fontSize: 17, fontWeight: 600, flex: 1, maxWidth: 480 }} defaultValue={client.name}

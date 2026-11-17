@@ -4,15 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { backend } from "../backend";
 import type { Doc } from "../types";
 import type { ClientItem, RackItem } from "./store";
-import { clientAlerts, type Alert } from "../attention/model";
+import { clientAlerts, todayIso, type Alert } from "../attention/model";
 import { InvRow, inventoryCsv, inventoryRows, matchRow, typeTotals } from "./util";
 
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
 const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
 const MAX = 500;
 
-export default function Inventory({ client, docs, onOpen }: {
+export default function Inventory({ client, fullClient, docs, onOpen }: {
   client: ClientItem;
+  /** The whole client (all sites): alerts run on it so IP clashes across sites still show. */
+  fullClient?: ClientItem;
   docs: Record<string, Doc | string>;
   onOpen: (r: RackItem, devId: number) => void;
 }) {
@@ -33,12 +35,12 @@ export default function Inventory({ client, docs, onOpen }: {
   const failed = client.sites.flatMap((s) => s.racks.filter((r) => typeof docs[r.key] === "string").map((r) => r.name));
   const alertMap = useMemo(() => {
     const m = new Map<string, Alert[]>();
-    for (const a of clientAlerts(client, docs, new Date().toLocaleDateString("en-CA"))) {
+    for (const a of clientAlerts(fullClient ?? client, docs, todayIso())) {
       if (a.rackKey == null || a.devId == null) continue;
       const k = `${a.rackKey}:${a.devId}`; const l = m.get(k); if (l) l.push(a); else m.set(k, [a]);
     }
     return m;
-  }, [client, docs]);
+  }, [client, fullClient, docs]);
   const alertsOf = (r: InvRow): Alert[] => (r.kind === "device" ? alertMap.get(`${r.rackKey}:${r.devId}`) ?? [] : []);
   const inScope = useMemo(() => all.filter((r) => (!site || r.siteId === site) && matchRow(r, q) && (!attnOnly || alertsOf(r).length > 0)), [all, site, q, attnOnly, alertMap]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = useMemo(() => (type ? inScope.filter((r) => (r.type || "Other") === type) : inScope), [inScope, type]);
@@ -90,7 +92,7 @@ export default function Inventory({ client, docs, onOpen }: {
                   style={{ cursor: "pointer", opacity: r.kind === "endpoint" ? 0.8 : 1 }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = v("row-hover-blue"))} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
                   <td style={td}>{r.site}</td><td style={td}>{r.rackFile}</td>
-                  <td style={{ ...td, fontWeight: r.kind === "device" ? 600 : 400 }}>{r.kind === "endpoint" ? "↳ " : ""}{r.name}{(() => { const bad = alertsOf(r).filter((a) => a.kind === "warranty" || a.kind === "battery" || a.kind === "load"); return bad.length ? <span title={bad.map((a) => a.msg).join("\n")} style={{ marginLeft: 6, color: v("danger"), fontWeight: 700 }}>!</span> : null; })()}</td>
+                  <td style={{ ...td, fontWeight: r.kind === "device" ? 600 : 400 }}>{r.kind === "endpoint" ? "↳ " : ""}{r.name}{(() => { const bad = alertsOf(r).filter((a) => a.kind === "warranty" || a.kind === "battery" || a.kind === "load"); return bad.length ? <span title={bad.map((a) => a.msg).join("\n")} style={{ marginLeft: 6, color: v(bad.some((a) => a.level === "critical") ? "danger" : "warn"), fontWeight: 700 }}>!</span> : null; })()}</td>
                   <td style={td}>{r.type}</td><td style={td}>{r.model}</td><td style={{ ...td, ...(alertsOf(r).some((a) => a.kind === "ip") ? { background: v("danger-bg") } : {}) }} title={alertsOf(r).filter((a) => a.kind === "ip").map((a) => a.msg).join("\n") || undefined}>{r.ip}</td>
                   <td style={td}>{r.mac}</td><td style={td}>{r.serial}</td><td style={td}>{r.where}</td>
                 </tr>

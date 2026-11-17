@@ -584,7 +584,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   }, [IS_WEB ? cur?.id : path, clientRev]); // eslint-disable-line react-hooks/exhaustive-deps
   // A rack that belongs to a client opens inside that client's Racks tab.
   useEffect(() => { if (screen.kind === "editor" && loc && loc !== "unassigned") setScreen({ kind: "client", key: loc.clientKey, tab: "racks" }); }, [loc]); // eslint-disable-line react-hooks/exhaustive-deps
-  const otherIps = useClientIps(loc, (r) => (IS_WEB ? r.id === cur?.id : !!r.path && !!path && sameFile(r.path, path)), clientRev);
+  const otherIps = useClientIps(loc, (r) => (IS_WEB ? r.id === cur?.id : !!r.path && !!path && sameFile(r.path, path)), clientRev, IS_WEB ? cur?.id ?? null : path || null);
   const budget = useMemo(() => powerBudget(doc), [doc]);
   const clashes = useMemo(() => ipClashes([...otherIps, ...ipEntries("current", doc)]), [otherIps, doc]);
   const hasLoc = !!loc && loc !== "unassigned";

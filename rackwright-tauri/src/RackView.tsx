@@ -231,7 +231,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
               })}
               {/* Rear-mounted (turned around): a yellow stripe on the left edge, clear of labels and ports. */}
               {d.rack != null && d.rev && <rect x={l + 1} y={t + 1} width={3} height={q.h - 2} fill={v("select")} style={{ pointerEvents: "none" }} />}
-              {clashOf(d.id) && <g style={{ pointerEvents: "none" }}>
+              {clashOf(d.id) && <g>
                 <rect x={r - 28} y={t + 3} width={24} height={13} rx={4} fill={v("danger")} />
                 <text x={r - 16} y={t + 9.5} textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight={700} fill={v("on-accent")}>IP!</text>
                 <title>{clashOf(d.id)}</title>
