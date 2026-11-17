@@ -134,7 +134,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
     }
   }, [panelOpen, say]);
   const openPanel = useCallback((s: Sel) => { setSel(s); setPanelOpen(true); }, []);
-  useEffect(() => { setFitTick((n) => n + 1); }, [panelOpen, wide]);
 
   useEffect(() => {
     let stale = false;
@@ -637,6 +636,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         {view === "rack" && <span style={{ display: "inline-flex", marginRight: 8 }}>{seg([["front", "Front"], ["rear", "Rear"]], face, (id) => setFace(id as "front" | "rear"), (l) => `Show the ${l.toLowerCase()}`)}</span>}
         <button style={{ ...btn, padding: "5px 9px" }} onClick={doUndo} disabled={!undo.length} title={`Undo (${SHORTCUTS.undo})`}>{"↶"}</button>
         <button style={{ ...btn, padding: "5px 9px" }} onClick={doRedo} disabled={!redo.length} title={`Redo (${SHORTCUTS.redo})`}>{"↷"}</button>
+        <button style={{ ...btn, background: panelOpen ? v("accent-soft") : v("control") }} onClick={() => setPanelOpen((o) => !o)} title="Show or hide the details panel" aria-pressed={panelOpen}>Details</button>
         <button style={{ ...btn, background: v("accent"), color: v("on-accent"), borderColor: v("accent") }} onClick={() => doSave()} title={`Save (${SHORTCUTS.save})`}>Save</button>
         {!IS_WEB && <button style={{ ...btn, padding: "5px 9px", marginLeft: 6, marginRight: 0 }} title="Settings" aria-label="Settings" onClick={() => setSettingsTab("profile")}>{"⚙"}</button>}
         {IS_WEB && webGuarded && <UserBar web={webGuarded} openSettings={setSettingsTab} />}
@@ -694,7 +694,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         {panelOpen && <div style={{ width: selDev ? 360 : 240, flexShrink: 0, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 10, overflow: "auto", display: "flex", flexDirection: "column", gap: 8,
           ...(wide ? {} : { position: "absolute", right: 0, top: 0, bottom: 0, zIndex: 20, boxShadow: "-6px 0 18px rgba(0,0,0,0.35)" }) }}>
           {!sel && <>
-            <Sec title="Overview" first />
+            <Sec title="Overview" first onClose={() => setPanelOpen(false)} />
             <div style={{ fontSize: 12, lineHeight: 1.7 }}>
               {doc.racks.length} rack(s), {sum.used}/{sum.total}U used<br />
               {doc.devices.length} devices ({sum.off} off-rack)<br />
@@ -704,7 +704,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <AuvikInfo doc={doc} onOpen={() => setUnplacedOpen(true)} />
           </>}
           {selRack && <>
-            <Sec title="Rack" first />
+            <Sec title="Rack" first onClose={() => setPanelOpen(false)} />
             {field("Name", selRack.name, (v) => edit((d) => { d.racks.find((r) => r.id === selRack.id)!.name = v; }, `rn${selRack.id}`))}
             {field("Height (U)", selRack.u, (v) => edit((d) => {
               const r = d.racks.find((x) => x.id === selRack.id)!;
@@ -772,7 +772,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             </div>
             </>} />}
           {selCable && <>
-            <Sec title="Cable" first />
+            <Sec title="Cable" first onClose={() => setPanelOpen(false)} />
             <div style={{ fontSize: 12 }}>{endp(selCable.a)}<br />to {endp(selCable.b)}</div>
             {field("Label", selCable.label ?? "", (v) => cab(selCable, { label: v }))}
             <label style={{ fontSize: 11, color: v("text-dim") }}>Colour<br />
@@ -846,6 +846,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
   );
 }
 
-function Sec({ title, first }: { title: string; first?: boolean }) {
-  return <div style={{ fontSize: 12, fontWeight: 600, color: v("text-muted"), marginTop: 14, paddingTop: first ? 0 : 8, borderTop: first ? "none" : `1px solid ${v("border-subtle")}` }}>{title}</div>;
+function Sec({ title, first, onClose }: { title: string; first?: boolean; onClose?: () => void }) {
+  return <div style={{ display: "flex", alignItems: "center", fontSize: 12, fontWeight: 600, color: v("text-muted"), marginTop: 14, paddingTop: first ? 0 : 8, borderTop: first ? "none" : `1px solid ${v("border-subtle")}` }}>
+    <span style={{ flex: 1 }}>{title}</span>
+    {onClose && <button aria-label="Close" title="Close" style={{ ...btn, padding: "0 8px", fontSize: 16, marginRight: 0 }} onClick={onClose}>{"×"}</button>}
+  </div>;
 }
