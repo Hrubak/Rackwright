@@ -1,3 +1,4 @@
+import { v } from "../theme";
 import { useMemo, useState } from "react";
 import type { Doc } from "../types";
 import { groupOfSwitch, placeUnplaced } from "../endpointEdit";
@@ -6,7 +7,7 @@ import type { Sel } from "../RackView";
 import { endpointsCsv, EpSort, filterEndpoints, flattenEndpoints, sortEndpoints } from "./endpoints";
 import { EP_KINDS, EpKind, KIND_COLOR, KIND_LABEL } from "./kinds";
 
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
 const COLS: [EpSort, string][] = [["name", "Name"], ["kind", "Kind"], ["type", "Type"], ["model", "Model"], ["ip", "IP"], ["mac", "MAC"], ["switch", "Switch / host"], ["port", "Port"], ["status", "Status"]];
 
 type Edit = (fn: (d: Doc) => string | void, key?: string) => boolean;
@@ -22,8 +23,8 @@ function PlaceDialog({ doc, index, edit, onClose }: { doc: Doc; index: number; e
   if (!u) return null;
   const grp = swDev ? groupOfSwitch(doc, swDev.id) : null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120 }}>
-      <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 340, border: "1px solid #3a3d42", fontSize: 12.5 }}>
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120 }}>
+      <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 340, border: `1px solid ${v("border")}`, fontSize: 12.5 }}>
         <b>Place {u.name} on a switch</b>
         <label style={{ display: "block", margin: "8px 0" }}>Switch<br />
           <select style={{ ...inp, width: "100%" }} value={sw} onChange={(e) => { setSw(e.target.value === "" ? "" : Number(e.target.value)); setPort(null); }}>
@@ -57,11 +58,11 @@ export default function EndpointsView({ doc, selected, onSelect, edit, onMember 
   const selId = selected?.kind === "dev" ? selected.id : null;
 
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "auto", background: "#14161a", padding: 14, fontSize: 12.5 }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "auto", background: v("bg"), padding: 14, fontSize: 12.5 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
         <input style={{ ...inp, width: 240 }} placeholder="Search name, IP, MAC, switch..." value={text} onChange={(e) => setText(e.target.value)} />
         {EP_KINDS.filter((k) => count(k) > 0 || kinds.has(k)).map((k) => (
-          <button key={k} onClick={() => toggle(k)} style={{ background: kinds.has(k) ? KIND_COLOR[k] : "#2a2d33", color: kinds.has(k) ? "#101113" : "#e6e8eb", border: `1px solid ${KIND_COLOR[k]}`, borderRadius: 12, padding: "2px 10px", cursor: "pointer" }}>
+          <button key={k} onClick={() => toggle(k)} style={{ background: kinds.has(k) ? KIND_COLOR[k] : v("control"), color: kinds.has(k) ? v("ink") : v("text"), border: `1px solid ${KIND_COLOR[k]}`, borderRadius: 12, padding: "2px 10px", cursor: "pointer" }}>
             {KIND_LABEL[k][1]} {count(k)}
           </button>
         ))}
@@ -71,10 +72,10 @@ export default function EndpointsView({ doc, selected, onSelect, edit, onMember 
         <button onClick={copy} disabled={!rows.length} style={{ ...inp, cursor: "pointer" }}>Copy as CSV</button>
       </div>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
-        <thead><tr style={{ textAlign: "left", background: "#1b1d21" }}>
+        <thead><tr style={{ textAlign: "left", background: v("panel") }}>
           {COLS.map(([k, h]) => (
             <th key={k} onClick={() => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(1); } }}
-              style={{ padding: "5px 8px", borderBottom: "1px solid #2c2f35", cursor: "pointer", whiteSpace: "nowrap", position: "sticky", top: -14, background: "#1b1d21" }}>
+              style={{ padding: "5px 8px", borderBottom: `1px solid ${v("border-subtle")}`, cursor: "pointer", whiteSpace: "nowrap", position: "sticky", top: -14, background: v("panel") }}>
               {h}{sort === k ? (dir === 1 ? " ▲" : " ▼") : ""}
             </th>
           ))}
@@ -82,7 +83,7 @@ export default function EndpointsView({ doc, selected, onSelect, edit, onMember 
         <tbody>
           {rows.map((r) => (
             <tr key={r.key} onClick={() => { if (r.devId == null) return; onSelect({ kind: "dev", id: r.devId }); onMember?.(r.devId, Number(r.key.split(":")[1])); }}
-              style={{ cursor: r.devId != null ? "pointer" : "default", borderBottom: "1px solid #24272c", background: r.devId != null && r.devId === selId ? "#2a3a52" : undefined }}>
+              style={{ cursor: r.devId != null ? "pointer" : "default", borderBottom: `1px solid ${v("panel-2")}`, background: r.devId != null && r.devId === selId ? v("accent-soft") : undefined }}>
               <td style={{ padding: "4px 8px" }}>{r.name}</td>
               <td style={{ padding: "4px 8px" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: KIND_COLOR[r.kind], marginRight: 6 }} />{KIND_LABEL[r.kind][0]}</td>
               <td style={{ padding: "4px 8px" }}>{r.type}</td>

@@ -1,17 +1,18 @@
 // Web-only UI pieces: users panel, shared rack list, dialogs. Only rendered when VITE_TARGET === "web".
+import { v } from "./theme";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import * as A from "./api";
 import { RackMeta, UpdateCheck, UpdateStatus, User } from "./api";
 
-export const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
-export const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
-const errStyle = { color: "#f85149", fontSize: 12, margin: "6px 0" } as const;
+export const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
+export const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
+const errStyle = { color: v("danger"), fontSize: 12, margin: "6px 0" } as const;
 export const msgOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function Modal({ title, onClose, children, width = 520 }: { title: string; onClose?: () => void; children: ReactNode; width?: number }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-      <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width, maxWidth: "94vw", maxHeight: "88vh", overflow: "auto", border: "1px solid #3a3d42", color: "#e6e8eb", fontSize: 13 }}>
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+      <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width, maxWidth: "94vw", maxHeight: "88vh", overflow: "auto", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 13 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>{title}</b>
           {onClose && <button style={{ ...btn, marginRight: 0, padding: "1px 8px" }} onClick={onClose}>x</button>}
@@ -58,7 +59,7 @@ function ChangePassword({ onClose }: { onClose: () => void }) {
       <Field label="Current password"><input style={{ ...inp, width: "100%" }} type="password" value={cur} onChange={(e) => setCur(e.target.value)} /></Field>
       <Field label="New password (min 8 characters)"><input style={{ ...inp, width: "100%" }} type="password" value={nw} onChange={(e) => setNw(e.target.value)} /></Field>
       {err && <div style={errStyle}>{err}</div>}
-      {ok && <div style={{ color: "#2ea043", fontSize: 12, margin: "6px 0" }}>Password changed.</div>}
+      {ok && <div style={{ color: v("ok"), fontSize: 12, margin: "6px 0" }}>Password changed.</div>}
       <button style={btn} onClick={go} disabled={!cur || !nw || ok}>Change</button>
       <button style={btn} onClick={onClose}>{ok ? "Close" : "Cancel"}</button>
     </Modal>
@@ -83,7 +84,7 @@ function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; 
   const remove = (u: User) => { if (confirm(`Delete ${u.name} (${u.email})?`)) run(() => A.deleteUser(u.id)); };
   const add = async () => { if (await run(() => A.addUser(nu), `Added ${nu.name}.`)) setNu({ email: "", name: "", password: "", is_admin: false }); };
   const th = { textAlign: "left", fontWeight: 600, padding: "3px 6px", opacity: 0.7 } as const;
-  const td = { padding: "3px 6px", borderTop: "1px solid #24272c" } as const;
+  const td = { padding: "3px 6px", borderTop: `1px solid ${v("panel-2")}` } as const;
   const sm = { ...btn, padding: "2px 8px", marginRight: 3, fontSize: 11 } as const;
   return (
     <Modal title="Users" onClose={onClose} width={720}>
@@ -98,7 +99,7 @@ function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; 
               <td style={{ ...td, whiteSpace: "nowrap" }}>
                 <button style={sm} onClick={() => rename(u)}>Rename</button>
                 <button style={sm} onClick={() => reset(u)}>Reset password</button>
-                <button style={{ ...sm, color: "#f85149" }} onClick={() => remove(u)}>Delete</button>
+                <button style={{ ...sm, color: v("danger") }} onClick={() => remove(u)}>Delete</button>
               </td>
             </tr>
           ))}
@@ -113,7 +114,7 @@ function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; 
         <button style={{ ...btn, marginRight: 0 }} onClick={add} disabled={!nu.email || !nu.name || !nu.password}>Add</button>
       </div>
       {err && <div style={errStyle}>{err}</div>}
-      {note && <div style={{ color: "#2ea043", fontSize: 12, margin: "6px 0" }}>{note}</div>}
+      {note && <div style={{ color: v("ok"), fontSize: 12, margin: "6px 0" }}>{note}</div>}
     </Modal>
   );
 }
@@ -153,7 +154,7 @@ function UpdatePanel({ onClose }: { onClose: () => void }) {
     setBusy(false);
   };
 
-  const ok = { color: "#2ea043", fontSize: 12, margin: "6px 0" } as const;
+  const ok = { color: v("ok"), fontSize: 12, margin: "6px 0" } as const;
   const when = st?.since ? new Date(st.since).toLocaleString() : "";
   return (
     <Modal title="Update server" onClose={onClose} width={680}>
@@ -174,7 +175,7 @@ function UpdatePanel({ onClose }: { onClose: () => void }) {
             <div style={{ marginTop: 10 }}>
               <div>New version <b>{chk.latest_version || chk.latest_commit}</b> (commit {chk.latest_commit}{chk.latest_date && <>, {new Date(chk.latest_date).toLocaleString()}</>}).</div>
               {chk.latest_subject && <div style={{ opacity: 0.7, fontSize: 12 }}>{chk.latest_subject}</div>}
-              {chk.changes && <pre style={{ whiteSpace: "pre-wrap", background: "#14161a", border: "1px solid #3a3d42", borderRadius: 4, padding: 8, maxHeight: 220, overflow: "auto", fontSize: 12, fontFamily: "inherit" }}>{chk.changes}</pre>}
+              {chk.changes && <pre style={{ whiteSpace: "pre-wrap", background: v("bg"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: 8, maxHeight: 220, overflow: "auto", fontSize: 12, fontFamily: "inherit" }}>{chk.changes}</pre>}
               <button style={{ ...btn, marginTop: 8 }} onClick={start} disabled={busy}>Update now</button>
             </div>
           )}
@@ -182,7 +183,7 @@ function UpdatePanel({ onClose }: { onClose: () => void }) {
       )}
 
       {running && (
-        <div style={{ margin: "8px 0", color: "#d29922" }}>
+        <div style={{ margin: "8px 0", color: v("warn") }}>
           {down ? "The server is restarting. This page reconnects by itself." : "Updating. This takes several minutes. You can close this window; the update keeps going."}
         </div>
       )}
@@ -201,7 +202,7 @@ function UpdatePanel({ onClose }: { onClose: () => void }) {
       {st?.log && (
         <>
           <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>Update log</div>
-          <pre ref={logRef} style={{ background: "#0e0f12", border: "1px solid #3a3d42", borderRadius: 4, padding: 8, maxHeight: 260, overflow: "auto", fontSize: 11, whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{st.log}</pre>
+          <pre ref={logRef} style={{ background: v("log-bg"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: 8, maxHeight: 260, overflow: "auto", fontSize: 11, whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{st.log}</pre>
         </>
       )}
     </Modal>
@@ -218,7 +219,7 @@ export function RackList({ currentId, onOpen, onClose }: { currentId: number | n
     if (!confirm(`Delete "${m.name}" for everyone? This cannot be undone.`)) return;
     setErr(""); try { await A.deleteRack(m.id); await reload(); } catch (e) { setErr(msgOf(e)); }
   };
-  const td = { padding: "4px 6px", borderTop: "1px solid #24272c" } as const;
+  const td = { padding: "4px 6px", borderTop: `1px solid ${v("panel-2")}` } as const;
   return (
     <Modal title="Shared racks" onClose={onClose} width={760}>
       {err && <div style={errStyle}>{err}</div>}
@@ -229,12 +230,12 @@ export function RackList({ currentId, onOpen, onClose }: { currentId: number | n
           <thead><tr>{["Name", "Client / site", "Updated by", "When", ""].map((h) => <th key={h} style={{ textAlign: "left", padding: "3px 6px", opacity: 0.7 }}>{h}</th>)}</tr></thead>
           <tbody>
             {list.map((m) => (
-              <tr key={m.id} style={{ background: m.id === currentId ? "#2a3a52" : undefined }}>
+              <tr key={m.id} style={{ background: m.id === currentId ? v("accent-soft") : undefined }}>
                 <td style={td}>{m.name}</td><td style={{ ...td, opacity: m.site ? 1 : 0.55 }}>{m.site ? `${m.client} / ${m.site}` : "Unassigned"}</td><td style={td}>{m.updated_by}</td>
                 <td style={td}>{new Date(m.updated_at).toLocaleString()}</td>
                 <td style={{ ...td, whiteSpace: "nowrap" }}>
                   <button style={{ ...btn, padding: "2px 8px", marginRight: 3 }} onClick={() => onOpen(m)}>Open</button>
-                  <button style={{ ...btn, padding: "2px 8px", marginRight: 0, color: "#f85149" }} onClick={() => remove(m)}>Delete</button>
+                  <button style={{ ...btn, padding: "2px 8px", marginRight: 0, color: v("danger") }} onClick={() => remove(m)}>Delete</button>
                 </td>
               </tr>
             ))}
@@ -263,7 +264,7 @@ export function ConflictDialog({ by, onTheirs, onMine, onCancel }: { by: string;
     <Modal title="Someone else changed this rack" onClose={onCancel} width={460}>
       <div style={{ marginBottom: 12 }}>{by ? <b>{by}</b> : "Another user"} saved a newer version since you opened it.</div>
       <button style={btn} onClick={onTheirs}>Reload theirs (discard mine)</button>
-      <button style={{ ...btn, color: "#f85149" }} onClick={onMine}>Overwrite with mine</button>
+      <button style={{ ...btn, color: v("danger") }} onClick={onMine}>Overwrite with mine</button>
       <button style={{ ...btn, marginRight: 0 }} onClick={onCancel}>Cancel</button>
     </Modal>
   );

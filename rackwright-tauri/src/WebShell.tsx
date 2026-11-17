@@ -1,4 +1,6 @@
 // Web-only auth gate: setup / sign-in / app.
+import { Logo } from "./Logo";
+import { v } from "./theme";
 import { ReactNode, useEffect, useState } from "react";
 import App from "./App";
 import * as A from "./api";
@@ -7,9 +9,9 @@ import { Field, btn, inp, msgOf } from "./web";
 
 function Screen({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#14161a", color: "#e6e8eb", fontFamily: "Segoe UI, sans-serif" }}>
-      <div style={{ background: "#1b1d21", padding: 20, borderRadius: 6, width: 320, border: "1px solid #3a3d42" }}>
-        <div style={{ fontSize: 18, marginBottom: 14 }}>Rackwright</div>
+    <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: v("bg"), color: v("text"), fontFamily: "Segoe UI, sans-serif" }}>
+      <div style={{ background: v("panel"), padding: 20, borderRadius: 6, width: 320, border: `1px solid ${v("border")}` }}>
+        <div style={{ marginBottom: 14 }}><Logo size={28} wordmark /></div>
         <div style={{ fontSize: 13, marginBottom: 10, opacity: 0.8 }}>{title}</div>
         {children}
       </div>
@@ -35,7 +37,7 @@ function AuthForm({ setupMode, onDone }: { setupMode: boolean; onDone: (u: User)
         {setupMode && <Field label="Name"><input style={{ ...inp, width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} /></Field>}
         <Field label={setupMode ? "Password (min 8 characters)" : "Password"}>
           <input style={{ ...inp, width: "100%" }} type="password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
-        {err && <div style={{ color: "#f85149", fontSize: 12, margin: "6px 0" }}>{err}</div>}
+        {err && <div style={{ color: v("danger"), fontSize: 12, margin: "6px 0" }}>{err}</div>}
         <button style={{ ...btn, marginRight: 0 }} disabled={busy || !email || !pw || (setupMode && !name)}>{setupMode ? "Create admin account" : "Sign in"}</button>
       </form>
     </Screen>

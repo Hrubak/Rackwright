@@ -2,6 +2,12 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.5.0 — 2026-11-16
+Web and desktop. First step of the look-and-feel work (plan: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`).
+- **New logo and app icon.** Rackwright has a logo: three rack units on a blue tile. It is the desktop app icon (exe, taskbar), the browser tab icon, and it heads the sign-in page.
+- **About.** Click the logo at the top left to see the version and whether you are in the web or desktop app. Press Escape or Close to go back.
+- **Groundwork for themes.** Every colour in the app and in the rack drawings now comes from one theme file. Nothing looks different yet. Light theme and company branding build on this in later releases. PDF export looks the same as before.
+
 ## 3.4.0 — 2026-11-16
 Web and desktop.
 - **Import Auvik into a client.** On the Clients screen, pick a client and click Import Auvik next to Add site. Choose the Auvik device export (.xlsx); the file stays on your computer.

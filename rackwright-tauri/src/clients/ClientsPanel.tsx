@@ -1,4 +1,5 @@
 // Clients screen: pick a client, see its sites and the racks in each, open a rack.
+import { v } from "../theme";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { Doc } from "../types";
 import { Stats, addStats, docStats, statText, zero } from "./util";
@@ -8,9 +9,9 @@ import { ClientItem, ClientListItem, RackItem, SiteItem, clientStore } from "./s
 
 const ImportToClient = lazy(() => import("./ImportToClient"));
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
 const small = { ...btn, padding: "1px 7px", fontSize: 11 } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
 const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface CurrentRack {
@@ -42,11 +43,11 @@ export function MiniRack({ doc }: { doc: Doc }) {
         const x = i * (W + 6), top = (maxU - r.u) * PX;
         return (
           <g key={r.id}>
-            <rect x={x} y={top} width={W} height={r.u * PX + 4} fill="#111317" stroke="#4a4e55" rx={2} />
+            <rect x={x} y={top} width={W} height={r.u * PX + 4} fill={v("mini-rack-bg")} stroke={v("mini-rack-border")} rx={2} />
             {doc.devices.filter((d) => d.rack === r.id).map((d) => {
               const cols = d.half ? Math.max(2, d.cols || 2) : 1;
               const w = (W - 4) / cols;
-              return <rect key={d.id} x={x + 2 + (d.half ? (d.side || 0) * w : 0)} y={top + 2 + (r.u - (d.u + d.u_size - 1)) * PX} width={w - 0.5} height={d.u_size * PX - 0.5} fill={d.color || "#5b6270"} />;
+              return <rect key={d.id} x={x + 2 + (d.half ? (d.side || 0) * w : 0)} y={top + 2 + (r.u - (d.u + d.u_size - 1)) * PX} width={w - 0.5} height={d.u_size * PX - 0.5} fill={d.color || v("mini-device")} />;
             })}
           </g>
         );
@@ -138,16 +139,16 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
   const total = client ? client.sites.reduce((a, s) => addStats(a, siteStats(s)), zero) : zero;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000c", zIndex: 90, display: "flex", alignItems: "stretch", justifyContent: "center", padding: 20 }}>
-      <div style={{ background: "#1b1d21", border: "1px solid #3a3d42", borderRadius: 6, color: "#e6e8eb", fontSize: 13, display: "flex", flexDirection: "column", width: "100%", maxWidth: 1400 }}>
-        <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid #2c2f35" }}>
+    <div style={{ position: "fixed", inset: 0, background: v("overlay-strong"), zIndex: 90, display: "flex", alignItems: "stretch", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: v("panel"), border: `1px solid ${v("border")}`, borderRadius: 6, color: v("text"), fontSize: 13, display: "flex", flexDirection: "column", width: "100%", maxWidth: 1400 }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderBottom: `1px solid ${v("border-subtle")}` }}>
           <b style={{ fontSize: 15, flex: 1 }}>Clients and sites</b>
           {busy && <span style={{ opacity: 0.7, marginRight: 10 }}>Working...</span>}
           <button style={{ ...btn, marginRight: 0 }} onClick={onClose}>Close</button>
         </div>
-        {err && <div style={{ background: "#3a1d1d", color: "#ffb4ab", padding: "6px 14px" }}>{err}</div>}
+        {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px" }}>{err}</div>}
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          <div style={{ width: 260, borderRight: "1px solid #2c2f35", display: "flex", flexDirection: "column", padding: 10 }}>
+          <div style={{ width: 260, borderRight: `1px solid ${v("border-subtle")}`, display: "flex", flexDirection: "column", padding: 10 }}>
             <input style={{ ...inp, marginBottom: 8 }} placeholder="Find a client" value={q} onChange={(e) => setQ(e.target.value)} />
             <div style={{ marginBottom: 8 }}>
               <button style={btn} onClick={newClient}>New client</button>
@@ -157,7 +158,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
               {list === null && <div style={{ opacity: 0.7 }}>Loading...</div>}
               {list && !list.length && <div style={{ opacity: 0.7, fontSize: 12 }}>No clients yet. Click New client{store.web ? "" : " or Open client file"}.</div>}
               {shown.map((c) => (
-                <div key={c.key} onClick={() => setKey(c.key)} style={{ padding: "6px 8px", borderRadius: 4, cursor: "pointer", background: c.key === key ? "#2a3a52" : undefined, marginBottom: 2 }}>
+                <div key={c.key} onClick={() => setKey(c.key)} style={{ padding: "6px 8px", borderRadius: 4, cursor: "pointer", background: c.key === key ? v("accent-soft") : undefined, marginBottom: 2 }}>
                   <div>{c.name}</div>
                   <div style={{ fontSize: 11, opacity: 0.65 }}>{c.sub}</div>
                 </div>
@@ -171,15 +172,15 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <input key={`n${client.key}${client.name}`} style={{ ...inp, fontSize: 17, fontWeight: 600, flex: 1, maxWidth: 480 }} defaultValue={client.name}
                     onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== client.name) run(() => store.update(client.key, { name: v }), refresh); }} />
-                  <button style={{ ...btn, color: "#f85149" }} onClick={removeClient}>{store.web ? "Delete client" : "Remove from list"}</button>
+                  <button style={{ ...btn, color: v("danger") }} onClick={removeClient}>{store.web ? "Delete client" : "Remove from list"}</button>
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>{client.sites.length} site{client.sites.length === 1 ? "" : "s"}, {statText(total)}{!store.web && <> · <span title={client.key}>{client.key}</span></>}</div>
                 <textarea key={`t${client.key}`} style={{ ...inp, width: "100%", maxWidth: 800, minHeight: 44, boxSizing: "border-box", marginBottom: 10 }} placeholder="Notes about this client (contacts, contract, escalation...)"
                   defaultValue={client.notes} onBlur={(e) => { if (e.target.value !== client.notes) run(() => store.update(client.key, { notes: e.target.value }), refresh); }} />
-                <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #2c2f35", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", borderBottom: `1px solid ${v("border-subtle")}`, marginBottom: 12 }}>
                   {([["sites", "Sites"], ["inventory", "Inventory and search"], ["links", "Links"]] as const).map(([id, label]) => (
-                    <button key={id} onClick={() => setTab(id)} style={{ background: "none", color: tab === id ? "#e6e8eb" : "#9aa0a8", border: "none", cursor: "pointer", fontSize: 13,
-                      padding: "6px 12px", borderBottom: tab === id ? "2px solid #5b8bd0" : "2px solid transparent", marginBottom: -1 }}>{label}</button>
+                    <button key={id} onClick={() => setTab(id)} style={{ background: "none", color: tab === id ? v("text") : v("text-muted-alt"), border: "none", cursor: "pointer", fontSize: 13,
+                      padding: "6px 12px", borderBottom: tab === id ? `2px solid ${v("accent-border")}` : "2px solid transparent", marginBottom: -1 }}>{label}</button>
                   ))}
                   <span style={{ flex: 1 }} />
                   {tab === "sites" && <button style={{ ...btn, marginBottom: 4 }} onClick={() => setImportOpen(true)}>Import Auvik</button>}
@@ -189,7 +190,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                 {tab === "links" && <Links client={client} docs={docs} store={store} onChanged={refresh} />}
                 {tab === "sites" && <>
                 {siteForm && (
-                  <div style={{ border: "1px solid #3a3d42", borderRadius: 6, padding: 10, marginBottom: 12, maxWidth: 520, background: "#202328" }}>
+                  <div style={{ border: `1px solid ${v("border")}`, borderRadius: 6, padding: 10, marginBottom: 12, maxWidth: 520, background: v("card") }}>
                     <b>{siteForm.id == null ? "New site" : "Edit site"}</b>
                     <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 6, marginTop: 8, alignItems: "center" }}>
                       <span>Name</span><input autoFocus style={inp} value={siteForm.name} onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })} />
@@ -207,14 +208,14 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                   {client.sites.map((s) => {
                     const st = siteStats(s);
                     return (
-                      <div key={s.id} style={{ border: "1px solid #33363c", borderRadius: 6, padding: 10, background: "#202328" }}>
+                      <div key={s.id} style={{ border: `1px solid ${v("scrollbar")}`, borderRadius: 6, padding: 10, background: v("card") }}>
                         <div style={{ display: "flex", alignItems: "flex-start" }}>
                           <div style={{ flex: 1 }}>
                             <b style={{ fontSize: 14 }}>{s.name}</b>
                             {s.address && <div style={{ fontSize: 12, opacity: 0.75 }}>{s.address}</div>}
                           </div>
                           <button style={small} onClick={() => setSiteForm({ id: s.id, name: s.name, address: s.address, notes: s.notes })}>Edit</button>
-                          <button style={{ ...small, marginRight: 0, color: "#f85149" }} onClick={() => removeSite(s)}>Delete</button>
+                          <button style={{ ...small, marginRight: 0, color: v("danger") }} onClick={() => removeSite(s)}>Delete</button>
                         </div>
                         {s.notes && <div style={{ fontSize: 12, opacity: 0.8, whiteSpace: "pre-wrap", marginTop: 4 }}>{s.notes}</div>}
                         <div style={{ fontSize: 11, opacity: 0.65, margin: "6px 0" }}>{statText(st)}</div>
@@ -222,9 +223,9 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                           {s.racks.map((r) => {
                             const d = docs[r.key];
                             return (
-                              <div key={r.key} style={{ border: "1px solid #2c2f35", borderRadius: 4, padding: 6, background: "#17191d", minWidth: 120 }}>
+                              <div key={r.key} style={{ border: `1px solid ${v("border-subtle")}`, borderRadius: 4, padding: 6, background: v("inset"), minWidth: 120 }}>
                                 <div style={{ cursor: "pointer" }} title="Open this rack" onClick={() => onOpenRack(r)}>
-                                  {d === undefined ? <div style={{ fontSize: 11, opacity: 0.6 }}>Loading...</div> : typeof d === "string" ? <div style={{ fontSize: 11, color: "#ffb4ab", maxWidth: 160 }}>{d}</div> : <MiniRack doc={d} />}
+                                  {d === undefined ? <div style={{ fontSize: 11, opacity: 0.6 }}>Loading...</div> : typeof d === "string" ? <div style={{ fontSize: 11, color: v("error-text"), maxWidth: 160 }}>{d}</div> : <MiniRack doc={d} />}
                                   <div style={{ fontSize: 12, marginTop: 4, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                                   {typeof d === "object" && <div style={{ fontSize: 10, opacity: 0.6 }}>{d.devices.length} devices</div>}
                                 </div>
@@ -241,7 +242,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                           {canAddCurrent && <button style={small} onClick={() => addCurrent(s)} title={current.label}>{store.web && current.id == null ? "Save the open rack here" : "Add the open rack"}</button>}
                         </div>
                         {picker && picker.siteId === s.id && (
-                          <div style={{ marginTop: 8, borderTop: "1px solid #2c2f35", paddingTop: 6 }}>
+                          <div style={{ marginTop: 8, borderTop: `1px solid ${v("border-subtle")}`, paddingTop: 6 }}>
                             <div style={{ fontSize: 12, marginBottom: 4 }}>Racks that are in no site yet:</div>
                             {picker.items === null && <div style={{ fontSize: 12, opacity: 0.7 }}>Loading...</div>}
                             {picker.items && !picker.items.length && <div style={{ fontSize: 12, opacity: 0.7 }}>None. Every saved rack is already in a site.</div>}

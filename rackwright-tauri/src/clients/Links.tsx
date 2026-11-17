@@ -1,11 +1,12 @@
 // Site-to-site links of a client: a diagram, a table and an add/edit form.
+import { v } from "../theme";
 import { useMemo, useState } from "react";
 import type { Doc } from "../types";
 import type { ClientItem, LinkBody, LinkEnd, LinkItem, RackItem, SiteItem, ClientStore } from "./store";
 import { LINK_KINDS, layoutSites, linkColor, linkLabel } from "./util";
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
 const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const W = 1000, H = 560, BW = 210, BH = 76, CW = 190, CH = 70;
@@ -105,7 +106,7 @@ export default function Links({ client, docs, store, onChanged }: {
   }, [links, lay]);
 
   const th = { textAlign: "left", padding: "4px 6px", opacity: 0.7, whiteSpace: "nowrap" } as const;
-  const td = { padding: "4px 6px", borderTop: "1px solid #24272c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 } as const;
+  const td = { padding: "4px 6px", borderTop: `1px solid ${v("row-divider")}`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 } as const;
   const kinds = [...new Set(links.map((l) => l.kind))];
 
   if (!client.sites.length) return <div style={{ opacity: 0.7 }}>Add at least one site on the Sites tab first. Then you can show how the sites are connected.</div>;
@@ -124,13 +125,13 @@ export default function Links({ client, docs, store, onChanged }: {
 
   return (
     <div>
-      {err && <div style={{ background: "#3a1d1d", color: "#ffb4ab", padding: "6px 10px", marginBottom: 8, borderRadius: 4 }}>{err}</div>}
+      {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 10px", marginBottom: 8, borderRadius: 4 }}>{err}</div>}
       <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
         <span style={{ fontSize: 12, opacity: 0.75, flex: 1 }}>{links.length ? "Click a line or a row to edit it." : "No links yet. Add the WAN links between this client's sites."}</span>
         <button style={{ ...btn, marginRight: 0 }} onClick={startNew} disabled={busy}>Add link</button>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 1100, height: "auto", background: "#14161a", border: "1px solid #2c2f35", borderRadius: 6, display: "block", fontFamily: "system-ui, sans-serif" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 1100, height: "auto", background: v("bg"), border: `1px solid ${v("border-subtle")}`, borderRadius: 6, display: "block", fontFamily: "system-ui, sans-serif" }}>
         {links.map((l) => {
           const g = geo.get(l.id); if (!g) return null;
           const c = linkColor(l.kind), on = sel === l.id;
@@ -139,28 +140,28 @@ export default function Links({ client, docs, store, onChanged }: {
             <g key={l.id} style={{ cursor: "pointer" }} onClick={() => startEdit(l)}>
               <line x1={g.a.x} y1={g.a.y} x2={g.b.x} y2={g.b.y} stroke="transparent" strokeWidth={16} />
               <line x1={g.a.x} y1={g.a.y} x2={g.b.x} y2={g.b.y} stroke={c} strokeWidth={on ? 4.5 : 2.5} strokeDasharray={l.kind === "VPN" ? "8 5" : undefined} />
-              <rect x={g.m.x - lw / 2} y={g.m.y - 11} width={lw} height={22} rx={11} fill="#1b1d21" stroke={c} strokeWidth={on ? 2 : 1} />
-              <text x={g.m.x} y={g.m.y + 4} textAnchor="middle" fontSize={12} fill="#e6e8eb">{label}</text>
-              {l.a_end && <text x={g.ta.x} y={g.ta.y} textAnchor="middle" fontSize={11} fill="#b6bcc4" stroke="#14161a" strokeWidth={3} paintOrder="stroke">{clip(l.a_end.name, 18)}</text>}
-              {l.b_end && <text x={g.tb.x} y={g.tb.y} textAnchor="middle" fontSize={11} fill="#b6bcc4" stroke="#14161a" strokeWidth={3} paintOrder="stroke">{clip(l.b_end.name, 18)}</text>}
+              <rect x={g.m.x - lw / 2} y={g.m.y - 11} width={lw} height={22} rx={11} fill={v("panel")} stroke={c} strokeWidth={on ? 2 : 1} />
+              <text x={g.m.x} y={g.m.y + 4} textAnchor="middle" fontSize={12} fill={v("text")}>{label}</text>
+              {l.a_end && <text x={g.ta.x} y={g.ta.y} textAnchor="middle" fontSize={11} fill={v("link-end-text")} stroke={v("bg")} strokeWidth={3} paintOrder="stroke">{clip(l.a_end.name, 18)}</text>}
+              {l.b_end && <text x={g.tb.x} y={g.tb.y} textAnchor="middle" fontSize={11} fill={v("link-end-text")} stroke={v("bg")} strokeWidth={3} paintOrder="stroke">{clip(l.b_end.name, 18)}</text>}
               <title>{`${siteName(l.site_a)} to ${siteName(l.site_b)}: ${label}${l.provider ? `, ${l.provider}` : ""}${l.circuit ? `, circuit ${l.circuit}` : ""}`}</title>
             </g>
           );
         })}
         {lay.internet && (
           <g>
-            <path d={cloud(lay.internet.x, lay.internet.y)} fill="#202a38" stroke="#5b8bd0" strokeWidth={1.5} />
-            <text x={lay.internet.x} y={lay.internet.y + 5} textAnchor="middle" fontSize={14} fill="#e6e8eb">Internet</text>
+            <path d={cloud(lay.internet.x, lay.internet.y)} fill={v("cloud-fill")} stroke={v("accent-border")} strokeWidth={1.5} />
+            <text x={lay.internet.x} y={lay.internet.y + 5} textAnchor="middle" fontSize={14} fill={v("text")}>Internet</text>
           </g>
         )}
         {client.sites.map((s) => {
           const p = lay.sites[s.id]; if (!p) return null;
           return (
             <g key={s.id}>
-              <rect x={p.x - BW / 2} y={p.y - BH / 2} width={BW} height={BH} rx={10} fill="#202328" stroke="#4a4f57" strokeWidth={1.5} />
-              <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize={14} fontWeight={600} fill="#e6e8eb">{clip(s.name, 24)}</text>
-              {s.address && <text x={p.x} y={p.y + 8} textAnchor="middle" fontSize={11} fill="#9aa0a8">{clip(s.address, 32)}</text>}
-              <text x={p.x} y={p.y + 25} textAnchor="middle" fontSize={11} fill="#7d838c">{counts(s)}</text>
+              <rect x={p.x - BW / 2} y={p.y - BH / 2} width={BW} height={BH} rx={10} fill={v("card")} stroke={v("diagram-edge")} strokeWidth={1.5} />
+              <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize={14} fontWeight={600} fill={v("text")}>{clip(s.name, 24)}</text>
+              {s.address && <text x={p.x} y={p.y + 8} textAnchor="middle" fontSize={11} fill={v("text-muted-alt")}>{clip(s.address, 32)}</text>}
+              <text x={p.x} y={p.y + 25} textAnchor="middle" fontSize={11} fill={v("diagram-subtext")}>{counts(s)}</text>
             </g>
           );
         })}
@@ -172,7 +173,7 @@ export default function Links({ client, docs, store, onChanged }: {
       )}
 
       {form && (
-        <div style={{ border: "1px solid #3a3d42", borderRadius: 6, padding: 10, margin: "12px 0", maxWidth: 640, background: "#202328" }}>
+        <div style={{ border: `1px solid ${v("border")}`, borderRadius: 6, padding: 10, margin: "12px 0", maxWidth: 640, background: v("card") }}>
           <b>{form.id == null ? "New link" : "Edit link"}</b>
           <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 6, marginTop: 8, alignItems: "center" }}>
             <span>Site A</span>
@@ -198,7 +199,7 @@ export default function Links({ client, docs, store, onChanged }: {
           <div style={{ marginTop: 8 }}>
             <button style={btn} onClick={save} disabled={busy}>Save link</button>
             <button style={btn} onClick={() => { setForm(null); setSel(null); }}>Cancel</button>
-            {form.id != null && <button style={{ ...btn, color: "#f85149", marginRight: 0 }} onClick={() => { const l = links.find((x) => x.id === form.id); if (l) remove(l); }}>Delete</button>}
+            {form.id != null && <button style={{ ...btn, color: v("danger"), marginRight: 0 }} onClick={() => { const l = links.find((x) => x.id === form.id); if (l) remove(l); }}>Delete</button>}
           </div>
         </div>
       )}
@@ -208,7 +209,7 @@ export default function Links({ client, docs, store, onChanged }: {
           <thead><tr>{["Site A", "Device", "Site B / Internet", "Device", "Kind", "Provider", "Circuit ID", "Bandwidth"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
           <tbody>
             {links.map((l) => (
-              <tr key={l.id} onClick={() => startEdit(l)} style={{ cursor: "pointer", background: sel === l.id ? "#2a3a52" : undefined }}>
+              <tr key={l.id} onClick={() => startEdit(l)} style={{ cursor: "pointer", background: sel === l.id ? v("accent-soft") : undefined }}>
                 <td style={td}>{siteName(l.site_a)}</td><td style={td}>{l.a_end?.name || ""}</td>
                 <td style={td}>{siteName(l.site_b)}</td><td style={td}>{l.b_end?.name || ""}</td>
                 <td style={{ ...td, color: linkColor(l.kind) }}>{l.kind}</td><td style={td}>{l.provider}</td><td style={td}>{l.circuit}</td><td style={td}>{l.bandwidth}</td>

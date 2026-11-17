@@ -6,10 +6,10 @@ export const KIND_LABEL: Record<EpKind, [string, string]> = {
   printer: ["printer", "printers"], vm: ["VM", "VMs"], other: ["other", "others"],
 };
 export const KIND_COLOR: Record<EpKind, string> = {
-  pc: "#4f8fdf", phone: "#3fb68b", iot: "#d9a441", printer: "#b07cd8", vm: "#5fc3d4", other: "#8b93a0",
+  pc: "#4f8fdf", phone: "#3fb68b", iot: "#d9a441", printer: "#b07cd8", vm: "#5fc3d4", other: "#8b93a0", // theme-ok
 };
-export const INFRA_COLOR = "#e0735c";
-export const EMPTY_COLOR = "#2a2d33";
+export const INFRA_COLOR = "#e0735c"; // theme-ok
+export const EMPTY_COLOR = "#2a2d33"; // theme-ok
 
 /** Kind from an explicit field, else guessed from the type / model text (older imports have no kind). */
 export function kindOf(ep: { kind?: string; type?: string; model?: string; name?: string }): EpKind {

@@ -133,15 +133,15 @@ function apTemplate(): Tpl {
   return t;
 }
 function ipmiTemplate(): Tpl {
-  return { name: "Management controller (iDRAC / iLO)", type: "Management", u_size: 1, half: true, color: "#5b4b7a", rows: 1, model: "", ports: mkPorts(["Mgmt"], "Mgmt") };
+  return { name: "Management controller (iDRAC / iLO)", type: "Management", u_size: 1, half: true, color: "#5b4b7a", rows: 1, model: "", ports: mkPorts(["Mgmt"], "Mgmt") }; // theme-ok
 }
 export function groupTemplate(n: number): Tpl {
   const rows = Math.max(2, Math.min(12, Math.ceil(n / 12)));
-  return { name: "Endpoints", type: "Endpoints", u_size: Math.max(1, Math.ceil((12 * rows + 4) / 26)), half: false, color: "#44566a", rows, model: "", ports: [] };
+  return { name: "Endpoints", type: "Endpoints", u_size: Math.max(1, Math.ceil((12 * rows + 4) / 26)), half: false, color: "#44566a", rows, model: "", ports: [] }; // theme-ok
 }
 
 export function vmTemplate(): Tpl {
-  return { name: "Virtual machines", type: "Virtual machines", u_size: 1, half: false, color: "#4b3f72", rows: 1, model: "", ports: [] };
+  return { name: "Virtual machines", type: "Virtual machines", u_size: 1, half: false, color: "#4b3f72", rows: 1, model: "", ports: [] }; // theme-ok
 }
 
 /** Desktop-size gear: a desktop faceplate, or half a rack wide. */

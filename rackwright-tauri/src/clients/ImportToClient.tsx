@@ -1,4 +1,5 @@
 // Import an Auvik export straight into a client: one rack per site, devices split by network if wanted.
+import { v } from "../theme";
 import { useState } from "react";
 import * as A from "../api";
 import type { Doc } from "../types";
@@ -6,8 +7,8 @@ import { RACK_MODELS, modelById, specOf } from "../racks";
 import type { ParsedAuvik } from "../auvik/parse";
 import { ClientItem, clientStore } from "./store";
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "3px 5px", fontSize: 12 } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "3px 5px", fontSize: 12 } as const;
 const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const MAIN = "main";
 const NEW_MAIN = "main:new";
@@ -115,14 +116,14 @@ export default function ImportToClient({ client, onDone, onClose }: { client: Cl
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
       onKeyDown={(e) => e.key === "Escape" && !busy && onClose()}>
-      <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 720, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: "1px solid #3a3d42", color: "#e6e8eb", fontSize: 12 }}>
+      <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 720, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 12 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>Import Auvik into {client.name}</b>
           <button style={{ ...btn, marginRight: 0, padding: "1px 8px" }} onClick={onClose} disabled={busy}>x</button>
         </div>
-        {err && <div style={{ color: "#f85149", marginBottom: 8 }}>{err}</div>}
+        {err && <div style={{ color: v("danger"), marginBottom: 8 }}>{err}</div>}
         {!parsed && (
           <div style={{ padding: "10px 0" }}>
             <div style={{ marginBottom: 8 }}>Choose the device export from Auvik (.xlsx). The file stays on this computer.</div>
@@ -149,9 +150,9 @@ export default function ImportToClient({ client, onDone, onClose }: { client: Cl
                 <button style={{ ...btn, marginLeft: 5 }} onClick={addNewSite}>Add site</button>
               </div>
               {!nets.length && <div style={{ opacity: 0.7 }}>This export lists no networks.</div>}
-              <div style={{ maxHeight: 260, overflow: "auto", border: "1px solid #2c2f35", borderRadius: 4 }}>
+              <div style={{ maxHeight: 260, overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4 }}>
                 {nets.map((n) => (
-                  <div key={n.name} style={{ display: "flex", gap: 8, padding: "2px 6px", alignItems: "center", borderTop: "1px solid #22252b" }}>
+                  <div key={n.name} style={{ display: "flex", gap: 8, padding: "2px 6px", alignItems: "center", borderTop: `1px solid ${v("border-faint")}` }}>
                     <span style={{ flex: 1 }}>{n.name}</span>
                     <span style={{ opacity: 0.65 }}>{n.devices} device{n.devices === 1 ? "" : "s"}</span>
                     <select style={{ ...inp, maxWidth: 200 }} value={assign[n.name] ?? MAIN} onChange={(e) => setAssign((a) => ({ ...a, [n.name]: e.target.value }))}>{siteOptions(true)}</select>

@@ -1,3 +1,4 @@
+import { v } from "../theme";
 import { useMemo, useState } from "react";
 import { Doc } from "../types";
 import { GENERIC_MAX_U, GENERIC_MIN_U, RACK_MODELS, modelById, specOf } from "../racks";
@@ -7,8 +8,8 @@ import { Mode, Mount, PlanItem, hostCtxOf, hostsOf, oobmHostsOf, resolvePlan, re
 import type { ParsedAuvik } from "./parse";
 import { StatusChip, UnplacedDialog } from "./Panels";
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "3px 5px" } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "3px 5px" } as const;
 const MODES: [Mode, string][] = [["rack", "Rack"], ["off", "Off-rack"], ["endpoint", "Endpoint"], ["phone", "Phone"], ["iot", "IoT"], ["vm", "Virtual machine"], ["skip", "Skip"]];
 const TYPES = ["Access Point", "Controller", "Firewall", "Generic Device", "Hypervisor", "Intelligent Platform Management Interface", "IP Phone", "Layer 3 Switch", "Printer",
   "Router", "Server", "Storage", "Switch", "Telecommunications Device", "UPS", "PDU", "Virtual Machine", "Workstation", "Unknown"];
@@ -73,9 +74,9 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
       onKeyDown={(e) => e.key === "Escape" && !showUnplaced && onClose()}>
-      <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 1100, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: "1px solid #3a3d42", color: "#e6e8eb", fontSize: 12 }}>
+      <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 1100, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 12 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>Import Auvik</b>
           <button style={{ ...btn, marginRight: 0, padding: "1px 8px" }} onClick={onClose}>x</button>
@@ -85,7 +86,7 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
             <div style={{ marginBottom: 8 }}>Choose the device export from Auvik (.xlsx). The file stays on this computer.</div>
             <input type="file" accept=".xlsx" disabled={busy} onChange={(e) => load(e.target.files?.[0])} />
             {busy && <span style={{ marginLeft: 8 }}>Reading...</span>}
-            {err && <div style={{ color: "#f85149", marginTop: 8 }}>{err}</div>}
+            {err && <div style={{ color: v("danger"), marginTop: 8 }}>{err}</div>}
           </div>
         )}
         {parsed && plan && <>
@@ -94,7 +95,7 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
           </div>
           {plan.warnings.slice(0, 3).map((w, i) => <div key={i} style={{ opacity: 0.7 }}>Note: {w}</div>)}
           {!review && missing.length > 0 && (
-            <div style={{ background: "#3a2d12", border: "1px solid #d29922", borderRadius: 4, padding: "4px 8px", margin: "6px 0" }}>
+            <div style={{ background: v("warn-bg"), border: `1px solid ${v("warn")}`, borderRadius: 4, padding: "4px 8px", margin: "6px 0" }}>
               Missing from this export (kept in the rack, not deleted): {missing.map((d) => d.name).join(", ")}
             </div>
           )}
@@ -109,7 +110,7 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
                 <select style={{ ...inp, maxWidth: 260 }} value={modelId} onChange={(e) => { setModelId(e.target.value); const m = modelById(e.target.value); if (m?.generic) setGu(String(m.u)); }}>
                   {RACK_MODELS.map((m) => <option key={m.id} value={m.id}>{m.generic ? m.name : `${m.name} (${m.u}U)`}</option>)}
                 </select></label>
-              {model?.generic && <label>U: <input type="number" style={{ ...inp, width: 56, borderColor: guOk ? "#3a3d42" : "#f85149" }} value={gu} onChange={(e) => setGu(e.target.value)} /></label>}
+              {model?.generic && <label>U: <input type="number" style={{ ...inp, width: 56, borderColor: guOk ? v("border") : v("danger") }} value={gu} onChange={(e) => setGu(e.target.value)} /></label>}
             </>}
             <span>{plan.groups.length} endpoint group(s), {plan.vmBoxes.length} VM box(es), {plan.cables.length} cable(s)</span>
             <button style={btn} onClick={() => setShowUnplaced(true)}>Unplaced endpoints ({plan.unplaced.length})</button>
@@ -118,19 +119,19 @@ export default function ImportAuvik({ doc, rackId, onApply, onClose }: {
           {diff && (
             <div style={{ margin: "4px 0" }}>
               {(["devices", "changes"] as const).map((k) => (
-                <button key={k} style={{ ...btn, background: tab === k ? "#3a3d42" : "#2a2d33" }} onClick={() => setTab(k)}>{k === "devices" ? "Devices" : `Changes (${tickedCount} of ${diff.changes.length} ticked)`}</button>
+                <button key={k} style={{ ...btn, background: tab === k ? v("border") : v("control") }} onClick={() => setTab(k)}>{k === "devices" ? "Devices" : `Changes (${tickedCount} of ${diff.changes.length} ticked)`}</button>
               ))}
             </div>
           )}
           {diff && tab === "changes" && <ChangesList changes={diff.changes} isOn={isOn} setOn={(ids, v) => setOvr((o) => { const n = { ...o }; for (const id of ids) n[id] = v; return n; })} />}
-          <div style={{ overflow: "auto", border: "1px solid #2c2f35", borderRadius: 4, flex: 1, minHeight: 200, display: diff && tab === "changes" ? "none" : undefined }}>
+          <div style={{ overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4, flex: 1, minHeight: 200, display: diff && tab === "changes" ? "none" : undefined }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ position: "sticky", top: 0, background: "#22252b" }}>
+              <thead style={{ position: "sticky", top: 0, background: v("border-faint") }}>
                 <tr style={{ textAlign: "left" }}><th style={{ padding: 4 }}>Include as</th><th>Name</th><th>Type</th><th>Make &amp; model</th><th>Matched template</th><th>Host / mount</th><th>IP</th><th>Status</th><th>Connected to</th></tr>
               </thead>
               <tbody>
                 {items.map((i) => (
-                  <tr key={i.key} style={{ borderTop: "1px solid #22252b", opacity: i.mode === "skip" ? 0.55 : 1 }}>
+                  <tr key={i.key} style={{ borderTop: `1px solid ${v("border-faint")}`, opacity: i.mode === "skip" ? 0.55 : 1 }}>
                     <td style={{ padding: "2px 4px" }}>
                       <select style={inp} value={i.mode} onChange={(e) => setMode(i.key, e.target.value as Mode)}>
                         {MODES.map(([m, l]) => <option key={m} value={m}>{l}</option>)}
@@ -196,13 +197,13 @@ const SECTIONS: { cats: Cat[]; title: string; hint?: string }[] = [
 function ChangesList({ changes, isOn, setOn }: { changes: Change[]; isOn: (c: Change) => boolean; setOn: (ids: string[], v: boolean) => void }) {
   if (!changes.length) return <div style={{ padding: 12, opacity: 0.8 }}>Nothing changed. The rack already matches this export.</div>;
   return (
-    <div style={{ overflow: "auto", border: "1px solid #2c2f35", borderRadius: 4, flex: 1, minHeight: 200 }}>
+    <div style={{ overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4, flex: 1, minHeight: 200 }}>
       {SECTIONS.map((sec) => {
         const list = changes.filter((c) => sec.cats.includes(c.cat));
         if (!list.length) return null;
         const ids = list.map((c) => c.id);
         return (
-          <div key={sec.title} style={{ padding: "6px 8px", borderBottom: "1px solid #22252b" }}>
+          <div key={sec.title} style={{ padding: "6px 8px", borderBottom: `1px solid ${v("border-faint")}` }}>
             <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
               <b>{sec.title} ({list.length})</b>
               <span style={{ opacity: 0.65, flex: 1 }}>{sec.hint}</span>
@@ -213,8 +214,8 @@ function ChangesList({ changes, isOn, setOn }: { changes: Change[]; isOn: (c: Ch
               <label key={c.id} style={{ display: "flex", gap: 8, padding: "2px 0 2px 6px", alignItems: "baseline", opacity: c.locked && !isOn(c) ? 0.6 : 1 }}>
                 <input type="checkbox" checked={isOn(c)} onChange={(e) => setOn([c.id], e.target.checked)} />
                 <span><b>{c.title}</b>{c.detail ? <span style={{ opacity: 0.7 }}> {c.detail}</span> : null}
-                  {c.from !== undefined || c.to !== undefined ? <span>: <span style={{ opacity: 0.7 }}>{c.from || "(empty)"}</span> {"->"} <span style={{ color: c.locked && !isOn(c) ? "#8b9097" : undefined }}>{c.to}</span></span> : null}
-                  {c.locked && <span style={{ color: "#d29922" }}> kept (you edited this)</span>}
+                  {c.from !== undefined || c.to !== undefined ? <span>: <span style={{ opacity: 0.7 }}>{c.from || "(empty)"}</span> {"->"} <span style={{ color: c.locked && !isOn(c) ? v("text-dim") : undefined }}>{c.to}</span></span> : null}
+                  {c.locked && <span style={{ color: v("warn") }}> kept (you edited this)</span>}
                 </span>
               </label>
             ))}

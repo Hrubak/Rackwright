@@ -1,12 +1,13 @@
 // Editable member list for the selected "Endpoints on ..." or "Virtual machines" device.
+import { v } from "../theme";
 import { useEffect, useRef, useState } from "react";
 import type { Device, Doc } from "../types";
 import { EpField, Endpoint, addMember, freePorts, groupSwitch, isGroup, isVmBox, memberPort, moveMember, removeMember, setMember } from "../endpointEdit";
 import { isDown } from "./Panels";
 
 type Edit = (fn: (d: Doc) => string | void, key?: string) => boolean;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "2px 4px", width: "100%", boxSizing: "border-box", fontSize: 11 } as const;
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 11 } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "2px 4px", width: "100%", boxSizing: "border-box", fontSize: 11 } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 11 } as const;
 const KINDS: [string, string][] = [["pc", "PC"], ["phone", "Phone"], ["iot", "IoT"], ["printer", "Printer"], ["vm", "VM"], ["other", "Other"]];
 
 function Lbl({ t, locked, children }: { t: string; locked?: boolean; children: React.ReactNode }) {
@@ -33,14 +34,14 @@ function Member({ dev, doc, i, e, edit, others }: { dev: Device; doc: Doc; i: nu
   const tsw = target && isGroup(target) ? groupSwitch(doc, target) : null;
   const text = (k: EpField, t: string) => <Lbl t={t} locked={lk(k)}><input style={inp} value={(e as any)[k] ?? ""} onChange={(ev) => set(k, ev.target.value)} /></Lbl>;
   return (
-    <div style={{ padding: "4px 2px 6px 8px", borderLeft: "2px solid #3a3d42", marginBottom: 4 }}>
+    <div style={{ padding: "4px 2px 6px 8px", borderLeft: `2px solid ${v("border")}`, marginBottom: 4 }}>
       {text("name", "Name")}
       <Lbl t="Kind" locked={lk("kind")}>
         <select style={inp} value={e.kind ?? "other"} onChange={(ev) => set("kind", ev.target.value)}>{KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
       </Lbl>
       {text("type", "Type")}{text("model", "Model")}{text("ip", "IP")}{text("mac", "MAC")}
       {!vm && text("port", "Switch port")}
-      <div style={{ opacity: 0.7, margin: "2px 0" }}>{e.manual ? "Added by hand. " : ""}{e.status && <span style={{ color: isDown(e.status) ? "#ff7b72" : undefined }}>Status {e.status}</span>}</div>
+      <div style={{ opacity: 0.7, margin: "2px 0" }}>{e.manual ? "Added by hand. " : ""}{e.status && <span style={{ color: isDown(e.status) ? v("danger-text") : undefined }}>Status {e.status}</span>}</div>
       {others.length > 0 && (
         <div style={{ margin: "4px 0" }}>
           <Lbl t="Move to">
@@ -53,7 +54,7 @@ function Member({ dev, doc, i, e, edit, others }: { dev: Device; doc: Doc; i: nu
           {target && <button style={btn} onClick={() => edit((d) => { if (!moveMember(d, dev.id, i, target.id, toPort)) return "!Could not move it"; return `Moved ${e.name} to ${target.name}`; })}>Move</button>}
         </div>
       )}
-      <button style={{ ...btn, color: "#f85149" }} onClick={() => { if (confirm(vm ? `Remove ${e.name}?` : `Remove ${e.name}, its port and its cable?`)) edit((d) => { removeMember(d, dev.id, i); return `Removed ${e.name}`; }); }}>Remove</button>
+      <button style={{ ...btn, color: v("danger") }} onClick={() => { if (confirm(vm ? `Remove ${e.name}?` : `Remove ${e.name}, its port and its cable?`)) edit((d) => { removeMember(d, dev.id, i); return `Removed ${e.name}`; }); }}>Remove</button>
     </div>
   );
 }
@@ -89,8 +90,8 @@ export function EndpointTable({ dev, doc, edit, focusIdx }: { dev: Device; doc: 
       {!vm && <div style={{ opacity: 0.7, margin: "2px 0" }}>{sw ? `On ${sw.name}.` : "Not cabled to a switch yet."}</div>}
       <div style={{ maxHeight: 360, overflow: "auto", marginTop: 3 }}>
         {rows.map((e, i) => (
-          <div key={i} ref={i === focusIdx ? fRef : undefined} style={{ background: i === focusIdx ? "#2a3a52" : undefined }}>
-            <div onClick={() => toggle(i)} style={{ cursor: "pointer", padding: "1px 3px", borderTop: "1px solid #2c2f35", overflowWrap: "anywhere" }}>
+          <div key={i} ref={i === focusIdx ? fRef : undefined} style={{ background: i === focusIdx ? v("accent-soft") : undefined }}>
+            <div onClick={() => toggle(i)} style={{ cursor: "pointer", padding: "1px 3px", borderTop: `1px solid ${v("border-subtle")}`, overflowWrap: "anywhere" }}>
               {open.has(i) ? "▾" : "▸"} {e.name} <span style={{ opacity: 0.6 }}>{e.ip}{!vm && memberPort(dev, i)?.label ? ` (${memberPort(dev, i)!.label.replace(/^.*Ethernet/i, "")})` : ""}</span>
             </div>
             {open.has(i) && <Member dev={dev} doc={doc} i={i} e={e} edit={edit} others={others} />}
@@ -98,7 +99,7 @@ export function EndpointTable({ dev, doc, edit, focusIdx }: { dev: Device; doc: 
         ))}
       </div>
       {adding ? (
-        <div style={{ borderTop: "1px solid #2c2f35", paddingTop: 4, marginTop: 4 }}>
+        <div style={{ borderTop: `1px solid ${v("border-subtle")}`, paddingTop: 4, marginTop: 4 }}>
           <Lbl t="Name"><input style={inp} value={nm} autoFocus onChange={(ev) => setNm(ev.target.value)} /></Lbl>
           {!vm && <Lbl t="Switch port"><PortSelect doc={doc} sw={sw} value={port} onChange={setPort} /></Lbl>}
           <button style={btn} onClick={() => { if (edit((d) => { addMember(d, dev.id, { name: nm.trim() || undefined }, port); return "Endpoint added"; })) { setAdding(false); setOpen((s) => new Set(s).add(rows.length)); } }}>Add</button>{" "}

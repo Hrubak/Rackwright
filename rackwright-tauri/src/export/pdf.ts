@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { createElement } from "react";
 import RackView from "../RackView";
+import { resolveSvgVars } from "../theme";
 import { Doc } from "../types";
 import { CableRow, DeviceRow, ExportData, Face, cableRows, contentBounds, deviceRows, docTitle } from "./data";
 
@@ -37,6 +38,7 @@ async function faceSvg(doc: Doc, data: ExportData, face: Face, host: HTMLElement
     const bg = document.createElementNS(SVG_NS, "rect");
     for (const [k, v] of Object.entries({ x: "0", y: "0", width: String(w), height: String(h), fill: BG })) bg.setAttribute(k, v);
     svg.insertBefore(bg, svg.firstChild);
+    resolveSvgVars(svg);
     fixColors(svg);
     return { svg, w, h };
   } finally {

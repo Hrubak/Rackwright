@@ -96,7 +96,7 @@ export function inventoryCsv(rows: InvRow[]): string {
 
 export const LINK_KINDS = ["VPN", "MPLS", "Fiber", "Internet", "Wireless", "SD-WAN", "Other"] as const;
 export const LINK_COLORS: Record<string, string> = {
-  VPN: "#58a6ff", MPLS: "#d29922", Fiber: "#3fb950", Internet: "#a371f7", Wireless: "#f778ba", "SD-WAN": "#39c5cf", Other: "#8b949e",
+  VPN: "#58a6ff", MPLS: "#d29922", Fiber: "#3fb950", Internet: "#a371f7", Wireless: "#f778ba", "SD-WAN": "#39c5cf", Other: "#8b949e", // theme-ok
 };
 export const linkColor = (kind: string) => LINK_COLORS[kind] ?? LINK_COLORS.Other;
 /** Short text for a link, e.g. "VPN · 500 Mbps". */

@@ -1,12 +1,13 @@
+import { v } from "./theme";
 import { useMemo, useState } from "react";
 import { GENERIC_MAX_U, GENERIC_MIN_U, KINDS, RACK_MODELS, RackKind, RackModel, dimsText, kindLabel } from "./racks";
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
 
 /** Small icon for the picker list: the outline of each rack kind, with its height scaled to U (52U fills the box). */
 export function FramePreview({ kind, u = 42 }: { kind: string; u?: number }) {
-  const W = 38, H = 46, frame = "#9aa1ab", post = "#c3c8cf", slot = "#4a4f58", inside = "#262a31";
+  const W = 38, H = 46, frame = v("icon-frame"), post = v("icon-post"), slot = v("icon-slot"), inside = v("row-hover");
   const h = Math.max(10, Math.round((Math.min(u, 52) / 52) * (H - 4))), w = 26;
   const x = (W - w) / 2, y = H - 2 - h, r = x + w, b = y + h;
   const slots = [];
@@ -74,14 +75,14 @@ export default function RackPicker({ title, okLabel, defaultName, onPick, onCanc
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
       onKeyDown={(e) => {
         if (e.key === "Escape") { e.preventDefault(); onCancel(); }
         else if (e.key === "Enter") { e.preventDefault(); ok(); }
         else if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
         else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
       }}>
-      <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 640, maxWidth: "94vw", maxHeight: "88vh", display: "flex", flexDirection: "column", border: "1px solid #3a3d42", color: "#e6e8eb", fontSize: 13 }}>
+      <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 640, maxWidth: "94vw", maxHeight: "88vh", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 13 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>{title}</b>
           <button style={{ ...btn, marginRight: 0, padding: "1px 8px" }} onClick={onCancel}>x</button>
@@ -93,14 +94,14 @@ export default function RackPicker({ title, okLabel, defaultName, onPick, onCanc
             {KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
           </select>
         </div>
-        <div style={{ overflow: "auto", border: "1px solid #2c2f35", borderRadius: 4, minHeight: 200, flex: 1 }}>
+        <div style={{ overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4, minHeight: 200, flex: 1 }}>
           {list.length === 0 && <div style={{ padding: 12, opacity: 0.7 }}>No racks match. Try a shorter search.</div>}
           {list.map((m) => {
             const on = m.id === chosen?.id;
             return (
               <div key={m.id} onClick={() => { setSelId(m.id); if (m.generic) setGu(String(m.u)); }} onDoubleClick={ok}
                 ref={(el) => { if (el && on) el.scrollIntoView({ block: "nearest" }); }}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 8px", cursor: "pointer", background: on ? "#2a3a52" : "transparent", borderBottom: "1px solid #22252b" }}>
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 8px", cursor: "pointer", background: on ? v("accent-soft") : "transparent", borderBottom: `1px solid ${v("border-faint")}` }}>
                 <FramePreview kind={m.kind} u={m.generic ? (Number(gu) || m.u) : m.u} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div>{m.name}</div>
@@ -117,14 +118,14 @@ export default function RackPicker({ title, okLabel, defaultName, onPick, onCanc
             <input style={{ ...inp, width: "100%", boxSizing: "border-box" }} value={name} onChange={(e) => setName(e.target.value)} /></label>
           {chosen?.generic && (
             <label style={{ fontSize: 12 }}>Height (U)<br />
-              <input type="number" min={GENERIC_MIN_U} max={GENERIC_MAX_U} style={{ ...inp, width: 70, borderColor: guOk ? "#3a3d42" : "#f85149" }} value={gu} onChange={(e) => setGu(e.target.value)} /></label>
+              <input type="number" min={GENERIC_MIN_U} max={GENERIC_MAX_U} style={{ ...inp, width: 70, borderColor: guOk ? v("border") : v("danger") }} value={gu} onChange={(e) => setGu(e.target.value)} /></label>
           )}
           <span>
             <button style={btn} onClick={onCancel}>Cancel</button>
             <button style={{ ...btn, marginRight: 0, opacity: canOk ? 1 : 0.5 }} disabled={!canOk} onClick={ok}>{okLabel}</button>
           </span>
         </div>
-        {chosen?.generic && !guOk && <div style={{ fontSize: 12, color: "#f85149", marginTop: 4 }}>Pick a height from {GENERIC_MIN_U} to {GENERIC_MAX_U}U.</div>}
+        {chosen?.generic && !guOk && <div style={{ fontSize: 12, color: v("danger"), marginTop: 4 }}>Pick a height from {GENERIC_MIN_U} to {GENERIC_MAX_U}U.</div>}
       </div>
     </div>
   );

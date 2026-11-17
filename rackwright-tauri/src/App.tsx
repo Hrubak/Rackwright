@@ -1,3 +1,6 @@
+import { v } from "./theme";
+import { About } from "./About";
+import { Logo } from "./Logo";
 import { CableOverlay, CableColorMode } from "./Cables";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,8 +36,8 @@ import {
 
 const empty: Doc = { v: 1, nid: 1, racks: [], devices: [], cables: [] };
 const none: RouteResult = { routes: [], hints: [] };
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px" } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
 
 const PROTOS = CATALOG.map((t) => protoOf(t));
 const TYPES = Array.from(new Set(CATALOG.map((t) => t.type))).sort();
@@ -47,6 +50,7 @@ interface Cur { id: number; name: string; version: number }
 
 export default function App({ web }: { web?: WebProps } = {}) {
   const [doc, setDoc] = useState<Doc>(empty);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [undo, setUndo] = useState<Doc[]>([]);
   const [redo, setRedo] = useState<Doc[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -428,7 +432,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     edit((d) => { Object.assign(d.cables.find((x) => x.id === c.id)!, patch); }, `cab${c.id}`);
   const lockIcon = (dv: Device, k: string) => dv.locked?.includes(k) ? (
     <button title="Next Auvik import may update this field" onClick={(e) => { e.preventDefault(); edit((d) => { const x = d.devices.find((y) => y.id === dv.id)!; x.locked = (x.locked ?? []).filter((f) => f !== k); if (!x.locked.length) delete x.locked; }); }}
-      style={{ background: "none", border: "none", cursor: "pointer", padding: "0 3px", fontSize: 11, color: "#d29922" }}>{"\u{1F512}"}</button>
+      style={{ background: "none", border: "none", cursor: "pointer", padding: "0 3px", fontSize: 11, color: v("warn") }}>{"\u{1F512}"}</button>
   ) : null;
   const field = (label: string, val: string | number, set: (v: string) => void, w = 200, lock?: ReactNode) => (
     <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>{label}{lock}<br />
@@ -451,8 +455,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
   })();
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: "#e6e8eb", fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
-      <div style={{ minHeight: 42, padding: "6px 10px", background: "#1b1d21", borderBottom: "1px solid #2c2f35", boxSizing: "border-box", display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 4, whiteSpace: "nowrap" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: v("text"), fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
+      <div style={{ minHeight: 42, padding: "6px 10px", background: v("panel"), borderBottom: `1px solid ${v("border-subtle")}`, boxSizing: "border-box", display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 4, whiteSpace: "nowrap" }}>
+        <button style={{ background: "none", border: "none", padding: "0 8px 0 0", cursor: "pointer", display: "flex" }} onClick={() => setAboutOpen(true)} title="About Rackwright"><Logo size={24} /></button>
         <button style={btn} onClick={doNew}>New</button>
         <button style={btn} onClick={() => setClientsOpen(true)} title="Clients, their sites and the racks in each">Clients</button>
         <button style={btn} onClick={doOpen}>Open</button>
@@ -473,7 +478,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <span style={{ display: "inline-flex", marginRight: 8 }}>
           {VIEWS.map(([id, label], i) => (
             <button key={id} onClick={() => setView(id)} title={`${label} view`}
-              style={{ ...btn, marginRight: 0, borderRadius: i === 0 ? "4px 0 0 4px" : i === VIEWS.length - 1 ? "0 4px 4px 0" : 0, marginLeft: i ? -1 : 0, background: view === id ? "#2a3a52" : btn.background, borderColor: view === id ? "#5b8bd0" : "#3a3d42" }}>{label}</button>
+              style={{ ...btn, marginRight: 0, borderRadius: i === 0 ? "4px 0 0 4px" : i === VIEWS.length - 1 ? "0 4px 4px 0" : 0, marginLeft: i ? -1 : 0, background: view === id ? v("accent-soft") : btn.background, borderColor: view === id ? v("accent-border") : v("border") }}>{label}</button>
           ))}
         </span>
         {view === "rack" && <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>}
@@ -483,7 +488,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         {IS_WEB && webGuarded && <UserBar web={webGuarded} />}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-        <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: "#1b1d21", borderRight: "1px solid #2c2f35", flexDirection: "column", fontSize: 12 }}>
+        <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: v("panel"), borderRight: `1px solid ${v("border-subtle")}`, flexDirection: "column", fontSize: 12 }}>
           <input style={{ ...inp, margin: "6px 6px 3px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
           <div style={{ display: "flex", gap: 6, margin: "0 6px 4px", alignItems: "center" }}>
             <select style={{ ...inp, flex: 1, minWidth: 0 }} value={typeF} onChange={(e) => setTypeF(e.target.value)}>
@@ -499,11 +504,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
               return (
                 <div className="cat" key={i} onMouseDown={(e) => startPdrag(e, i)} onDoubleClick={() => addFromCatalog(i)}
                   title="Drag into the rack, or double-click to add"
-                  style={{ padding: "4px 8px", borderBottom: "1px solid #24272c", cursor: "grab", background: palSel === i ? "#2a3a52" : undefined, opacity: st === "full" ? 0.5 : 1 }}>
+                  style={{ padding: "4px 8px", borderBottom: `1px solid ${v("panel-2")}`, cursor: "grab", background: palSel === i ? v("accent-soft") : undefined, opacity: st === "full" ? 0.5 : 1 }}>
                   <span style={{ opacity: 0.6, marginRight: 6 }}>{icon(i)}</span>{c.name}{" "}
                   <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}{widthLabel(c)}</span>
-                  {st === "off" && <span style={{ color: "#d29922" }}> off-rack</span>}
-                  {st === "full" && <span style={{ color: "#f85149" }}> no room</span>}
+                  {st === "off" && <span style={{ color: v("warn") }}> off-rack</span>}
+                  {st === "full" && <span style={{ color: v("danger") }}> no room</span>}
                 </div>
               );
             })}
@@ -526,10 +531,10 @@ export default function App({ web }: { web?: WebProps } = {}) {
           </div>
           {toast && (
             <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", padding: "6px 14px", borderRadius: 5, fontSize: 13,
-              background: toast.bad ? "#5a1d1d" : "#1d3a2a", border: `1px solid ${toast.bad ? "#f85149" : "#2ea043"}`, pointerEvents: "none" }}>{toast.text}</div>
+              background: toast.bad ? v("danger-bg") : v("ok-bg"), border: `1px solid ${toast.bad ? v("danger") : v("ok")}`, pointerEvents: "none" }}>{toast.text}</div>
           )}
         </div>
-        <div style={{ width: 240, background: "#1b1d21", borderLeft: "1px solid #2c2f35", padding: 8, overflow: "auto" }}>
+        <div style={{ width: 240, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 8, overflow: "auto" }}>
           {!sel && <>
             <b>Overview</b>
             <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.7 }}>
@@ -625,27 +630,28 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <div style={{ fontSize: 12, margin: "6px 0" }}>{endp(selCable.a)}<br />to {endp(selCable.b)}</div>
             {field("Label", selCable.label ?? "", (v) => cab(selCable, { label: v }))}
             <label style={{ fontSize: 12 }}>Colour<br />
-              <input type="color" value={selCable.color || "#1f6feb"} onChange={(e) => cab(selCable, { color: e.target.value })} /></label>
+              <input type="color" value={selCable.color || "#1f6feb"} onChange={(e) => cab(selCable, { color: e.target.value })} /></label> // theme-ok
             <label style={{ fontSize: 12, display: "block", margin: "6px 0" }}>Style<br />
               <select style={inp} value={selCable.style ?? "solid"} onChange={(e) => cab(selCable, { style: e.target.value })}>
                 <option>solid</option><option>dashed</option>
               </select></label>
           </>}
-          {sel && <button style={{ ...btn, marginTop: 10, color: "#f85149" }} onClick={del}>Delete</button>}
+          {sel && <button style={{ ...btn, marginTop: 10, color: v("danger") }} onClick={del}>Delete</button>}
         </div>
       </div>
       {routes.hints.length > 0 && (
-        <div style={{ maxHeight: 70, overflow: "auto", background: "#1b1d21", fontSize: 12, padding: 6, borderTop: "1px solid #2c2f35" }}>
+        <div style={{ maxHeight: 70, overflow: "auto", background: v("panel"), fontSize: 12, padding: 6, borderTop: `1px solid ${v("border-subtle")}` }}>
           {routes.hints.map((h, i) => <div key={i}>! {h.msg}</div>)}
         </div>
       )}
       {pdrag && pdrag.active && (
-        <div style={{ position: "fixed", left: pdrag.x + 12, top: pdrag.y + 8, pointerEvents: "none", background: "#2a3a52", border: "1px solid #5b8bd0",
+        <div style={{ position: "fixed", left: pdrag.x + 12, top: pdrag.y + 8, pointerEvents: "none", background: v("accent-soft"), border: `1px solid ${v("accent-border")}`,
           borderRadius: 4, padding: "2px 8px", fontSize: 12, zIndex: 50 }}>{icon(pdrag.i)} {CATALOG[pdrag.i].name}</div>
       )}
+      {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
       {offer && (
-        <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120 }}>
-          <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 460, maxWidth: "94vw", border: "1px solid #3a3d42", color: "#e6e8eb", fontSize: 13 }}>
+        <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120 }}>
+          <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 460, maxWidth: "94vw", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 13 }}>
             <b style={{ fontSize: 14 }}>Restore unsaved changes?</b>
             <div style={{ margin: "10px 0 12px" }}>
               Rackwright closed before <b>{draftName(offer)}</b> was saved. The last changes are from {new Date(offer.at).toLocaleString()}
@@ -673,8 +679,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
       {unplacedOpen && <UnplacedDialog items={doc.auvik?.unplaced ?? []} onClose={() => setUnplacedOpen(false)} />}
       {importOpen && (
-        <div style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#1b1d21", padding: 14, borderRadius: 6, width: 520, border: "1px solid #3a3d42" }}>
+        <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 520, border: `1px solid ${v("border")}` }}>
             <div style={{ fontSize: 12, marginBottom: 6, opacity: 0.8 }}>Paste a list, top of rack first, e.g. "Rack1", "- Panel A - (2U)", "- Open - (12U)". Open/Empty/Free leave a gap; add "rear" to mount on the back.</div>
             <textarea style={{ ...inp, width: "100%", height: 260, boxSizing: "border-box" }} value={importText} onChange={(e) => setImportText(e.target.value)} />
             <div style={{ marginTop: 8, fontSize: 12 }}>Rack height (0 = size to list): <input style={{ ...inp, width: 50 }} value={importH} onChange={(e) => setImportH(e.target.value)} />

@@ -25,6 +25,6 @@ export type PortPos = [number, number, number, number]; // id, x, y, size
 
 export const UH = 26, RW = 480, RAIL = 24, HDR = 46, PADB = 10;
 export const PORT_COLORS: Record<string, string> = {
-  RJ45: "#6aa84f", SFP: "#e69138", "SFP+": "#f1c232", QSFP: "#cc4125", "Fiber LC": "#3d85c6",
-  Power: "#555a62", Console: "#7a8fa6", Mgmt: "#8e7cc3", Other: "#888",
+  RJ45: "#6aa84f", SFP: "#e69138", "SFP+": "#f1c232", QSFP: "#cc4125", "Fiber LC": "#3d85c6", // theme-ok
+  Power: "#555a62", Console: "#7a8fa6", Mgmt: "#8e7cc3", Other: "#888", // theme-ok
 };

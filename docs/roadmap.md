@@ -16,4 +16,7 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
   - User profile: name, email, password, personal preferences (theme, default view, units).
   - System settings (admin, web): company name and logo for client-facing output, defaults for new racks, server update, users.
 - **Polished UI.** A clearer top bar and header: group the toolbar into menus (File, Edit, View, Clients, Help), show where you are (Client > Site > Rack), and tidy the side panels.
-- **Themes and styles.** Dark and light themes, plus a presentation style for showing to clients (cleaner colours, larger labels, company branding on exports).
+- **Themes and styles.** Dark, light and "match my computer" themes. Clients see Rackwright through exports, not the live app, so there is no in-app presentation mode.
+- **Client report.** A quarterly-review report for one client, Overview or Detailed, with your own summary and recommendations: a branded PDF, and a Word document built from your uploaded master template. Branding (logo, colours, font, artwork, template) is uploaded by an admin and never committed.
+
+Design: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`. Releases: 3.5.0 groundwork and logo (done), 3.6.0 top bar, 3.7.0 Settings, 3.8.0 light theme, 3.9.0 client report PDF, 3.10.0 Word report.

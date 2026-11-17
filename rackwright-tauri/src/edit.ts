@@ -239,7 +239,7 @@ export function duplicateDevice(doc: Doc, id: number): Device | null {
 
 export function addRack(doc: Doc, name?: string, u = 42, spec?: RackSpec): Rack {
   const x = doc.racks.reduce((m, r) => Math.max(m, r.x + RW + 2 * RAIL + 90), 0);
-  const r: any = { id: nid(doc), name: name || `Rack ${doc.racks.length + 1}`, u, x, y: 0, numbering: "up", color: "#3a3d42", notes: "" };
+  const r: any = { id: nid(doc), name: name || `Rack ${doc.racks.length + 1}`, u, x, y: 0, numbering: "up", color: "#3a3d42", notes: "" }; // theme-ok
   if (spec) applySpec(r, spec);
   doc.racks.push(r);
   return r;
@@ -305,10 +305,10 @@ export function newCable(doc: Doc, a: number, b: number): Cable | string {
   if (a === b) return "Pick two different ports";
   if (doc.cables.some((c) => c.a === a || c.b === a || c.a === b || c.b === b)) return "A port already has a cable";
   const pa = portOf(doc, a)!.p, pb = portOf(doc, b)!.p;
-  const c: any = { id: 0, a, b, color: "#1f6feb", style: "solid", type: "Cat6", length: 3, unit: "ft", label: "", logical: "", notes: "" };
+  const c: any = { id: 0, a, b, color: "#1f6feb", style: "solid", type: "Cat6", length: 3, unit: "ft", label: "", logical: "", notes: "" }; // theme-ok
   if (pa.type === "Power" && pb.type === "Power") {
     if (isOutlet(pa) === isOutlet(pb)) return "Power cords run from an outlet (Out) to an inlet";
-    Object.assign(c, { color: "#2b2b2b", type: "Power", length: 2 });
+    Object.assign(c, { color: "#2b2b2b", type: "Power", length: 2 }); // theme-ok
   }
   c.id = nid(doc);
   doc.cables.push(c);
@@ -392,19 +392,19 @@ export function smartTemplate(name: string, u: number): Tpl {
   const mk = (type: string, color: string, ports: Tpl["ports"]): Tpl => ({ name, type, u_size: u, color, ports, half: false, rows: 0 });
   const hit = catalogMatch(name, u);
   if (hit) return hit;
-  if (/cable\s*(mgmt|manage|mgr)|wire\s*manage|cbl/.test(n)) return mk("Cable manager", "#222428", []);
-  if (/blank|filler/.test(n)) return mk("Blank", "#33363b", []);
-  if (n.includes("fiber")) return mk("Patch panel", "#a8925a", mkPorts("{n}", 12 * u, "Fiber LC"));
-  if (/panel|\bpp\b|^pp-/.test(n)) return mk("Patch panel", "#9aa3ad", mkPorts("{n}", 24 * u, "RJ45"));
-  if (/apc|ups|battery/.test(n)) return mk("UPS", "#222428", [...mkPorts("Out{n}", 6, "Power"), ...mkPorts("Input", 1, "Power", 0)]);
-  if (n.includes("pdu") || n.includes("power strip")) return mk("PDU", "#222428", [...mkPorts("Out{n}", 8, "Power"), ...mkPorts("Input", 1, "Power", 0)]);
-  if (/firewall|\bfw\b|fortigate|palo|sonicwall/.test(n)) return mk("Firewall", "#b24040", [...mkPorts("{n}", 8, "RJ45"), ...mkPorts("SFP+{n}", 2, "SFP+"), ...pwr()]);
-  if (/router|\brtr\b/.test(n)) return mk("Router", "#2f8f8f", [...mkPorts("Gi0/{n}", 4, "RJ45", 0), ...pwr()]);
-  if (/\bnas\b|storage|\bsan\b/.test(n)) return mk("Storage", "#7456a8", [...mkPorts("LAN{n}", 2, "RJ45"), ...mkPorts("PSU{n}", 2, "Power")]);
-  if (/server|\bsrv\b|\bhv\b|esx|host/.test(n)) return mk("Server", "#4b5563", [...mkPorts("NIC{n}", 4, "RJ45"), ...mkPorts("PSU{n}", 2, "Power")]);
-  if (/stk|stack|switch|\bsw\d*\b|\bidf\b|\bmdf\b/.test(n)) return mk("Switch", "#3b6ea8", [...mkPorts("{n}", u >= 2 ? 48 : 24, "RJ45"), ...mkPorts("SFP{n}", 4, "SFP+"), ...pwr()]);
-  if (n.includes("shelf")) return mk("Shelf", "#4b5563", []);
-  return mk("Other", "#4b5563", []);
+  if (/cable\s*(mgmt|manage|mgr)|wire\s*manage|cbl/.test(n)) return mk("Cable manager", "#222428", []); // theme-ok
+  if (/blank|filler/.test(n)) return mk("Blank", "#33363b", []); // theme-ok
+  if (n.includes("fiber")) return mk("Patch panel", "#a8925a", mkPorts("{n}", 12 * u, "Fiber LC")); // theme-ok
+  if (/panel|\bpp\b|^pp-/.test(n)) return mk("Patch panel", "#9aa3ad", mkPorts("{n}", 24 * u, "RJ45")); // theme-ok
+  if (/apc|ups|battery/.test(n)) return mk("UPS", "#222428", [...mkPorts("Out{n}", 6, "Power"), ...mkPorts("Input", 1, "Power", 0)]); // theme-ok
+  if (n.includes("pdu") || n.includes("power strip")) return mk("PDU", "#222428", [...mkPorts("Out{n}", 8, "Power"), ...mkPorts("Input", 1, "Power", 0)]); // theme-ok
+  if (/firewall|\bfw\b|fortigate|palo|sonicwall/.test(n)) return mk("Firewall", "#b24040", [...mkPorts("{n}", 8, "RJ45"), ...mkPorts("SFP+{n}", 2, "SFP+"), ...pwr()]); // theme-ok
+  if (/router|\brtr\b/.test(n)) return mk("Router", "#2f8f8f", [...mkPorts("Gi0/{n}", 4, "RJ45", 0), ...pwr()]); // theme-ok
+  if (/\bnas\b|storage|\bsan\b/.test(n)) return mk("Storage", "#7456a8", [...mkPorts("LAN{n}", 2, "RJ45"), ...mkPorts("PSU{n}", 2, "Power")]); // theme-ok
+  if (/server|\bsrv\b|\bhv\b|esx|host/.test(n)) return mk("Server", "#4b5563", [...mkPorts("NIC{n}", 4, "RJ45"), ...mkPorts("PSU{n}", 2, "Power")]); // theme-ok
+  if (/stk|stack|switch|\bsw\d*\b|\bidf\b|\bmdf\b/.test(n)) return mk("Switch", "#3b6ea8", [...mkPorts("{n}", u >= 2 ? 48 : 24, "RJ45"), ...mkPorts("SFP{n}", 4, "SFP+"), ...pwr()]); // theme-ok
+  if (n.includes("shelf")) return mk("Shelf", "#4b5563", []); // theme-ok
+  return mk("Other", "#4b5563", []); // theme-ok
 }
 
 export function buildFromText(doc: Doc, text: string, height = 0): number {

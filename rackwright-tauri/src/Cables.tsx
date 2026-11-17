@@ -1,4 +1,5 @@
 import React, { memo, useMemo, useState } from "react";
+import { v } from "./theme";
 import { findBundles } from "./bundles";
 import { isOutlet } from "./edit";
 import type { Cable, Device, Doc, Route } from "./types";
@@ -19,9 +20,9 @@ export function cableKind(type?: string): Kind {
   return "other";
 }
 export const TYPE_COLORS: Record<string, string> = {
-  cat5e: "#6fa8f0", cat6: "#2f7be0", cat6a: "#3f5fd6",
-  om3: "#3fd6dc", om4: "#1fb4c6", os2: "#f0e442",
-  dac: "#9aa0a8", power: "#2a2c30", console: "#a8d8f8", other: "#b48ad8",
+  cat5e: "#6fa8f0", cat6: "#2f7be0", cat6a: "#3f5fd6", // theme-ok
+  om3: "#3fd6dc", om4: "#1fb4c6", os2: "#f0e442", // theme-ok
+  dac: "#9aa0a8", power: "#2a2c30", console: "#a8d8f8", other: "#b48ad8", // theme-ok
 };
 export function typeKey(type?: string): string {
   const t = (type || "").toLowerCase().replace(/[\s_-]/g, "");
@@ -39,7 +40,7 @@ const lum = (hex: string) => {
   return (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
 };
 // Faint separation stroke: dark under light cables, light under near-black ones.
-const under = (c: string) => (lum(c) < 0.2 ? "#9aa0aa" : "#000");
+const under = (c: string) => (lum(c) < 0.2 ? v("cable-under-light") : v("cable-shadow"));
 
 // ---- geometry
 export function roundedPath(pts: [number, number][], rmax = 6): string {
@@ -60,43 +61,43 @@ export function roundedPath(pts: [number, number][], rmax = 6): string {
 }
 
 // ---- plugs: drawn at the port, body extends along +y (flipped by dir), about 10 px long
-const HEAD = "#c9ced5", EDGE = "#4a4f57";
+const HEAD = v("plug-head"), EDGE = v("plug-edge");
 function Plug({ kind, x, y, dir, color, outlet }: { kind: Kind; x: number; y: number; dir: number; color: string; outlet: boolean }) {
   const sw = { stroke: EDGE, strokeWidth: 0.6, vectorEffect: "non-scaling-stroke" as const };
   let g: React.ReactNode;
   if (kind === "fiber") {
     g = <>
       {[-1.7, 1.7].map((o) => <g key={o}>
-        <rect x={o - 1.2} y={0} width={2.4} height={2.6} fill="#f4f6f8" {...sw} />
+        <rect x={o - 1.2} y={0} width={2.4} height={2.6} fill={v("plug-tip")} {...sw} />
         <rect x={o - 1.4} y={2.6} width={2.8} height={6.6} rx={1} fill={color} {...sw} />
       </g>)}
-      <rect x={-3.2} y={3.6} width={6.4} height={1.6} rx={0.6} fill="#d8dce1" {...sw} />
+      <rect x={-3.2} y={3.6} width={6.4} height={1.6} rx={0.6} fill={v("plug-latch")} {...sw} />
     </>;
   } else if (kind === "dac") {
     g = <>
-      <rect x={-3} y={0} width={6} height={6} rx={0.8} fill="#b9bfc7" {...sw} />
-      <line x1={-1.6} y1={1.2} x2={-1.6} y2={4.8} stroke="#7b818a" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
-      <line x1={1.6} y1={1.2} x2={1.6} y2={4.8} stroke="#7b818a" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+      <rect x={-3} y={0} width={6} height={6} rx={0.8} fill={v("plug-metal")} {...sw} />
+      <line x1={-1.6} y1={1.2} x2={-1.6} y2={4.8} stroke={v("plug-pin")} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
+      <line x1={1.6} y1={1.2} x2={1.6} y2={4.8} stroke={v("plug-pin")} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
       <rect x={-1.6} y={6} width={3.2} height={4} rx={1} fill={color} {...sw} />
     </>;
   } else if (kind === "power") {
     const c13 = outlet; // outlet end carries the C13 plug, the inlet end a C14 style plug
-    const edge = c13 ? "#7d838c" : "#9aa0a8";
+    const edge = c13 ? v("plug-c13-edge") : v("plug-c14-edge");
     g = <>
-      <path d="M-3.6 0H3.6V3.6L2.2 5.6H-2.2L-3.6 3.6Z" fill={c13 ? "#202226" : "#14151a"} stroke={edge} strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
-      {!c13 && <><rect x={-1.6} y={0.9} width={1} height={2} fill="#b9bfc7" /><rect x={0.6} y={0.9} width={1} height={2} fill="#b9bfc7" /></>}
-      <rect x={-2} y={5.6} width={4} height={4.4} rx={1.2} fill="#2b2d31" stroke={edge} strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
+      <path d="M-3.6 0H3.6V3.6L2.2 5.6H-2.2L-3.6 3.6Z" fill={c13 ? v("plug-c13-body") : v("plug-c14-body")} stroke={edge} strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
+      {!c13 && <><rect x={-1.6} y={0.9} width={1} height={2} fill={v("plug-metal")} /><rect x={0.6} y={0.9} width={1} height={2} fill={v("plug-metal")} /></>}
+      <rect x={-2} y={5.6} width={4} height={4.4} rx={1.2} fill={v("plug-boot")} stroke={edge} strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
     </>;
   } else if (kind === "console") {
     g = <>
       <rect x={-2.8} y={0} width={5.6} height={4.6} rx={0.8} fill={HEAD} {...sw} />
       <rect x={-2.4} y={4.6} width={4.8} height={5.2} rx={1.2} fill={color} {...sw} />
-      <line x1={-2.8} y1={2.2} x2={2.8} y2={2.2} stroke="#7a8fa6" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+      <line x1={-2.8} y1={2.2} x2={2.8} y2={2.2} stroke={v("plug-console")} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
     </>;
   } else { // RJ45
     g = <>
       <rect x={-3} y={0} width={6} height={4.8} rx={0.6} fill={HEAD} {...sw} />
-      <rect x={-1.5} y={-0.7} width={3} height={1.4} rx={0.5} fill="#e4e8ec" {...sw} />
+      <rect x={-1.5} y={-0.7} width={3} height={1.4} rx={0.5} fill={v("plug-white")} {...sw} />
       <path d="M-2.6 4.8H2.6L2 9.8H-2L-2.6 4.8Z" fill={color} stroke={EDGE} strokeWidth={0.6} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </>;
   }
@@ -116,7 +117,7 @@ const CableShape = memo(function CableShape(p: ShapeProps) {
     <g opacity={state === "dim" ? 0.18 : 1} style={{ cursor: "pointer" }}
       onClick={(e) => { e.stopPropagation(); p.onPick(p.id); }}
       onMouseEnter={(e) => p.onEnter(p.id, e)} onMouseMove={p.onMove} onMouseLeave={p.onLeave}>
-      {state === "sel" && <path d={p.d} fill="none" stroke="#ffd33d" strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />}
+      {state === "sel" && <path d={p.d} fill="none" stroke={v("select")} strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />}
       {state === "rel" && <path d={p.d} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={0.28} />}
       <path d={p.d} fill="none" stroke={under(color)} strokeOpacity={0.4} strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={p.dash} />
       <path d={p.d} fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={p.dash} />
@@ -138,10 +139,10 @@ const Harness = memo(function Harness({ routes, faded }: { routes: Route[]; fade
         const rect = b.axis === "v" ? { x: f0, y: b.lo, width: th, height: len } : { x: b.lo, y: f0, width: len, height: th };
         return (
           <g key={i}>
-            <rect {...rect} rx={rx} fill="#cfd6e0" fillOpacity={0.09} stroke="#cfd6e0" strokeOpacity={0.2} strokeWidth={0.8} />
+            <rect {...rect} rx={rx} fill={v("duct-fill")} fillOpacity={0.09} stroke={v("duct-fill")} strokeOpacity={0.2} strokeWidth={0.8} />
             {ties.map((t, k) => b.axis === "v"
-              ? <rect key={k} x={f0 - 1} y={t - 1.2} width={th + 2} height={2.4} rx={1.2} fill="#8d96a3" fillOpacity={0.75} />
-              : <rect key={k} x={t - 1.2} y={f0 - 1} width={2.4} height={th + 2} rx={1.2} fill="#8d96a3" fillOpacity={0.75} />)}
+              ? <rect key={k} x={f0 - 1} y={t - 1.2} width={th + 2} height={2.4} rx={1.2} fill={v("duct-tick")} fillOpacity={0.75} />
+              : <rect key={k} x={t - 1.2} y={f0 - 1} width={2.4} height={th + 2} rx={1.2} fill={v("duct-tick")} fillOpacity={0.75} />)}
           </g>
         );
       })}
@@ -172,14 +173,14 @@ const StubShape = memo(function StubShape({ s, color, state, zoom, onPick, onEnt
       onClick={(e) => { e.stopPropagation(); onPick(s.cable); }}
       onMouseEnter={(e) => onEnter(s.cable, e)} onMouseMove={onMove} onMouseLeave={onLeave}>
       <title>{s.full}</title>
-      {state === "sel" && <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke="#ffd33d" strokeWidth={5} strokeLinecap="round" opacity={0.9} />}
-      <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke="#000" strokeOpacity={0.4} strokeWidth={3.4} strokeLinecap="round" />
+      {state === "sel" && <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={v("select")} strokeWidth={5} strokeLinecap="round" opacity={0.9} />}
+      <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={v("cable-shadow")} strokeOpacity={0.4} strokeWidth={3.4} strokeLinecap="round" />
       <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
-      <circle cx={s.x2} cy={s.y2} r={2.4} fill={color} stroke="#000" strokeOpacity={0.5} strokeWidth={0.6} />
+      <circle cx={s.x2} cy={s.y2} r={2.4} fill={color} stroke={v("cable-shadow")} strokeOpacity={0.5} strokeWidth={0.6} />
       <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth={8} />
       {show && (
         <text transform={`translate(${s.x + 3} ${s.y2 + (down ? 5 : -5)}) rotate(${down ? 90 : -90})`} textAnchor={down ? "start" : "end"}
-          fontSize={8} fill="#d5dae0" stroke="#0b0c0e" strokeWidth={2.2} paintOrder="stroke" style={{ pointerEvents: "none" }}>{s.short}</text>
+          fontSize={8} fill={v("cable-label")} stroke={v("cable-label-halo")} strokeWidth={2.2} paintOrder="stroke" style={{ pointerEvents: "none" }}>{s.short}</text>
       )}
     </g>
   );
@@ -200,7 +201,7 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
     const c = cmap.get(r.cable), n = r.pts.length;
     return {
       id: r.cable, d: roundedPath(r.pts), dash: c?.style === "dashed" ? "6 4" : undefined, kind: cableKind(c?.type),
-      color: colorMode === "type" ? typeColor(c?.type) : c?.color || "#999",
+      color: colorMode === "type" ? typeColor(c?.type) : c?.color || "#999", // theme-ok
       a: r.pts[0], b: r.pts[n - 1], da: r.dir_a, db: r.dir_b,
       oa: !!pinfo.get(c?.a ?? -1)?.outlet, ob: !!pinfo.get(c?.b ?? -1)?.outlet,
       ends: c ? [pinfo.get(c.a)?.dev.id, pinfo.get(c.b)?.dev.id] : [],
@@ -254,17 +255,17 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
       {opts.style === "routed" && shown.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
       {opts.style === "stubs" && stubs.map((s, i) => {
         const sh = shapeById.get(s.cable);
-        return <StubShape key={`${s.cable}:${i}`} s={s} color={sh?.color || "#999"} state={sh ? stateOf(sh) : "normal"} zoom={zoom} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />;
+        return <StubShape key={`${s.cable}:${i}`} s={s} color={sh?.color || "#999"} state={sh ? stateOf(sh) : "normal"} zoom={zoom} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />; // theme-ok
       })}
       {dots.size > 0 && shapes.filter((s) => dots.has(s.id)).map((s) => (
         <g key={"dot" + s.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onPick(s.id); }}>
-          {[s.a, s.b].map((p, k) => <circle key={k} cx={p[0]} cy={p[1]} r={3.4} fill={s.color} stroke="#0b0c0e" strokeWidth={1} />)}
+          {[s.a, s.b].map((p, k) => <circle key={k} cx={p[0]} cy={p[1]} r={3.4} fill={s.color} stroke={v("tip-bg")} strokeWidth={1} />)}
         </g>
       ))}
       {hovC && tip && (
         <g transform={`translate(${hovC.x + 10 / zoom} ${hovC.y + 12 / zoom}) scale(${1 / zoom})`} style={{ pointerEvents: "none" }}>
-          <rect width={Math.max(...tip.map((t) => t.length)) * 5.6 + 12} height={tip.length * 14 + 8} rx={4} fill="#0b0c0e" fillOpacity={0.94} stroke="#3a3d42" />
-          {tip.map((t, i) => <text key={i} x={6} y={15 + i * 14} fontSize={10.5} fill={i === 0 ? "#e6e8eb" : "#a9afb7"} fontWeight={i === 0 ? 600 : 400}>{t}</text>)}
+          <rect width={Math.max(...tip.map((t) => t.length)) * 5.6 + 12} height={tip.length * 14 + 8} rx={4} fill={v("tip-bg")} fillOpacity={0.94} stroke={v("border")} />
+          {tip.map((t, i) => <text key={i} x={6} y={15 + i * 14} fontSize={10.5} fill={i === 0 ? v("text") : v("tip-text-dim")} fontWeight={i === 0 ? 600 : 400}>{t}</text>)}
         </g>
       )}
     </g>
@@ -281,22 +282,22 @@ export function CableOverlay({ cables, mode, onMode, opts = DEFAULT_OPTS, onOpts
     }
     return [...m.values()].sort((a, b) => b.n - a.n);
   }, [cables]);
-  const selSt: React.CSSProperties = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 3, fontSize: 11.5 };
-  const box: React.CSSProperties = { background: "#0b0c0eee", border: "1px solid #3a3d42", borderRadius: 5, fontSize: 11.5, color: "#c9ced4" };
+  const selSt: React.CSSProperties = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 3, fontSize: 11.5 };
+  const box: React.CSSProperties = { background: v("float-bg"), border: `1px solid ${v("border")}`, borderRadius: 5, fontSize: 11.5, color: v("float-text") };
   return (
     <div style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start", pointerEvents: "none" }}>
       {mode === "type" && rows.length > 0 && (
         <div style={{ ...box, padding: "5px 9px", pointerEvents: "auto", minWidth: 110 }}>
           {rows.map((r) => (
             <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 7, lineHeight: "17px" }}>
-              <span style={{ width: 18, height: 3, borderRadius: 2, background: r.color, boxShadow: lum(r.color) < 0.2 ? "0 0 0 1px #9aa0aa" : undefined }} />
+              <span style={{ width: 18, height: 3, borderRadius: 2, background: r.color, boxShadow: lum(r.color) < 0.2 ? `0 0 0 1px ${v("cable-under-light")}` : undefined }} />
               <span style={{ flex: 1 }}>{r.label}</span><span style={{ opacity: 0.6 }}>{r.n}</span>
             </div>
           ))}
         </div>
       )}
       <label style={{ ...box, padding: "3px 8px", pointerEvents: "auto" }}>Cable color{" "}
-        <select value={mode} onChange={(e) => onMode(e.target.value as CableColorMode)} style={{ background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 3, fontSize: 11.5 }}>
+        <select value={mode} onChange={(e) => onMode(e.target.value as CableColorMode)} style={{ background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 3, fontSize: 11.5 }}>
           <option value="own">own</option><option value="type">by type</option>
         </select>
       </label>

@@ -1,11 +1,12 @@
 // Collapsible port list in the properties panel: rename, change type, add, delete.
+import { v } from "./theme";
 import { useState } from "react";
 import { Device, Doc, PORT_COLORS } from "./types";
 import { addPort, deletePort } from "./endpointEdit";
 
 type Edit = (fn: (d: Doc) => string | void, key?: string) => boolean;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "2px 4px", fontSize: 11 } as const;
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 11 } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "2px 4px", fontSize: 11 } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 11 } as const;
 
 export default function PortsEditor({ dev, doc, edit }: { dev: Device; doc: Doc; edit: Edit }) {
   const [open, setOpen] = useState(false);
@@ -18,7 +19,7 @@ export default function PortsEditor({ dev, doc, edit }: { dev: Device; doc: Doc;
   };
   return (
     <div style={{ margin: "6px 0", fontSize: 12 }}>
-      <a href="#" style={{ color: "#58a6ff" }} onClick={(e) => { e.preventDefault(); setOpen(!open); }}>{open ? "▾" : "▸"} Ports ({dev.ports.length})</a>
+      <a href="#" style={{ color: v("link") }} onClick={(e) => { e.preventDefault(); setOpen(!open); }}>{open ? "▾" : "▸"} Ports ({dev.ports.length})</a>
       {open && (
         <div style={{ marginTop: 4 }}>
           <div style={{ maxHeight: 280, overflow: "auto" }}>
@@ -29,8 +30,8 @@ export default function PortsEditor({ dev, doc, edit }: { dev: Device; doc: Doc;
                   {Object.keys(PORT_COLORS).map((t) => <option key={t}>{t}</option>)}
                   {!(p.type in PORT_COLORS) && <option>{p.type}</option>}
                 </select>
-                <span title={cabled(p.id) ? "Cabled" : "Free"} style={{ width: 8, height: 8, borderRadius: 4, background: cabled(p.id) ? "#2ea043" : "#3a3d42" }} />
-                <button style={{ ...btn, padding: "0 6px", color: "#f85149" }} title="Delete this port" onClick={() => del(p.id, p.name)}>x</button>
+                <span title={cabled(p.id) ? "Cabled" : "Free"} style={{ width: 8, height: 8, borderRadius: 4, background: cabled(p.id) ? v("ok") : v("border") }} />
+                <button style={{ ...btn, padding: "0 6px", color: v("danger") }} title="Delete this port" onClick={() => del(p.id, p.name)}>x</button>
               </div>
             ))}
           </div>

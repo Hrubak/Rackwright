@@ -1,13 +1,13 @@
-<!doctype html><html><head><meta charset="UTF-8"/><title>Rackwright</title>
+<!doctype html><html><head><meta charset="UTF-8"/><title>Rackwright</title><link rel="icon" type="image/svg+xml" href="/rackwright.svg">
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#14161a;font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden;user-select:none}
+body{margin:0;background:var(--rw-bg);font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden;user-select:none}
 button{font:inherit;font-size:12.5px;transition:background .12s,border-color .12s}
-button:hover:not(:disabled){background:#363a42!important;border-color:#5a5f67!important}
+button:hover:not(:disabled){background:var(--rw-hover)!important;border-color:var(--rw-hover-border)!important}
 button:disabled{opacity:.4;cursor:default!important}
 input,select,textarea{font:inherit;font-size:12.5px;user-select:text;outline:none}
-input:focus,select:focus,textarea:focus{border-color:#4aa3ff!important}
-::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#33363c;border-radius:5px}::-webkit-scrollbar-track{background:transparent}
-.cat:hover{background:#262a31}
+input:focus,select:focus,textarea:focus{border-color:var(--rw-focus)!important}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--rw-scrollbar);border-radius:5px}::-webkit-scrollbar-track{background:transparent}
+.cat:hover{background:var(--rw-row-hover)}
 </style></head>
 <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>

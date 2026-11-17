@@ -1,12 +1,13 @@
 // Client inventory: every device (and optionally every endpoint) across a client's sites, with search, totals and CSV.
+import { v } from "../theme";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { backend } from "../backend";
 import type { Doc } from "../types";
 import type { ClientItem, RackItem } from "./store";
 import { InvRow, inventoryCsv, inventoryRows, matchRow, typeTotals } from "./util";
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
-const inp = { background: "#14161a", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
+const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
 const MAX = 500;
 
 export default function Inventory({ client, docs, onOpen }: {
@@ -37,8 +38,8 @@ export default function Inventory({ client, docs, onOpen }: {
     await backend.saveBytes(name, "text/csv", new TextEncoder().encode("﻿" + inventoryCsv(rows)));
   };
   const open = (r: InvRow) => { const rk = racks.get(r.rackKey); if (rk) onOpen(rk, r.devId); };
-  const th = { textAlign: "left", padding: "4px 6px", opacity: 0.7, position: "sticky", top: 0, background: "#1b1d21", whiteSpace: "nowrap" } as const;
-  const td = { padding: "3px 6px", borderTop: "1px solid #24272c", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 } as const;
+  const th = { textAlign: "left", padding: "4px 6px", opacity: 0.7, position: "sticky", top: 0, background: v("panel"), whiteSpace: "nowrap" } as const;
+  const td = { padding: "3px 6px", borderTop: `1px solid ${v("panel-2")}`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 } as const;
 
   return (
     <div>
@@ -54,26 +55,26 @@ export default function Inventory({ client, docs, onOpen }: {
         <button style={btn} onClick={exportCsv} disabled={!rows.length}>Export CSV</button>
         {loading && <span style={{ fontSize: 12, opacity: 0.7 }}>Loading racks...</span>}
       </div>
-      {failed.length > 0 && <div style={{ fontSize: 12, color: "#ffb4ab", marginBottom: 6 }}>Could not read: {failed.join(", ")}</div>}
+      {failed.length > 0 && <div style={{ fontSize: 12, color: v("error-text"), marginBottom: 6 }}>Could not read: {failed.join(", ")}</div>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, fontSize: 12 }}>
         <span style={{ opacity: 0.8, marginRight: 4 }}>{inScope.length} {eps ? "items" : "devices"}{q || site ? ` (of ${all.length})` : ""}:</span>
         {totals.map(([t, n]) => (
           <button key={t} onClick={() => setType(type === t ? "" : t)}
-            style={{ ...btn, padding: "1px 8px", marginRight: 0, background: type === t ? "#2a3a52" : btn.background, borderColor: type === t ? "#5b8bd0" : "#3a3d42" }}>
+            style={{ ...btn, padding: "1px 8px", marginRight: 0, background: type === t ? v("accent-soft") : btn.background, borderColor: type === t ? v("accent-border") : v("border") }}>
             {t} {n}
           </button>
         ))}
       </div>
       {!client.sites.some((s) => s.racks.length) && <div style={{ opacity: 0.7 }}>This client has no racks yet. Add racks to its sites first.</div>}
       {rows.length > 0 && (
-        <div style={{ overflow: "auto", maxHeight: "calc(100vh - 330px)", border: "1px solid #2c2f35", borderRadius: 4 }}>
+        <div style={{ overflow: "auto", maxHeight: "calc(100vh - 330px)", border: `1px solid ${v("border-subtle")}`, borderRadius: 4 }}>
           <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
             <thead><tr>{["Site", "Rack", "Name", "Type", "Model", "IP", "MAC", "Serial", "Location"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.slice(0, MAX).map((r, i) => (
                 <tr key={`${r.rackKey}:${r.devId}:${i}`} onClick={() => open(r)} title="Open this rack with the device selected"
                   style={{ cursor: "pointer", opacity: r.kind === "endpoint" ? 0.8 : 1 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#24324a")} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
+                  onMouseEnter={(e) => (e.currentTarget.style.background = v("row-hover-blue"))} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
                   <td style={td}>{r.site}</td><td style={td}>{r.rackFile}</td>
                   <td style={{ ...td, fontWeight: r.kind === "device" ? 600 : 400 }}>{r.kind === "endpoint" ? "↳ " : ""}{r.name}</td>
                   <td style={td}>{r.type}</td><td style={td}>{r.model}</td><td style={td}>{r.ip}</td>

@@ -1,6 +1,7 @@
+import { v } from "../theme";
 import { useEffect, useRef, useState } from "react";
 
-const btn = { background: "#2a2d33", color: "#e6e8eb", border: "1px solid #3a3d42", borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
+const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 
 export interface ExportItem { label: string; run: () => void; hint?: string; disabled?: boolean }
 
@@ -22,7 +23,7 @@ export default function ExportMenu({ items }: { items: ExportItem[] }) {
         setAt(at ? null : { x: b.left, y: b.bottom + 2 });
       }}>Export ▾</button>
       {at && (
-        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: at.x, top: at.y, zIndex: 50, background: "#1b1d21", border: "1px solid #3a3d42", borderRadius: 4, padding: 4, minWidth: 190, boxShadow: "0 4px 14px #0008" }}>
+        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: at.x, top: at.y, zIndex: 50, background: v("panel"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: 4, minWidth: 190, boxShadow: `0 4px 14px ${v("shadow")}` }}>
           {items.map((it) => (
             <button key={it.label} disabled={it.disabled} title={it.hint}
               style={{ ...btn, display: "block", width: "100%", textAlign: "left", marginRight: 0, border: "none", background: "transparent", opacity: it.disabled ? 0.5 : 1, cursor: it.disabled ? "default" : "pointer" }}

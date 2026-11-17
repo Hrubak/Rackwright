@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DARK, v } from "./theme";
 import RackFrame from "./RackFrame";
 import { kindLabel } from "./racks";
 import { Target, devDims, mountOf, rackUsage, resolveTarget, shapeOf, showsRear, xOffset } from "./edit";
@@ -21,15 +22,16 @@ function devRect(doc: Doc, d: Device) {
 
 function drawBlob(d: Device, l: number, t: number, rear: boolean, sel: boolean) {
   const p = d.plate || {}, cx = l + 32, cy = t + 32, sq = shapeOf(d) === "squircle";
-  const body = rear ? "#c3c8ce" : p.body || "#f2f4f6", ring = p.k === "uap" ? "#2a6fdb" : p.bc || "#2a6fdb";
-  const out = sel ? "#ffd33d" : "#8b9097";
+  const body = rear ? "#c3c8ce" : p.body || "#f2f4f6", ring = p.k === "uap" ? "#2a6fdb" : p.bc || "#2a6fdb"; // theme-ok
+  const out = sel ? "#ffd33d" : "#8b9097"; // theme-ok
   const shape = (inset: number, fill: string, stroke: string, sw: number) => sq
     ? <rect x={cx - 29 + inset} y={cy - 29 + inset} width={58 - 2 * inset} height={58 - 2 * inset} rx={16 - inset} fill={fill} stroke={stroke} strokeWidth={sw} />
     : <circle cx={cx} cy={cy} r={29 - inset} fill={fill} stroke={stroke} strokeWidth={sw} />;
   return <>
     {shape(0, body, out, sel ? 2.5 : 1.2)}
-    {shape(5, "none", rear ? "#8b9097" : "#ffffff", 3)}
-    {rear ? [-12, 12].map((x) => <circle key={x} cx={cx + x} cy={cy - 4} r={2.2} fill="#6b717a" />)
+    {shape(5, "none", rear ? "#8b9097" : "#ffffff", 3) // theme-ok
+    }
+    {rear ? [-12, 12].map((x) => <circle key={x} cx={cx + x} cy={cy - 4} r={2.2} fill="#6b717a" />) // theme-ok
       : <>{shape(9, "none", ring, 2)}<circle cx={cx} cy={cy - 7} r={2.2} fill={ring} /></>}
   </>;
 }
@@ -39,15 +41,15 @@ const clip = (s: string, w: number, cw: number) => { const n = Math.max(3, Math.
 function drawManager(d: Device, l: number, t: number, r: number, b: number) {
   const nm = d.name.toLowerCase(), out: React.ReactNode[] = [];
   if (nm.includes("brush")) {
-    out.push(<rect key="b" x={l + 30} y={t + 4} width={r - l - 60} height={b - t - 8} fill="#0c0d0f" stroke="#2c2f34" />);
-    for (let x = l + 34; x < r - 34; x += 3) out.push(<line key={"v" + x} x1={x} y1={t + 6} x2={x} y2={b - 6} stroke="#444851" />);
+    out.push(<rect key="b" x={l + 30} y={t + 4} width={r - l - 60} height={b - t - 8} fill="#0c0d0f" stroke="#2c2f34" />); // theme-ok
+    for (let x = l + 34; x < r - 34; x += 3) out.push(<line key={"v" + x} x1={x} y1={t + 6} x2={x} y2={b - 6} stroke="#444851" />); // theme-ok
   } else if (nm.includes("ring")) {
-    for (let x = l + 40; x < r - 40; x += 70) out.push(<ellipse key={x} cx={x} cy={(t + b) / 2} rx={7} ry={(b - t) / 2 - 4} fill="none" stroke="#9aa0a6" strokeWidth={2} />);
+    for (let x = l + 40; x < r - 40; x += 70) out.push(<ellipse key={x} cx={x} cy={(t + b) / 2} rx={7} ry={(b - t) / 2 - 4} fill="none" stroke="#9aa0a6" strokeWidth={2} />); // theme-ok
   } else {
-    for (let x = l + 26; x < r - 26; x += 22) out.push(<rect key={x} x={x} y={t + 3} width={9} height={b - t - 6} fill="#2f333a" stroke="#454a52" />);
+    for (let x = l + 26; x < r - 26; x += 22) out.push(<rect key={x} x={x} y={t + 3} width={9} height={b - t - 6} fill="#2f333a" stroke="#454a52" />); // theme-ok
   }
-  for (const ex of [l + 6, r - 6]) out.push(<circle key={"e" + ex} cx={ex} cy={(t + b) / 2} r={3} fill="#0c0d0f" stroke="#9aa0a6" />);
-  out.push(<text key="n" x={(l + r) / 2} y={(t + b) / 2} textAnchor="middle" dominantBaseline="central" fontSize={10} fill="#c9ced4" style={{ pointerEvents: "none" }}>{d.name}</text>);
+  for (const ex of [l + 6, r - 6]) out.push(<circle key={"e" + ex} cx={ex} cy={(t + b) / 2} r={3} fill="#0c0d0f" stroke="#9aa0a6" />); // theme-ok
+  out.push(<text key="n" x={(l + r) / 2} y={(t + b) / 2} textAnchor="middle" dominantBaseline="central" fontSize={10} fill="#c9ced4" style={{ pointerEvents: "none" }}>{d.name}</text>); // theme-ok
   return out;
 }
 
@@ -111,7 +113,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
   const vis = (d: Device) => d.rack == null || d.face === face || d.face === "both";
 
   return (
-    <svg ref={svgRef} style={{ width: "100%", height: "100%", background: "#14161a", cursor: drag ? "copy" : undefined }}
+    <svg ref={svgRef} style={{ width: "100%", height: "100%", background: v("bg"), cursor: drag ? "copy" : undefined }}
       onWheel={(e) => {
         const f = e.deltaY < 0 ? 1.1 : 1 / 1.1, bb = svgRef.current!.getBoundingClientRect();
         const mx = e.clientX - bb.left, my = e.clientY - bb.top;
@@ -149,19 +151,19 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
       <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
         {doc.racks.map((r) => (
           <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }}>
-            <rect stroke={selected?.kind === "rack" && selected.id === r.id ? "#ffd33d" : "#3a3d42"} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill="#1d2025" />
+            <rect stroke={selected?.kind === "rack" && selected.id === r.id ? v("select") : v("border")} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill={v("rack-body")} />
             {r.kind && <RackFrame kind={r.kind} x={r.x} y={r.y} w={RW + 2 * RAIL} h={HDR + r.u * UH + PADB} />}
-            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill="#e6e8eb" fontSize={16} fontWeight={600}>{r.name}</text>
-            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill="#7d838c" fontSize={10.5}>{r.kind ? `${r.model_name || kindLabel(r.kind)} · ${r.u}U · ${rackUsage(doc, r).used}U used, ${rackUsage(doc, r).free}U free` : `${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
-            <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill="#0b0c0e" stroke="#2c2f35" />
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill={v("text")} fontSize={16} fontWeight={600}>{r.name}</text>
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill={v("rack-subtitle")} fontSize={10.5}>{r.kind ? `${r.model_name || kindLabel(r.kind)} · ${r.u}U · ${rackUsage(doc, r).used}U used, ${rackUsage(doc, r).free}U free` : `${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
+            <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill={v("rack-well")} stroke={v("rack-well-edge")} />
             {Array.from({ length: r.u }, (_, i) => {
               const y = r.y + HDR + (r.u - i - 1) * UH;
               return (
                 <g key={i}>
-                  {i % 2 === 0 && <rect x={r.x + RAIL} y={y} width={RW} height={UH} fill="#111317" />}
-                  <rect x={r.x + 3} y={y + UH / 2 - 2} width={4} height={4} rx={1} fill="#2a2d33" />
-                  <rect x={r.x + RW + 2 * RAIL - 7} y={y + UH / 2 - 2} width={4} height={4} rx={1} fill="#2a2d33" />
-                  <text x={r.x + 17} y={y + UH / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fill="#6b717a" fontSize={9}>{i + 1}</text>
+                  {i % 2 === 0 && <rect x={r.x + RAIL} y={y} width={RW} height={UH} fill={v("u-stripe")} />}
+                  <rect x={r.x + 3} y={y + UH / 2 - 2} width={4} height={4} rx={1} fill={v("u-hole")} />
+                  <rect x={r.x + RW + 2 * RAIL - 7} y={y + UH / 2 - 2} width={4} height={4} rx={1} fill={v("u-hole")} />
+                  <text x={r.x + 17} y={y + UH / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fill={v("u-label")} fontSize={9}>{i + 1}</text>
                 </g>
               );
             })}
@@ -172,7 +174,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           const q = devRect(doc, d);
           const l = q.l, t = q.t, r = q.l + q.w, b = q.t + q.h;
           const isSel = selected?.kind === "dev" && selected.id === d.id;
-          const col = d.color || "#3b6ea8";
+          const col = d.color || "#3b6ea8"; // theme-ok
           const pg = d.ports.map((p) => pp.get(p.id)).filter((g): g is PortPos => !!g).map((g) => [g[1], g[2], g[3]] as [number, number, number]);
           const blob = shapeOf(d) !== "rect";
           const plate = d.plate && !blob ? drawPlate(d, l, t, r, b, pg, showsRear(d, face), view.z) : null;
@@ -181,19 +183,19 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           const lx = plate ? plate.lx : l + 7, labw = plate ? plate.labw : Math.min(150, q.w * 0.3);
           const two = q.h >= 22;
           const sub = d.ip || d.model || d.type;
-          const cableOn = (pid: number) => { const c = doc.cables.find((x) => x.a === pid || x.b === pid); return c ? (c.color || "#1f6feb") : null; };
+          const cableOn = (pid: number) => { const c = doc.cables.find((x) => x.a === pid || x.b === pid); return c ? (c.color || "#1f6feb") : null; }; // theme-ok
           return (
             <g key={d.id} onMouseEnter={() => setHovDev(d.id)} onMouseLeave={() => setHovDev(null)} onMouseDown={(e) => {
                 e.stopPropagation(); onSelect({ kind: "dev", id: d.id });
                 const w = world(e); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, sx: e.clientX, sy: e.clientY, moved: false };
               }}>
               {blob ? drawBlob(d, l, t, face === "rear", isSel)
-                : <rect stroke={isSel ? "#ffd33d" : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={d.type === "Endpoints" ? 8 : 2} fill={mgr ? "#1d2024" : col} />}
+                : <rect stroke={isSel ? v("select") : shade(col, -70)} strokeWidth={isSel ? 2.5 : 1} x={l + 1} y={t + 1} width={q.w - 2} height={q.h - 2} rx={d.type === "Endpoints" ? 8 : 2} fill={mgr ? v("mgr-face") : col} />}
               {plate ? plate.nodes : null}
               {blob ? (
                 <>
-                  <text x={l + 32} y={b + 11} textAnchor="middle" fill="#e6e8eb" fontSize={11} fontWeight={600} style={{ pointerEvents: "none" }}>{clip(d.name, 130, 6.2)}</text>
-                  {d.ip && <text x={l + 32} y={b + 23} textAnchor="middle" fill="#8b9097" fontSize={9.5} style={{ pointerEvents: "none" }}>{d.ip}</text>}
+                  <text x={l + 32} y={b + 11} textAnchor="middle" fill={v("text")} fontSize={11} fontWeight={600} style={{ pointerEvents: "none" }}>{clip(d.name, 130, 6.2)}</text>
+                  {d.ip && <text x={l + 32} y={b + 23} textAnchor="middle" fill={v("text-dim")} fontSize={9.5} style={{ pointerEvents: "none" }}>{d.ip}</text>}
                 </>
               ) : mgr ? drawManager(d, l, t, r, b) : (
                 <>
@@ -202,19 +204,20 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
                 </>
               )}
               {d.type === "Endpoints" && d.endpoints && (
-                <g style={{ pointerEvents: "none" }}><circle cx={l + 14} cy={b - 13} r={9} fill="#e6e8eb" /><text x={l + 14} y={b - 13} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700} fill="#1b1d21">{d.endpoints.length}</text></g>
+                <g style={{ pointerEvents: "none" }}><circle cx={l + 14} cy={b - 13} r={9} fill={v("text")} /><text x={l + 14} y={b - 13} textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700} fill={v("badge-ink")}>{d.endpoints.length}</text></g>
               )}
               {d.ports.map((p) => {
                 const g = pp.get(p.id); if (!g) return null;
                 const c = cableOn(p.id);
-                const node = drawPort(p.id, p, g[1], g[2], g[3], c, !!plate || blob, pendingPort === p.id, view.z, PORT_COLORS[p.type] ?? "#888", (e) => { e.stopPropagation(); onPort(p.id); });
+                const node = drawPort(p.id, p, g[1], g[2], g[3], c, !!plate || blob, pendingPort === p.id, view.z, PORT_COLORS[p.type] ?? "#888", (e) => { e.stopPropagation(); onPort(p.id); }); // theme-ok
+                const lfg = fgFor(c || (plate ? DARK["ink"] : PORT_COLORS[p.type] ?? "#cccccc")); // theme-ok
                 const lab = g[3] * view.z >= 15 && p.name ? (
-                  <text key={"l" + p.id} x={g[1]} y={g[2]} textAnchor="middle" dominantBaseline="central" fontSize={8.5} fill={fgFor(c || (plate ? "#101113" : PORT_COLORS[p.type] ?? "#cccccc"))} style={{ pointerEvents: "none" }}>{p.name.slice(-3)}</text>
+                  <text key={"l" + p.id} x={g[1]} y={g[2]} textAnchor="middle" dominantBaseline="central" fontSize={8.5} fill={lfg} style={{ pointerEvents: "none" }}>{p.name.slice(-3)}</text>
                 ) : null;
                 return <g key={p.id}>{node}{lab}</g>;
               })}
               {/* Rear-mounted (turned around): a yellow stripe on the left edge, clear of labels and ports. */}
-              {d.rack != null && d.rev && <rect x={l + 1} y={t + 1} width={3} height={q.h - 2} fill="#ffd33d" style={{ pointerEvents: "none" }} />}
+              {d.rack != null && d.rev && <rect x={l + 1} y={t + 1} width={3} height={q.h - 2} fill={v("select")} style={{ pointerEvents: "none" }} />}
               <title>{d.name}{d.rack != null && mountOf(d).startsWith("rear") ? " (rear mounted)" : ""}</title>
             </g>
           );
@@ -227,13 +230,13 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
             const q = devRect(doc, { ...dev, rack: t.r.id, u: t.u, side: t.side }); x = q.l; y = q.t; ok = t.p.ok; why = t.p.why || t.p.warn || ""; warn = !!t.p.warn;
           } else if (t.kind === "float") { x = t.fx; y = t.fy; why = "Off-rack"; warn = true; }
           else return null;
-          const col = !ok ? "#f85149" : warn ? "#d29922" : "#2ea043";
+          const col = !ok ? DARK["danger"] : warn ? DARK["warn"] : DARK["ok"];
           const round = shapeOf({ ...dev, rack: null });
           return <g style={{ pointerEvents: "none" }}>
             {round === "disc" ? <circle cx={x + 32} cy={y + 32} r={29} fill={col + "55"} stroke={col} strokeWidth={2} />
               : <rect x={x + 1} y={y + 1} width={dm.w - 2} height={dm.h - 2} rx={round === "squircle" ? 16 : 2} fill={col + "55"} stroke={col} strokeWidth={2} />}
-            {why && <g><rect x={x} y={y - 18} width={Math.max(60, why.length * 6.2 + 12)} height={16} rx={3} fill="#000d" stroke={col} />
-              <text x={x + 6} y={y - 10} fill="#fff" fontSize={10.5} dominantBaseline="central">{why}</text></g>}
+            {why && <g><rect x={x} y={y - 18} width={Math.max(60, why.length * 6.2 + 12)} height={16} rx={3} fill={v("why-bg")} stroke={col} />
+              <text x={x + 6} y={y - 10} fill={v("why-text")} fontSize={10.5} dominantBaseline="central">{why}</text></g>}
           </g>;
         })()}
         <VmLinks doc={doc} rectOf={(d) => devRect(doc, d)} visible={vis} />
