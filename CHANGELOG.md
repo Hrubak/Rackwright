@@ -2,6 +2,15 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.12.0 — 2026-11-17
+Web and desktop. Update the LXC as usual: the server adds a place to store rooms on start. Nothing is saved to a site until you change its floor plan.
+- **Floor plan tab.** A site now holds rooms, and each room has a floor plan of its racks plus doors, cooling, power panels, desks and labels. It is the first tab when you open a client. Every existing site starts with one "Main room" with all its racks placed along the top.
+- **Arrange the room.** Drag racks and objects to move them; press R while dragging a rack to turn it. The thick blue edge is the rack's front. Drag an object's corner to resize it, and press Delete to remove it. Double-click a rack to open it. One tile is 2 ft, or 600 mm when Settings › Units is metric.
+- **Rooms.** Add, rename and delete rooms (a room must be empty before you delete it), move a rack to another room, and change a room's size. If the new size is too small for what is in it, Rackwright asks whether to keep the current size or allow things to overlap. All rooms shows every room of the site at once.
+- **Cabling between racks.** Lines with counts show the data (blue) and power (dashed) cables between racks of the same rack file. Turn them off with Show cabling between racks.
+- **Export PDF** prints the room on one Letter landscape page.
+- The Sites tab shows how many rooms each site has, with a link to its floor plan.
+
 ## 3.11.0 — 2026-11-17
 Web and desktop. A new layout based on RackMap, a colleague's app: start from your clients, then go into a site and a rack. Nothing changes in your saved racks until you edit them.
 - **Clients dashboard is the home screen.** Each client has a card with its racks, devices, cables, how full the racks are, and its sites. Click Open, or a site, to go in. The grid button at the top left always brings you back. "Needs attention" below the cards fills in with 3.13.0.

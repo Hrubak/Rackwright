@@ -20,6 +20,8 @@ export interface FloorPlanProps {
   onOpenRack: (key: string, rackId: number) => void;
   onSelect: (sel: FloorSel) => void;
   selected: FloorSel;
+  /** Overview: no hint, no cabling toggle. */
+  readOnly?: boolean;
 }
 
 function rackInfo(docs: Record<string, Doc | string>, s: RackSpot) {
@@ -30,7 +32,7 @@ function rackInfo(docs: Record<string, Doc | string>, s: RackSpot) {
   return { name: r?.name || "Rack", used, total: r?.u ?? 0 };
 }
 
-export function FloorPlan({ room, docs, units, onChange, onOpenRack, onSelect, selected }: FloorPlanProps) {
+export function FloorPlan({ room, docs, units, onChange, onOpenRack, onSelect, selected, readOnly }: FloorPlanProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -161,31 +163,60 @@ export function FloorPlan({ room, docs, units, onChange, onOpenRack, onSelect, s
     const bad = d && !tileFree(room, d.x, d.y, f.w, f.h, { kind: "rack", id });
     // front edge: rot 0 = bottom, 90 = left, 180 = top, 270 = right
     const edge = rot === 0 ? [L, T + Ht, L + Wd, T + Ht] : rot === 180 ? [L, T, L + Wd, T] : rot === 90 ? [L, T, L, T + Ht] : [L + Wd, T, L + Wd, T + Ht];
-    const name = info.name.length > 9 && Wd < TILE * 1.5 ? info.name.slice(0, 8) + "..." : info.name;
+    // portrait racks write along the long side; trim to what fits (about 6.5 px per character)
+    const tall = Ht > Wd, cx = L + Wd / 2, cy = T + Ht / 2;
+    const room_ = Math.floor(((tall ? Ht : Wd) - 8) / 6.5);
+    const name = info.name.length > room_ ? info.name.slice(0, Math.max(1, room_ - 1)) + "…" : info.name;
+    const turn = tall ? `rotate(-90 ${cx} ${cy})` : undefined;
     return (
       <g key={"r" + id} onPointerDown={(e) => start(e, "rack", id, b, sp.rot)} onDoubleClick={() => onOpenRack(sp.key, sp.rack)} style={{ cursor: "move" }} opacity={d ? 0.85 : 1}>
         <rect x={L} y={T} width={Wd} height={Ht} rx={3} fill={v("panel")} stroke={bad ? v("danger") : sel ? v("select") : v("border")} strokeWidth={sel || bad ? 2 : 1.2} />
         <line x1={edge[0]} y1={edge[1]} x2={edge[2]} y2={edge[3]} stroke={v("accent")} strokeWidth={4} strokeLinecap="round" />
-        <text x={L + Wd / 2} y={T + Ht / 2 - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill={v("text")} pointerEvents="none">{name}</text>
-        <text x={L + Wd / 2} y={T + Ht / 2 + 8} textAnchor="middle" fontSize={10} fill={v("text-muted")} pointerEvents="none">{info.used}/{info.total}U</text>
+        <g transform={turn} pointerEvents="none">
+          <text x={cx} y={cy - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill={v("text")}>{name}</text>
+          <text x={cx} y={cy + 8} textAnchor="middle" fontSize={10} fill={v("text-muted")}>{info.used}/{info.total}U</text>
+        </g>
         {s.n > 1 && <text x={L + 3} y={T + 11} fontSize={9} fill={v("text-muted")} pointerEvents="none">{s.i + 1}/{s.n}</text>}
         <title>{info.name} - double-click to open</title>
       </g>
     );
   };
 
+  // cabling between racks: lines go under the racks, count badges on top (data and power side by side)
+  const linkArt = { lines: [] as JSX.Element[], badges: [] as JSX.Element[] };
+  for (const l of links) {
+    const A = center(l.a), B = center(l.b);
+    const mx = (A.x + B.x) / 2, span = Math.hypot(B.x - A.x, B.y - A.y);
+    // lift the arc so its badge sits above the racks (their centres are a tile below the top), kept inside the room
+    const my = Math.max(20 - (A.y + B.y) / 2, Math.min(A.y, B.y) - TILE * 2.2 - span * 0.15);
+    const d = `M${A.x},${A.y} Q${mx},${my} ${B.x},${B.y}`;
+    const lx = 0.25 * A.x + 0.5 * mx + 0.25 * B.x, ly = 0.25 * A.y + 0.5 * my + 0.25 * B.y;
+    const both = l.data > 0 && l.power > 0;
+    const badge = (n: number, color: string, dx: number, k: string) => (
+      <g key={k} pointerEvents="none"><rect x={lx + dx - 10} y={ly - 8} width={20} height={16} rx={8} fill={color} />
+        <text x={lx + dx} y={ly} textAnchor="middle" dominantBaseline="central" fontSize={10} fill={v("on-accent")}>{n}</text></g>);
+    if (l.data) {
+      linkArt.lines.push(<path key={l.a + l.b + "d"} d={d} fill="none" stroke={v("link")} strokeWidth={Math.min(6, 1.2 + Math.log2(l.data + 1))} opacity={0.85} pointerEvents="none" />);
+      linkArt.badges.push(badge(l.data, v("link"), both ? -11 : 0, l.a + l.b + "db"));
+    }
+    if (l.power) {
+      linkArt.lines.push(<path key={l.a + l.b + "p"} d={d} fill="none" stroke={v("warn")} strokeWidth={Math.min(6, 1.2 + Math.log2(l.power + 1))} strokeDasharray="5 4" opacity={0.85} pointerEvents="none" />);
+      linkArt.badges.push(badge(l.power, v("warn"), both ? 11 : 0, l.a + l.b + "pb"));
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }} onKeyDown={onKeyDown} tabIndex={0}>
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: v("text-muted") }}>
         <span>{unitNote}</span>
-        <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        {!readOnly && <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <input type="checkbox" checked={cables} onChange={(e) => setCables(e.target.checked)} /> Show cabling between racks
-        </label>
-        <span>Drag to move. Press R while dragging to rotate. Double-click a rack to open it.</span>
+        </label>}
+        {!readOnly && <span>Drag to move. Press R while dragging to rotate. Double-click a rack to open it.</span>}
       </div>
       <div style={{ overflow: "auto" }}>
         <svg ref={svgRef} data-floorplan="" xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-          style={{ background: v("bg"), border: `2px solid ${v("border")}`, touchAction: "none", userSelect: "none", display: "block" }}
+          style={{ touchAction: "none", userSelect: "none", display: "block" }}
           onPointerMove={move} onPointerUp={end} onPointerCancel={() => setDrag(null)} onPointerDown={() => onSelect(null)}>
           <defs>
             <pattern id="fp-grid" width={TILE} height={TILE} patternUnits="userSpaceOnUse">
@@ -196,29 +227,13 @@ export function FloorPlan({ room, docs, units, onChange, onOpenRack, onSelect, s
               <line x1={0} y1={0} x2={0} y2={8} stroke={v("text-muted")} strokeWidth={2} />
             </pattern>
           </defs>
+          <rect width={W} height={H} fill={v("bg")} />
           <rect width={W} height={H} fill="url(#fp-grid)" />
+          <rect x={1} y={1} width={W - 2} height={H - 2} fill="none" stroke={v("border")} strokeWidth={2} />
+          {linkArt.lines}
           {room.objects.map(renderObj)}
           {room.racks.map(renderRack)}
-          {links.map((l) => {
-            const A = center(l.a), B = center(l.b);
-            const mx = (A.x + B.x) / 2, span = Math.hypot(B.x - A.x, B.y - A.y);
-            const arc = (off: number) => {
-              const my = (A.y + B.y) / 2 - TILE * 0.4 - span * 0.15 + off;
-              return { d: `M${A.x},${A.y} Q${mx},${my} ${B.x},${B.y}`, lx: 0.25 * A.x + 0.5 * mx + 0.25 * B.x, ly: 0.25 * A.y + 0.5 * my + 0.25 * B.y };
-            };
-            const out = [];
-            if (l.data) {
-              const a = arc(0);
-              out.push(<g key={l.a + l.b + "d"} pointerEvents="none"><path d={a.d} fill="none" stroke={v("link")} strokeWidth={Math.min(6, 1.2 + Math.log2(l.data + 1))} opacity={0.85} />
-                <rect x={a.lx - 10} y={a.ly - 8} width={20} height={16} rx={8} fill={v("link")} /><text x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="central" fontSize={10} fill={v("on-accent")}>{l.data}</text></g>);
-            }
-            if (l.power) {
-              const a = arc(l.data ? 16 : 0);
-              out.push(<g key={l.a + l.b + "p"} pointerEvents="none"><path d={a.d} fill="none" stroke={v("warn")} strokeWidth={Math.min(6, 1.2 + Math.log2(l.power + 1))} strokeDasharray="5 4" opacity={0.85} />
-                <rect x={a.lx - 10} y={a.ly - 8} width={20} height={16} rx={8} fill={v("warn")} /><text x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="central" fontSize={10} fill={v("on-accent")}>{l.power}</text></g>);
-            }
-            return out;
-          })}
+          {linkArt.badges}
         </svg>
       </div>
     </div>

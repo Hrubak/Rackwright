@@ -193,7 +193,7 @@ export default function FloorTab({ client, siteId, docs, units, onOpenRack, onSa
             <b style={{ fontSize: 13 }}>{r.name}</b> <span style={{ fontSize: 11, opacity: 0.7 }}>Click to edit this room.</span>
             <div style={{ cursor: "pointer" }} onClick={() => { setRoomId(r.id); setAll(false); setSel(null); }}>
               <div style={{ pointerEvents: "none" }}>
-                <FloorPlan room={r} docs={docs} units={units} onChange={() => {}} onOpenRack={() => {}} onSelect={() => {}} selected={null} />
+                <FloorPlan room={r} docs={docs} units={units} onChange={() => {}} onOpenRack={() => {}} onSelect={() => {}} selected={null} readOnly />
               </div>
             </div>
           </div>))
