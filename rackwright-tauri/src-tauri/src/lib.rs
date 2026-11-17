@@ -32,6 +32,21 @@ fn write_text(path: String, text: String) -> Result<(), String> {
     std::fs::write(path, text).map_err(|e| e.to_string())
 }
 
+/// Opens a Rackwright release page in the default browser (update prompt). Only GitHub release pages of this project.
+#[tauri::command]
+fn open_release(url: String) -> Result<(), String> {
+    if !url.starts_with("https://github.com/Hrubak/Rackwright/releases/") || url.chars().any(|c| c.is_whitespace() || c == '"') {
+        return Err("Not a Rackwright release page".into());
+    }
+    #[cfg(target_os = "windows")]
+    let r = std::process::Command::new("explorer").arg(&url).spawn();
+    #[cfg(target_os = "macos")]
+    let r = std::process::Command::new("open").arg(&url).spawn();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let r = std::process::Command::new("xdg-open").arg(&url).spawn();
+    r.map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn route_cables(doc: Doc, face: String) -> router::RouteResult {
     router::route_all(&doc, &face)
@@ -50,8 +65,7 @@ fn port_positions(doc: Doc) -> Vec<(i64, f64, f64, f64)> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![open_doc, save_doc, save_bytes, read_text, write_text, route_cables, port_positions])
+        .invoke_handler(tauri::generate_handler![open_doc, save_doc, save_bytes, read_text, write_text, open_release, route_cables, port_positions])
         .run(tauri::generate_context!())
         .expect("error while running Rackwright");
 }

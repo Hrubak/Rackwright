@@ -36,7 +36,7 @@ export function useDesktopUpdates() {
 
   const download = useCallback(async () => {
     if (!offer) return;
-    try { await (await import("@tauri-apps/plugin-opener")).openUrl(offer.url); } catch { /* ignore */ }
+    try { await (await import("@tauri-apps/api/core")).invoke("open_release", { url: offer.url }); } catch { /* ignore */ }
   }, [offer]);
   const skip = useCallback(() => { if (offer) set(SKIP, offer.version); setOffer(null); }, [offer]);
   const hide = useCallback(() => setOffer(null), []);
