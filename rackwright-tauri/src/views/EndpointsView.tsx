@@ -40,7 +40,7 @@ function PlaceDialog({ doc, index, edit, onClose }: { doc: Doc; index: number; e
   );
 }
 
-export default function EndpointsView({ doc, selected, onSelect, edit, onMember }: { doc: Doc; selected: Sel; onSelect: (s: Sel) => void; edit?: Edit; onMember?: (dev: number, idx: number) => void }) {
+export default function EndpointsView({ doc, selected, onSelect, onOpen, edit, onMember }: { doc: Doc; selected: Sel; onSelect: (s: Sel) => void; onOpen?: (s: Sel) => void; edit?: Edit; onMember?: (dev: number, idx: number) => void }) {
   const [placing, setPlacing] = useState<number | null>(null);
   const all = useMemo(() => flattenEndpoints(doc), [doc]);
   const [kinds, setKinds] = useState<Set<EpKind>>(new Set());
@@ -82,7 +82,7 @@ export default function EndpointsView({ doc, selected, onSelect, edit, onMember 
         </tr></thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.key} onClick={() => { if (r.devId == null) return; onSelect({ kind: "dev", id: r.devId }); onMember?.(r.devId, Number(r.key.split(":")[1])); }}
+            <tr key={r.key} onDoubleClick={() => { if (r.devId != null) onOpen?.({ kind: "dev", id: r.devId }); }} onClick={() => { if (r.devId == null) return; onSelect({ kind: "dev", id: r.devId }); onMember?.(r.devId, Number(r.key.split(":")[1])); }}
               style={{ cursor: r.devId != null ? "pointer" : "default", borderBottom: `1px solid ${v("panel-2")}`, background: r.devId != null && r.devId === selId ? v("accent-soft") : undefined }}>
               <td style={{ padding: "4px 8px" }}>{r.name}</td>
               <td style={{ padding: "4px 8px" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: KIND_COLOR[r.kind], marginRight: 6 }} />{KIND_LABEL[r.kind][0]}</td>

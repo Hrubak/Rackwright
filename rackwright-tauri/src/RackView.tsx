@@ -57,11 +57,11 @@ export type Sel = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
 export type Resolver = (dev: Device, clientX: number, clientY: number) => Target;
 
-export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own", cableOpts }: {
+export default function RackView({ doc: committed, liveDoc, onDragTarget, onDragEnd, face, routes, ports, selected, onSelect, onOpen, pendingPort, onPort, onMoveDevice, onReject, drag, resolveRef, fitTick, cableColor = "own", cableOpts }: {
   doc: Doc; face: "front" | "rear"; routes: RouteResult;
   /** Provisional document while an existing device is dragged (device drawn at its target; routes/ports props then belong to it). */
   liveDoc?: Doc | null; onDragTarget?: (id: number, t: Target) => void; onDragEnd?: (committed: boolean) => void; ports: PortPos[];
-  selected: Sel; onSelect: (s: Sel) => void; pendingPort: number | null; onPort: (pid: number) => void;
+  selected: Sel; onSelect: (s: Sel) => void; onOpen?: (s: Sel) => void; pendingPort: number | null; onPort: (pid: number) => void;
   onMoveDevice: (id: number, rack: number | null, u: number, side: number, fx: number, fy: number) => void;
   onReject: (why: string) => void;
   drag: { dev: Device; x: number; y: number } | null; resolveRef: React.MutableRefObject<Resolver>; fitTick: number; cableColor?: CableColorMode; cableOpts?: CableOpts;
@@ -150,7 +150,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
       onClick={(e) => { if (e.target === e.currentTarget) onSelect(null); }}>
       <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
         {doc.racks.map((r) => (
-          <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }}>
+          <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }} onDoubleClick={(e) => { e.stopPropagation(); onOpen?.({ kind: "rack", id: r.id }); }}>
             <rect stroke={selected?.kind === "rack" && selected.id === r.id ? v("select") : v("border")} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill={v("rack-body")} />
             {r.kind && <RackFrame kind={r.kind} x={r.x} y={r.y} w={RW + 2 * RAIL} h={HDR + r.u * UH + PADB} />}
             <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill={v("rack-title")} fontSize={16} fontWeight={600}>{r.name}</text>
@@ -185,7 +185,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           const sub = d.ip || d.model || d.type;
           const cableOn = (pid: number) => { const c = doc.cables.find((x) => x.a === pid || x.b === pid); return c ? (c.color || "#1f6feb") : null; }; // theme-ok
           return (
-            <g key={d.id} onMouseEnter={() => setHovDev(d.id)} onMouseLeave={() => setHovDev(null)} onMouseDown={(e) => {
+            <g key={d.id} onDoubleClick={(e) => { e.stopPropagation(); onOpen?.({ kind: "dev", id: d.id }); }} onMouseEnter={() => setHovDev(d.id)} onMouseLeave={() => setHovDev(null)} onMouseDown={(e) => {
                 e.stopPropagation(); onSelect({ kind: "dev", id: d.id });
                 const w = world(e); mv.current = { id: d.id, ox: w.x - q.l, oy: w.y - q.t, sx: e.clientX, sy: e.clientY, moved: false };
               }}>
@@ -241,7 +241,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           </g>;
         })()}
         <VmLinks doc={doc} rectOf={(d) => devRect(doc, d)} visible={vis} />
-        <Cables doc={doc} routes={routes.routes} selected={selected} hoverDev={hovDev} onSelect={onSelect} colorMode={cableColor} zoom={view.z} opts={cableOpts} />
+        <Cables doc={doc} routes={routes.routes} selected={selected} hoverDev={hovDev} onSelect={onSelect} onOpen={onOpen} colorMode={cableColor} zoom={view.z} opts={cableOpts} />
       </g>
     </svg>
   );

@@ -8,7 +8,7 @@ import { infraLayout, InfraEdge, InfraNode } from "./infra";
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 const POWER = "#d9a441", DATA = "#7d8ea6"; // theme-ok
 
-export default function InfraView({ doc, selected, onSelect }: { doc: Doc; selected: Sel; onSelect: (s: Sel) => void }) {
+export default function InfraView({ doc, selected, onSelect, onOpen }: { doc: Doc; selected: Sel; onSelect: (s: Sel) => void; onOpen?: (s: Sel) => void }) {
   const lay = useMemo(() => infraLayout(doc), [doc]);
   const [power, setPower] = useState(true);
   const [hov, setHov] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export default function InfraView({ doc, selected, onSelect }: { doc: Doc; selec
   const node = (n: InfraNode) => {
     const d = n.dev, col = d.color || "#3b6ea8", fg = fgFor(col), on = selId === n.id; // theme-ok
     return (
-      <g key={n.id} style={{ cursor: "pointer" }} onClick={(ev) => { ev.stopPropagation(); onSelect({ kind: "dev", id: n.id }); }}>
+      <g key={n.id} style={{ cursor: "pointer" }} onClick={(ev) => { ev.stopPropagation(); onSelect({ kind: "dev", id: n.id }); }} onDoubleClick={(ev) => { ev.stopPropagation(); onOpen?.({ kind: "dev", id: n.id }); }}>
         <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={6} fill={col} stroke={on ? v("select") : shade(col, -70)} strokeWidth={on ? 2.5 : 1} />
         <text x={n.x + 8} y={n.y + 18} fontSize={12.5} fontWeight={700} fill={fg} style={{ pointerEvents: "none" }}>{clip(d.name, 22)}</text>
         <text x={n.x + 8} y={n.y + 34} fontSize={10} fill={fg} opacity={0.85} style={{ pointerEvents: "none" }}>{clip(d.ip || d.model || d.type, 26)}</text>
@@ -90,7 +90,7 @@ export default function InfraView({ doc, selected, onSelect }: { doc: Doc; selec
           {lay.extras.map((x) => {
             const host = x.host != null ? nodeById.get(x.host) : null, vm = x.kind === "vm";
             return (
-              <g key={x.key} style={{ cursor: "pointer" }} onClick={(ev) => { ev.stopPropagation(); onSelect({ kind: "dev", id: x.devId }); }}>
+              <g key={x.key} style={{ cursor: "pointer" }} onClick={(ev) => { ev.stopPropagation(); onSelect({ kind: "dev", id: x.devId }); }} onDoubleClick={(ev) => { ev.stopPropagation(); onOpen?.({ kind: "dev", id: x.devId }); }}>
                 {host && vm && <line x1={host.x + host.w / 2} y1={host.y + host.h} x2={x.x + x.w / 2} y2={x.y} stroke={v("vm-link")} strokeDasharray="4 3" />}
                 <rect x={x.x} y={x.y} width={x.w} height={x.h} rx={vm ? 3 : 14} fill={v("rack-body")} stroke={selId === x.devId ? v("select") : vm ? v("vm-edge") : v("diagram-edge")} strokeDasharray={vm ? "4 3" : undefined} />
                 <text x={x.x + 8} y={x.y + 14} fontSize={10.5} fontWeight={600} fill={v("text")} style={{ pointerEvents: "none" }}>{clip(x.title, 25)}</text>

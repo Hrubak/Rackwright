@@ -109,13 +109,13 @@ type CState = "normal" | "dim" | "rel" | "sel";
 interface ShapeProps {
   id: number; d: string; color: string; dash?: string; state: CState; kind: Kind;
   a: [number, number]; b: [number, number]; da: number; db: number; oa: boolean; ob: boolean;
-  onPick: (id: number) => void; onEnter: (id: number, e: React.MouseEvent) => void; onMove: (e: React.MouseEvent) => void; onLeave: () => void;
+  onPick: (id: number) => void; onOpen?: (id: number) => void; onEnter: (id: number, e: React.MouseEvent) => void; onMove: (e: React.MouseEvent) => void; onLeave: () => void;
 }
 const CableShape = memo(function CableShape(p: ShapeProps) {
   const { state, color } = p;
   return (
     <g opacity={state === "dim" ? 0.18 : 1} style={{ cursor: "pointer" }}
-      onClick={(e) => { e.stopPropagation(); p.onPick(p.id); }}
+      onClick={(e) => { e.stopPropagation(); p.onPick(p.id); }} onDoubleClick={(e) => { e.stopPropagation(); p.onOpen?.(p.id); }}
       onMouseEnter={(e) => p.onEnter(p.id, e)} onMouseMove={p.onMove} onMouseLeave={p.onLeave}>
       {state === "sel" && <path d={p.d} fill="none" stroke={v("select")} strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />}
       {state === "rel" && <path d={p.d} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={0.28} />}
@@ -162,15 +162,15 @@ function place(e: React.MouseEvent): { x: number; y: number } {
 }
 
 // ---- a stub: short line out of the faceplate, label at its end
-const StubShape = memo(function StubShape({ s, color, state, zoom, onPick, onEnter, onMove, onLeave }: {
-  s: Stub; color: string; state: CState; zoom: number; onPick: (id: number) => void;
+const StubShape = memo(function StubShape({ s, color, state, zoom, onPick, onOpen, onEnter, onMove, onLeave }: {
+  s: Stub; color: string; state: CState; zoom: number; onPick: (id: number) => void; onOpen?: (id: number) => void;
   onEnter: (id: number, e: React.MouseEvent) => void; onMove: (e: React.MouseEvent) => void; onLeave: () => void;
 }) {
   const show = (s.labelOn || state === "sel" || state === "rel") && zoom >= 0.5;
   const down = s.dir > 0;
   return (
     <g opacity={state === "dim" ? 0.25 : 1} style={{ cursor: "pointer" }}
-      onClick={(e) => { e.stopPropagation(); onPick(s.cable); }}
+      onClick={(e) => { e.stopPropagation(); onPick(s.cable); }} onDoubleClick={(e) => { e.stopPropagation(); onOpen?.(s.cable); }}
       onMouseEnter={(e) => onEnter(s.cable, e)} onMouseMove={onMove} onMouseLeave={onLeave}>
       <title>{s.full}</title>
       {state === "sel" && <line x1={s.x} y1={s.y} x2={s.x2} y2={s.y2} stroke={v("select")} strokeWidth={5} strokeLinecap="round" opacity={0.9} />}
@@ -186,8 +186,8 @@ const StubShape = memo(function StubShape({ s, color, state, zoom, onPick, onEnt
   );
 });
 
-export default function Cables({ doc, routes, selected, hoverDev, onSelect, colorMode, zoom, opts = DEFAULT_OPTS }: {
-  doc: Doc; routes: Route[]; selected: Focus; hoverDev: number | null; onSelect: (s: Focus) => void; colorMode: CableColorMode; zoom: number; opts?: CableOpts;
+export default function Cables({ doc, routes, selected, hoverDev, onSelect, onOpen, colorMode, zoom, opts = DEFAULT_OPTS }: {
+  doc: Doc; routes: Route[]; selected: Focus; hoverDev: number | null; onSelect: (s: Focus) => void; onOpen?: (s: Focus) => void; colorMode: CableColorMode; zoom: number; opts?: CableOpts;
 }) {
   const [hovC, setHovC] = useState<TipInfo | null>(null);
   const cmap = useMemo(() => new Map<number, Cable>(doc.cables.map((c) => [c.id, c])), [doc.cables]);
@@ -236,6 +236,7 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
   };
 
   const onPick = useMemo(() => (id: number) => onSelect({ kind: "cable", id }), [onSelect]);
+  const onOpenC = useMemo(() => (id: number) => onOpen?.({ kind: "cable", id }), [onOpen]);
   const onEnter = useMemo(() => (id: number, e: React.MouseEvent) => setHovC({ id, ...place(e) }), []);
   const onMove = useMemo(() => (e: React.MouseEvent) => { const q = place(e); setHovC((h) => (h ? { ...h, ...q } : h)); }, []);
   const onLeave = useMemo(() => () => setHovC(null), []);
@@ -252,13 +253,13 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, colo
   return (
     <g>
       {opts.style === "routed" && <Harness routes={shownRoutes} faded={active} />}
-      {opts.style === "routed" && shown.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
+      {opts.style === "routed" && shown.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onOpen={onOpenC} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
       {opts.style === "stubs" && stubs.map((s, i) => {
         const sh = shapeById.get(s.cable);
-        return <StubShape key={`${s.cable}:${i}`} s={s} color={sh?.color || "#999"} state={sh ? stateOf(sh) : "normal"} zoom={zoom} onPick={onPick} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />; // theme-ok
+        return <StubShape key={`${s.cable}:${i}`} s={s} color={sh?.color || "#999"} state={sh ? stateOf(sh) : "normal"} zoom={zoom} onPick={onPick} onOpen={onOpenC} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />; // theme-ok
       })}
       {dots.size > 0 && shapes.filter((s) => dots.has(s.id)).map((s) => (
-        <g key={"dot" + s.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onPick(s.id); }}>
+        <g key={"dot" + s.id} style={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onPick(s.id); }} onDoubleClick={(e) => { e.stopPropagation(); onOpenC(s.id); }}>
           {[s.a, s.b].map((p, k) => <circle key={k} cx={p[0]} cy={p[1]} r={3.4} fill={s.color} stroke={v("tip-bg")} strokeWidth={1} />)}
         </g>
       ))}

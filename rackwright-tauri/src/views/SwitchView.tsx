@@ -9,7 +9,7 @@ const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("bor
 const colorOf = (i: PortInfo) => (i.kind === "empty" ? EMPTY_COLOR : i.kind === "infra" ? INFRA_COLOR : KIND_COLOR[i.kind]);
 const kindText = (i: PortInfo) => (i.kind === "empty" ? "Empty" : i.kind === "infra" ? "Network device" : KIND_LABEL[i.kind][0]);
 
-export default function SwitchView({ doc, selected, onSelect }: { doc: Doc; selected: Sel; onSelect: (s: Sel) => void }) {
+export default function SwitchView({ doc, selected, onSelect, onOpen }: { doc: Doc; selected: Sel; onSelect: (s: Sel) => void; onOpen?: (s: Sel) => void }) {
   const switches = useMemo(() => switchesOf(doc), [doc]);
   const [pick, setPick] = useState<number | null>(null);
   const [showEmpty, setShowEmpty] = useState(false);
@@ -25,7 +25,7 @@ export default function SwitchView({ doc, selected, onSelect }: { doc: Doc; sele
   const cell = (i: PortInfo) => {
     const tip = i.kind === "empty" ? `Port ${i.port.name}: empty` : `Port ${i.port.name} to ${i.far}${i.ip ? " (" + i.ip + ")" : ""}, ${kindText(i)}`;
     return (
-      <div key={i.port.id} title={tip} onClick={() => i.farDevId != null && onSelect({ kind: "dev", id: i.farDevId })}
+      <div key={i.port.id} title={tip} onDoubleClick={() => i.farDevId != null && onOpen?.({ kind: "dev", id: i.farDevId })} onClick={() => i.farDevId != null && onSelect({ kind: "dev", id: i.farDevId })}
         style={{ width: 54, height: 46, boxSizing: "border-box", borderRadius: 4, background: colorOf(i), border: `1px solid ${v("edge")}`, padding: "2px 3px", overflow: "hidden",
           color: i.kind === "empty" ? v("text-faint") : v("ink"), cursor: i.farDevId != null ? "pointer" : "default", fontSize: 9.5, lineHeight: "11px" }}>
         <b style={{ fontSize: 11 }}>{i.port.name}</b>
@@ -62,7 +62,7 @@ export default function SwitchView({ doc, selected, onSelect }: { doc: Doc; sele
         <thead><tr style={{ textAlign: "left", background: v("panel") }}>{["Port", "Connected to", "Type", "IP", "MAC"].map((h) => <th key={h} style={{ padding: "5px 8px", borderBottom: `1px solid ${v("border-subtle")}` }}>{h}</th>)}</tr></thead>
         <tbody>
           {list.map((i) => (
-            <tr key={i.port.id} onClick={() => i.farDevId != null && onSelect({ kind: "dev", id: i.farDevId })} style={{ cursor: i.farDevId != null ? "pointer" : "default", borderBottom: `1px solid ${v("panel-2")}` }}>
+            <tr key={i.port.id} onDoubleClick={() => i.farDevId != null && onOpen?.({ kind: "dev", id: i.farDevId })} onClick={() => i.farDevId != null && onSelect({ kind: "dev", id: i.farDevId })} style={{ cursor: i.farDevId != null ? "pointer" : "default", borderBottom: `1px solid ${v("panel-2")}` }}>
               <td style={{ padding: "4px 8px" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: colorOf(i), marginRight: 6 }} />{i.port.name} <span style={{ opacity: 0.5 }}>{i.port.type}</span></td>
               <td style={{ padding: "4px 8px" }}>{i.far || <span style={{ opacity: 0.4 }}>empty</span>}{i.farPort && <span style={{ opacity: 0.55 }}> ({i.farPort})</span>}</td>
               <td style={{ padding: "4px 8px" }}>{i.kind === "empty" ? "" : i.type || kindText(i)}</td>

@@ -101,6 +101,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [cableOpts, setCableOpts] = useState<CableOpts>(loadOpts);
   const [epFocus, setEpFocus] = useState<{ dev: number; idx: number } | null>(null);
   const [fitTick, setFitTick] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
@@ -126,6 +127,14 @@ export default function App({ web }: { web?: WebProps } = {}) {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 3500);
   }, []);
+  const pick = useCallback((s: Sel) => {
+    setSel(s);
+    if (s && s.kind === "dev" && !panelOpen) {
+      try { if (!localStorage.getItem("rw.hintDbl")) { localStorage.setItem("rw.hintDbl", "1"); say("Double-click a device to open its details."); } } catch { /* ignore */ }
+    }
+  }, [panelOpen, say]);
+  const openPanel = useCallback((s: Sel) => { setSel(s); setPanelOpen(true); }, []);
+  useEffect(() => { setFitTick((n) => n + 1); }, [panelOpen, wide]);
 
   useEffect(() => {
     let stale = false;
@@ -435,7 +444,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
           case "undo": e.preventDefault(); doUndo(); break;
           case "duplicate": e.preventDefault(); doDuplicate(); break;
           case "delete": del(); break;
-          case "deselect": setPending(null); setSel(null); break;
+          case "deselect": if (pending == null && panelOpen) setPanelOpen(false); else { setPending(null); setSel(null); } break;
           case "fit": setFitTick((n) => n + 1); break;
         }
       }
@@ -448,7 +457,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [doUndo, doRedo, del, doSave, doNew, doOpen, doDuplicate, edit, selDev, place]);
+  }, [doUndo, doRedo, del, doSave, doNew, doOpen, doDuplicate, edit, selDev, place, pending, panelOpen]);
 
   const rackForTags = targetRack();
   const list = useMemo(() => {
@@ -635,7 +644,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {!IS_WEB && deskUpd.offer && <UpdateBanner kind="desktop" text={`Rackwright ${deskUpd.offer.version} is available.`} primary="Download" secondary="Skip this version" onPrimary={deskUpd.download} onSecondary={deskUpd.skip} onClose={deskUpd.hide} />}
       {IS_WEB && webUpd.reload && <UpdateBanner kind="reload" text={`Rackwright was updated to ${webUpd.reload}. Reload to use the new version.`} primary="Reload" onPrimary={() => location.reload()} />}
       {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
-      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", position: "relative" }}>
         <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: v("panel"), borderRight: `1px solid ${v("border-subtle")}`, flexDirection: "column", fontSize: 12 }}>
           <input style={{ ...inp, margin: "10px 10px 8px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
           <div style={{ display: "flex", gap: 6, margin: "0 10px 8px", alignItems: "center" }}>
@@ -667,12 +676,12 @@ export default function App({ web }: { web?: WebProps } = {}) {
           {view !== "rack" && selDev && (
             <button style={{ ...btn, position: "absolute", right: 10, top: 10, zIndex: 5, marginRight: 0 }} onClick={() => setView("rack")}>Show {selDev.name} in rack</button>
           )}
-          {view === "infra" && <InfraView doc={doc} selected={sel} onSelect={setSel} />}
-          {view === "switch" && <SwitchView doc={doc} selected={sel} onSelect={setSel} />}
-          {view === "endpoints" && <EndpointsView doc={doc} selected={sel} onSelect={setSel} edit={edit} onMember={(dev, idx) => setEpFocus({ dev, idx })} />}
+          {view === "infra" && <InfraView doc={doc} selected={sel} onSelect={pick} onOpen={openPanel} />}
+          {view === "switch" && <SwitchView doc={doc} selected={sel} onSelect={pick} onOpen={openPanel} />}
+          {view === "endpoints" && <EndpointsView doc={doc} selected={sel} onSelect={pick} onOpen={openPanel} edit={edit} onMember={(dev, idx) => setEpFocus({ dev, idx })} />}
           <div style={{ position: "absolute", inset: 0, display: view === "rack" ? "block" : "none" }}>
           <RackView doc={doc} liveDoc={live?.doc ?? null} onDragTarget={onDragTarget} onDragEnd={onDragEnd} face={face}
-            routes={live ? live.routes : routes} ports={live ? live.ports : ports} selected={sel} onSelect={setSel}
+            routes={live ? live.routes : routes} ports={live ? live.ports : ports} selected={sel} onSelect={pick} onOpen={openPanel}
             pendingPort={pending} onPort={onPort} onMoveDevice={onMoveDevice} onReject={(w) => say(w, true)}
             drag={dragDev ? { dev: dragDev as Device, x: pdrag!.x, y: pdrag!.y } : null} resolveRef={resolveRef} fitTick={fitTick} cableColor={cableColor} cableOpts={cableOpts} />
           <CableOverlay cables={legendCables} opts={cableOpts} onOpts={(o) => { setCableOpts(o); saveOpts(o); }} mode={cableColor} onMode={(m) => { setCableColor(m); try { localStorage.setItem("rw.cableColor", m); } catch { /* ignore */ } }} />
@@ -682,7 +691,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
               background: toast.bad ? v("danger-bg") : v("ok-bg"), border: `1px solid ${toast.bad ? v("danger") : v("ok")}`, pointerEvents: "none" }}>{toast.text}</div>
           )}
         </div>
-        <div style={{ width: selDev ? 360 : 240, flexShrink: 0, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 10, overflow: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+        {panelOpen && <div style={{ width: selDev ? 360 : 240, flexShrink: 0, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 10, overflow: "auto", display: "flex", flexDirection: "column", gap: 8,
+          ...(wide ? {} : { position: "absolute", right: 0, top: 0, bottom: 0, zIndex: 20, boxShadow: "-6px 0 18px rgba(0,0,0,0.35)" }) }}>
           {!sel && <>
             <Sec title="Overview" first />
             <div style={{ fontSize: 12, lineHeight: 1.7 }}>
@@ -724,7 +734,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
           {selDev && <DevicePanel doc={doc} dev={selDev} edit={edit} epFocus={epFocus?.dev === selDev.id ? epFocus.idx : null}
-            onSelect={(id) => setSel({ kind: "dev", id })} onClose={() => setSel(null)} onLocate={() => { setView("rack"); setFitTick((k) => k + 1); }}
+            onSelect={(id) => setSel({ kind: "dev", id })} onClose={() => setPanelOpen(false)} onLocate={() => { setView("rack"); setFitTick((k) => k + 1); }}
             onDuplicate={doDuplicate} onChangeModel={() => setModelFor(selDev.id)} onDelete={del} onCopied={(ok) => say(ok ? "Copied" : "Could not copy", !ok)}
             lockIcon={(k) => lockIcon(selDev, k)} devSet={(k, val) => devSet(selDev, k, val)}
             placement={<>
@@ -773,7 +783,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
               </select></label>
           </>}
           {sel && !selDev && <button style={{ ...btn, color: v("danger"), marginRight: 0 }} onClick={del}>Delete</button>}
-        </div>
+        </div>}
       </div>
       {routes.hints.length > 0 && (
         <div style={{ maxHeight: 70, overflow: "auto", background: v("panel"), fontSize: 12, padding: 6, borderTop: `1px solid ${v("border-subtle")}` }}>
