@@ -33,4 +33,4 @@ A colleague shared RackMap (CheddarBW/RackMap) to fold into Rackwright. Rackwrig
 - **Build or reorganise racks from imports.** Text, CSV, Visio, SVG, PDF and diagram pictures (read on your own machine), always with a preview; importing again moves devices instead of duplicating them.
 - **Later:** device change history, cable trace through patch panels, label sheets and QR codes, restore an earlier save, multi-select bulk edit.
 
-Design: `docs/superpowers/specs/2026-11-17-rackmap-merge-design.md`. Releases: 3.11.0 layout, 3.12.0 rooms and floor plans, 3.13.0 needs attention, duplicate IPs and power, 3.14.0 site visit, 3.15.0 text and CSV import, 3.16.0 diagram and picture import, 3.17.0 Word report.
+Design: `docs/superpowers/specs/2026-11-17-rackmap-merge-design.md`. Releases: 3.11.0 layout (done), 3.12.0 rooms and floor plans, 3.13.0 needs attention, duplicate IPs and power, 3.14.0 site visit, 3.15.0 text and CSV import, 3.16.0 diagram and picture import, 3.17.0 Word report.

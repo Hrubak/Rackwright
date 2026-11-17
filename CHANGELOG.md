@@ -2,6 +2,17 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.11.0 — 2026-11-17
+Web and desktop. A new layout based on RackMap, a colleague's app: start from your clients, then go into a site and a rack. Nothing changes in your saved racks until you edit them.
+- **Clients dashboard is the home screen.** Each client has a card with its racks, devices, cables, how full the racks are, and its sites. Click Open, or a site, to go in. The grid button at the top left always brings you back. "Needs attention" below the cards fills in with 3.13.0.
+- **Client page.** A bar under the menus picks the client and site, with tabs: Sites (add and edit sites, add racks, Import Auvik), Racks (the rack editor; pick a rack to open), Inventory, Cabling and Links, plus Client report.
+- **Cabling tab (new).** Every cable of the client in one table: site, rack, from, port, to, port, kind, label and length. Search it, export it to CSV, or click a row to open that rack with the cable selected.
+- **Device panel with tabs.** Double-click a device to open it. Overview shows what it connects to and its power path (for example PSU1 ← PDU-A Out7 ← UPS Out1) and where it sits. Specs has new fields: status, manufacturer, hostname, asset tag, OS, role, owner, purchase date, warranty end, power (W), and battery date and rating for UPSes. Ports, Services (what runs on it) and Notes complete it. Buttons: Locate in rack, Duplicate, Copy as text, Change model, Delete.
+- **Single click selects, double-click opens.** A single click selects a device, rack or cable (arrow keys and Ctrl+D still work). Double-click opens its panel; while it is open, a click on something else switches to it. Esc or × closes it. The Details button next to Save shows the rack overview. In a narrow window the panel opens over the drawing.
+- **Equipment sidebar.** Search, Catalog (grouped by maker) and Generic tabs, and filters for firewalls, switches, servers, storage, UPS and power. Drag onto a rack or double-click to add, as before. Collapse it with « to give the racks more room.
+- **Start screen.** New installs start on the Clients dashboard. Change it in Settings › Profile › Start screen.
+- Going to the dashboard or another client keeps your open rack, with its unsaved changes, until you open a different rack.
+
 ## 3.10.0 — 2026-11-17
 Web and desktop. Update the LXC as usual; this is the last update you need to look for yourself.
 - **Update prompts on the web.** When the server has been updated, everyone with Rackwright open sees "Rackwright was updated. Reload" so they are not left on the old version. Admins also see a banner when a newer Rackwright is available for the server, with Update now (the same as Update server in your account menu) and Later. Admins are checked at most once a day.
