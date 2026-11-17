@@ -17,6 +17,7 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
   - System settings (admin, web): company name and logo for client-facing output, defaults for new racks, server update, users.
 - **Polished UI.** A clearer top bar and header: group the toolbar into menus (File, Edit, View, Clients, Help), show where you are (Client > Site > Rack), and tidy the side panels.
 - **Themes and styles.** Dark, light and "match my computer" themes. Clients see Rackwright through exports, not the live app, so there is no in-app presentation mode.
+- **Version check.** Desktop: on start and once a day, check the public GitHub release `desktop-v<version>`; a banner offers Download (opens the release page) and Skip this version. Web: admins get a banner when the server's branch has a newer version, with Update now (the existing Update server); everyone gets "Rackwright was updated — Reload" when the server is newer than the open page.
 - **Client report.** A quarterly-review report for one client, Overview or Detailed, with your own summary and recommendations: a branded PDF, and a Word document built from your uploaded master template. Branding (logo, colours, font, artwork, template) is uploaded by an admin and never committed.
 
-Design: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`. Releases: 3.5.0 groundwork and logo (done), 3.6.0 top bar (done), 3.7.0 Settings (done), 3.8.0 light theme (done), 3.9.0 client report PDF, 3.10.0 Word report.
+Design: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`. Releases: 3.5.0 groundwork and logo (done), 3.6.0 top bar (done), 3.7.0 Settings (done), 3.8.0 light theme (done), 3.9.0 client report PDF (done), 3.10.0 version check, 3.11.0 Word report.

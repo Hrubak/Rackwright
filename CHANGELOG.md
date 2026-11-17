@@ -2,6 +2,15 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.9.0 — 2026-11-17
+Web and desktop. The web server gets new upload types and a saved report per client, so update the LXC as usual.
+- **Client report.** A quarterly-review PDF for one client. Open it from the Clients screen (Client report), the Clients menu or File › Export. Pick Overview or Detailed, the sites to include, the date and who it is prepared for, and write an executive summary and recommendations. The text is remembered for each client, so next quarter starts from the last one.
+  - Overview: cover page, executive summary, totals and devices by type, the site links map, and for each site its infrastructure diagram and the front of every rack, then your recommendations.
+  - Detailed adds the rear of every rack, switch port maps with what each port connects to, a device table per site, the full inventory and the links table.
+  - Drawings are always in the light colours. Big racks and diagrams shrink to fit the page; long tables carry on to the next page with their headings.
+- **Report branding (admins).** Settings › Company › Reports: secondary colour, an address line for the footer, your own font (regular and bold, TTF or OTF), and cover, page header and page footer artwork. Header and footer artwork run across the full width of every page after the cover. Without a font, reports use Noto Sans, so names with accents always print. Nothing you upload is stored in the code; it stays on your server (web) or this computer (desktop).
+- On the desktop, the company logo now lives with the other branding files (up to 2 MB).
+
 ## 3.8.1 — 2026-11-17
 Web and desktop.
 - **New devices** in the device list: Starlink router (Gen 3), Synology DS1815+ (8-bay desktop NAS), UniFi AC Mesh Pro (UAP-AC-M-PRO), UniFi Switch Flex Mini (USW-Flex-Mini) and UniFi Switch 8 60W (US-8-60W). Search by name or model. The desktop ones go off-rack or on a shelf, like other desktop devices.

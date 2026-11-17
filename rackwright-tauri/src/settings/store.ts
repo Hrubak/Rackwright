@@ -1,6 +1,7 @@
 import { IS_WEB } from "../backend";
 import * as api from "../api";
-import type { Branding, Prefs, SystemSettings } from "./types";
+import type { AssetName, Branding, Prefs, SystemSettings } from "./types";
+import { idbDelete, idbGet, idbPut } from "./assets";
 
 export interface SettingsStore {
   getPrefs(): Promise<Prefs>;
@@ -9,9 +10,40 @@ export interface SettingsStore {
   setSystem(s: SystemSettings): Promise<SystemSettings>;
   getBranding(): Promise<Branding>;
   setLogo(file: File | null): Promise<void>;
+  getAsset(name: AssetName): Promise<Blob | null>;
+  setAsset(name: AssetName, file: File | null): Promise<void>;
 }
 
-const MAX_LOGO = 1024 * 1024;
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+const MB = 1024 * 1024;
+const isFont = (n: AssetName) => n === "font_regular" || n === "font_bold";
+
+async function checkAsset(name: AssetName, file: File) {
+  if (isFont(name)) {
+    const h = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    const m = String.fromCharCode(...h);
+    const ok = (h[0] === 0 && h[1] === 1 && h[2] === 0 && h[3] === 0) || m === "OTTO" || m === "true";
+    if (!ok) throw new Error("Upload a TTF or OTF font file.");
+  } else if (!IMAGE_TYPES.includes(file.type)) throw new Error("Upload a PNG, JPG, SVG or WebP image.");
+  const max = name === "logo" ? 2 : 5;
+  if (file.size > max * MB) throw new Error(`That file is too large (${max} MB at most).`);
+}
+
+let logoUrl: string | null = null;
+let logoBlob: Blob | null = null;
+let migrated = false;
+async function migrateLogo() {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const old = localStorage.getItem("rw.logo");
+    if (!old) return;
+    try {
+      if (!(await idbGet("logo"))) await idbPut("logo", await (await fetch(old)).blob());
+    } catch { /* could not convert; drop the old copy anyway */ }
+    localStorage.removeItem("rw.logo");
+  } catch { /* storage unavailable */ }
+}
 
 function lsGet<T>(key: string, fallback: T): T {
   try { const s = localStorage.getItem(key); return s ? (JSON.parse(s) as T) : fallback; } catch { return fallback; }
@@ -36,6 +68,10 @@ const webStore: SettingsStore = {
   async setLogo(file) {
     if (file) await api.putAsset("logo", file); else await api.deleteAsset("logo");
   },
+  getAsset: (name) => api.getAsset(name),
+  async setAsset(name, file) {
+    if (file) await api.putAsset(name, file); else await api.deleteAsset(name);
+  },
 };
 
 const localStore: SettingsStore = {
@@ -45,20 +81,24 @@ const localStore: SettingsStore = {
   async setSystem(s) { lsSet("rw.system", s); return s; },
   async getBranding() {
     const s = lsGet<SystemSettings>("rw.system", {});
-    let logo: string | null = null;
-    try { logo = localStorage.getItem("rw.logo"); } catch { /* ignore */ }
-    return { company_name: s.company_name ?? "", accent: s.accent ?? null, logo_url: logo };
+    let blob: Blob | null = null;
+    try { blob = await localStore.getAsset("logo"); } catch { /* no logo */ }
+    if (!blob) { if (logoUrl) URL.revokeObjectURL(logoUrl); logoUrl = null; logoBlob = null; }
+    else if (!logoUrl || logoBlob !== blob) {
+      if (logoUrl) URL.revokeObjectURL(logoUrl);
+      logoUrl = URL.createObjectURL(blob); logoBlob = blob;
+    }
+    return { company_name: s.company_name ?? "", accent: s.accent ?? null, logo_url: logoUrl };
   },
-  async setLogo(file) {
-    if (!file) { try { localStorage.removeItem("rw.logo"); } catch { /* ignore */ } return; }
-    if (file.size > MAX_LOGO) throw new Error("Pick an image under 1 MB.");
-    const url = await new Promise<string>((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(String(r.result));
-      r.onerror = () => rej(new Error("Could not read that file."));
-      r.readAsDataURL(file);
-    });
-    try { localStorage.setItem("rw.logo", url); } catch { throw new Error("Could not save the logo."); }
+  setLogo: (file) => localStore.setAsset("logo", file),
+  async getAsset(name) {
+    if (name === "logo") await migrateLogo();
+    return idbGet(name);
+  },
+  async setAsset(name, file) {
+    if (!file) { await idbDelete(name); return; }
+    await checkAsset(name, file);
+    await idbPut(name, file);
   },
 };
 

@@ -1,20 +1,23 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { applyAccent, applyTheme, isHex6, resolveTheme } from "../theme";
 import { settingsStore } from "./store";
-import type { Branding, Prefs, SystemSettings } from "./types";
+import type { AssetName, Branding, Prefs, SystemSettings } from "./types";
 
 interface Ctx {
   prefs: Prefs; system: SystemSettings; branding: Branding;
   savePrefs(p: Partial<Prefs>): Promise<void>;
   saveSystem(s: Partial<SystemSettings>): Promise<void>;
   setLogo(f: File | null): Promise<void>;
+  setAsset(name: AssetName, f: File | null): Promise<void>;
+  /** Goes up after any asset change. */
+  assetsVersion: number;
   reload(): Promise<void>;
   loaded: boolean;
 }
 
 const EMPTY: Branding = { company_name: "", accent: null, logo_url: null };
 const noop = async () => {};
-const SettingsCtx = createContext<Ctx>({ prefs: {}, system: {}, branding: EMPTY, savePrefs: noop, saveSystem: noop, setLogo: noop, reload: noop, loaded: false });
+const SettingsCtx = createContext<Ctx>({ prefs: {}, system: {}, branding: EMPTY, savePrefs: noop, saveSystem: noop, setLogo: noop, setAsset: noop, assetsVersion: 0, reload: noop, loaded: false });
 
 const accentOf = (s: SystemSettings) => (typeof s.accent === "string" && isHex6(s.accent) ? s.accent : null);
 
@@ -23,6 +26,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [system, setSystem] = useState<SystemSettings>({});
   const [branding, setBranding] = useState<Branding>(EMPTY);
   const [loaded, setLoaded] = useState(false);
+  const [assetsVersion, setAssetsVersion] = useState(0);
   const store = useMemo(() => settingsStore(), []);
 
   const reload = useCallback(async () => {
@@ -57,12 +61,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     applyAccent(accentOf(next));
     try { setBranding(await store.getBranding()); } catch { /* keep */ }
   }, [store, system]);
-  const setLogo = useCallback(async (f: File | null) => {
-    await store.setLogo(f);
-    setBranding(await store.getBranding());
+  const setAsset = useCallback(async (name: AssetName, f: File | null) => {
+    await store.setAsset(name, f);
+    setAssetsVersion((n) => n + 1);
+    if (name === "logo") setBranding(await store.getBranding());
   }, [store]);
+  const setLogo = useCallback((f: File | null) => setAsset("logo", f), [setAsset]);
 
-  const value = useMemo(() => ({ prefs, system, branding, savePrefs, saveSystem, setLogo, reload, loaded }), [prefs, system, branding, savePrefs, saveSystem, setLogo, reload, loaded]);
+  const value = useMemo(() => ({ prefs, system, branding, savePrefs, saveSystem, setLogo, setAsset, assetsVersion, reload, loaded }), [prefs, system, branding, savePrefs, saveSystem, setLogo, setAsset, assetsVersion, reload, loaded]);
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
 }
 

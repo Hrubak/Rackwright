@@ -710,6 +710,7 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
             "/api/clients/:id",
             get(clients::get_client).patch(clients::patch_client).delete(clients::delete_client),
         )
+        .route("/api/clients/:id/report", get(clients::get_client_report).put(clients::put_client_report))
         .route("/api/clients/:id/sites", post(clients::create_site))
         .route("/api/sites/:id", axum::routing::patch(clients::patch_site).delete(clients::delete_site))
         .route("/api/clients/:id/links", post(clients::create_link))

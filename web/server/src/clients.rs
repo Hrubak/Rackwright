@@ -65,7 +65,57 @@ pub(crate) fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if !has_site_id {
         conn.execute_batch("ALTER TABLE racks ADD COLUMN site_id INTEGER;")?;
     }
+    let mut has_report = false;
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(clients)")?;
+        let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
+        for n in names {
+            if n? == "report" {
+                has_report = true;
+            }
+        }
+    }
+    if !has_report {
+        conn.execute_batch("ALTER TABLE clients ADD COLUMN report TEXT NOT NULL DEFAULT '{}';")?;
+    }
     conn.execute_batch("CREATE INDEX IF NOT EXISTS racks_site ON racks(site_id);")
+}
+
+const MAX_REPORT: usize = 64 * 1024;
+
+pub(crate) async fn get_client_report(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<i64>) -> ApiResult {
+    auth(&st, &headers)?;
+    let text: Option<String> = {
+        let conn = st.db();
+        let t = conn
+            .query_row("SELECT report FROM clients WHERE id = ?1", params![id], |r| r.get::<_, String>(0))
+            .optional()?;
+        t
+    };
+    let text = text.ok_or_else(client_not_found)?;
+    let v = serde_json::from_str::<Value>(&text)
+        .ok()
+        .filter(|v| v.is_object())
+        .unwrap_or_else(|| json!({}));
+    Ok(json_ok(&v))
+}
+
+pub(crate) async fn put_client_report(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<i64>, body: Bytes) -> ApiResult {
+    auth(&st, &headers)?;
+    let conn = st.db();
+    if !client_exists(&conn, id)? {
+        return Err(client_not_found());
+    }
+    if body.len() > MAX_REPORT {
+        return Err(ApiError::bad("Report options are too large (64 KB at most)"));
+    }
+    let v: Value = parse(&body)?;
+    if !v.is_object() {
+        return Err(ApiError::bad("Report options must be a JSON object"));
+    }
+    let text = v.to_string();
+    conn.execute("UPDATE clients SET report = ?1 WHERE id = ?2", params![text, id])?;
+    Ok(json_ok(&v))
 }
 
 // ---------------------------------------------------------------- helpers

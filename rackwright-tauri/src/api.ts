@@ -131,3 +131,19 @@ export async function apiRaw<T = any>(method: string, path: string, file: File):
   return j as T;
 }
 export const putAsset = (name: string, file: File) => apiRaw<AssetInfo>("PUT", `/api/assets/${name}`, file);
+
+/** GET a binary asset. 404 -> null. */
+export async function getAsset(name: string): Promise<Blob | null> {
+  let r: Response;
+  try { r = await fetch(`/api/assets/${name}`, { credentials: "same-origin" }); } catch { throw new ApiError(0, "Cannot reach the server"); }
+  if (r.status === 404) return null;
+  if (!r.ok) {
+    if (r.status === 401) onUnauthorized();
+    let j: any = {};
+    try { j = await r.json(); } catch { /* ignore */ }
+    throw new ApiError(r.status, j?.error || `Request failed (${r.status})`, j);
+  }
+  return r.blob();
+}
+export const getClientReport = (id: number) => api<Record<string, unknown>>("GET", `/api/clients/${id}/report`);
+export const putClientReport = (id: number, o: unknown) => api("PUT", `/api/clients/${id}/report`, o);

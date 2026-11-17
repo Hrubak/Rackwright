@@ -16,6 +16,16 @@ const MAX_PREFS: usize = 16 * 1024;
 const MAX_SETTINGS: usize = 64 * 1024;
 const LOGO_TYPES: &[&str] = &["image/png", "image/svg+xml", "image/jpeg", "image/webp"];
 const LOGO_MAX: usize = 2 * 1024 * 1024;
+const ART_MAX: usize = 5 * 1024 * 1024;
+const FONT_MAX: usize = 5 * 1024 * 1024;
+const FONT_TYPES: &[&str] = &[
+    "font/ttf",
+    "font/otf",
+    "font/sfnt",
+    "application/x-font-ttf",
+    "application/x-font-otf",
+    "application/octet-stream",
+];
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS settings (
@@ -165,6 +175,24 @@ fn validate_settings(v: &Value) -> Result<(), ApiError> {
             _ => return Err(ApiError::bad("Default rack height must be a whole number from 1 to 60")),
         }
     }
+    if let Some(x) = obj.get("report_secondary") {
+        match x.as_str() {
+            Some(s) if s.is_empty() || is_hex_colour(s) => {}
+            _ => return Err(ApiError::bad("Secondary colour must look like #336699")),
+        }
+    }
+    if let Some(x) = obj.get("address_line") {
+        match x.as_str() {
+            Some(s) if s.chars().count() <= 200 => {}
+            _ => return Err(ApiError::bad("Address line must be text of 200 characters or fewer")),
+        }
+    }
+    if let Some(x) = obj.get("report_font_name") {
+        match x.as_str() {
+            Some(s) if s.chars().count() <= 100 => {}
+            _ => return Err(ApiError::bad("Font name must be text of 100 characters or fewer")),
+        }
+    }
     Ok(())
 }
 
@@ -208,12 +236,18 @@ pub(crate) async fn put_settings(State(st): State<Shared>, headers: HeaderMap, b
 
 // ---------------------------------------------------------------- assets
 
-/// Allowed types and size limit for an asset name, or None for an unknown name.
-fn asset_rule(name: &str) -> Option<(&'static [&'static str], usize)> {
+/// Allowed types, size limit and whether the asset is a font, or None for an unknown name.
+fn asset_rule(name: &str) -> Option<(&'static [&'static str], usize, bool)> {
     match name {
-        "logo" => Some((LOGO_TYPES, LOGO_MAX)),
+        "logo" => Some((LOGO_TYPES, LOGO_MAX, false)),
+        "cover_art" | "header_art" | "footer_art" => Some((LOGO_TYPES, ART_MAX, false)),
+        "font_regular" | "font_bold" => Some((FONT_TYPES, FONT_MAX, true)),
         _ => None,
     }
+}
+
+fn has_font_magic(b: &[u8]) -> bool {
+    b.starts_with(&[0x00, 0x01, 0x00, 0x00]) || b.starts_with(b"OTTO") || b.starts_with(b"true")
 }
 
 fn asset_not_found() -> ApiError {
@@ -227,20 +261,31 @@ pub(crate) async fn put_asset(
     body: Bytes,
 ) -> ApiResult {
     auth_admin(&st, &headers)?;
-    let (types, max) = asset_rule(&name).ok_or_else(asset_not_found)?;
+    let (types, max, is_font) = asset_rule(&name).ok_or_else(asset_not_found)?;
     let mime = headers
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.split(';').next().unwrap_or("").trim().to_lowercase())
         .unwrap_or_default();
     if !types.iter().any(|t| *t == mime.as_str()) {
-        return Err(ApiError::bad("That file type is not allowed. Use PNG, SVG, JPEG or WebP."));
+        return Err(ApiError::bad(if is_font {
+            "Upload a TTF or OTF font file."
+        } else {
+            "Upload a PNG, JPG, SVG or WebP image."
+        }));
     }
     if body.is_empty() {
         return Err(ApiError::bad("The file is empty"));
     }
     if body.len() > max {
-        return Err(ApiError::bad("The file is too large (2 MB at most)"));
+        return Err(ApiError::bad(if max == LOGO_MAX {
+            "That file is too large (2 MB at most)."
+        } else {
+            "That file is too large (5 MB at most)."
+        }));
+    }
+    if is_font && !has_font_magic(&body) {
+        return Err(ApiError::bad("Upload a TTF or OTF font file."));
     }
     let now = now_rfc3339();
     st.db().execute(

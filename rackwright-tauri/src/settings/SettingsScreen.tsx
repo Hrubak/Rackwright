@@ -1,12 +1,13 @@
 // Settings screen: full-window panel with a left nav. Profile, Company, New racks, Users, Server update.
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
-import { DARK, isHex6, v } from "../theme";
+import { DARK, LIGHT, isHex6, v } from "../theme";
 import { IS_WEB } from "../backend";
 import * as A from "../api";
 import { RACK_MODELS, GENERIC_MAX_U, GENERIC_MIN_U, kindLabel } from "../racks";
 import { UpdateBody, UsersBody, WebProps, errStyle, msgOf } from "../web";
 import { useSettings } from "./context";
-import type { StartScreen, ThemePref, Units } from "./types";
+import { settingsStore } from "./store";
+import type { AssetName, StartScreen, ThemePref, Units } from "./types";
 
 export type SettingsTab = "profile" | "company" | "racks" | "users" | "update";
 
@@ -118,8 +119,95 @@ function Company() {
         <button style={btn} onClick={() => setAccent("")}>Use default</button>
         {!valid && <span style={{ ...errStyle, marginLeft: 6 }}>Use a colour like {DARK.accent}.</span>}
       </div>
-      <div style={help}>Shown in the top bar and on the sign-in page. Reports use these in a later version.</div>
+      <div style={help}>Shown in the top bar, on the sign-in page and in client reports.</div>
       <button style={btn} onClick={() => st.run(() => saveSystem({ company_name: name.trim(), accent }))} disabled={!valid}>Save</button>
+      {st.view}
+      <Reports />
+    </>
+  );
+}
+
+const ART: [AssetName, string][] = [["cover_art", "Cover artwork"], ["header_art", "Page header artwork"], ["footer_art", "Page footer artwork"]];
+const IMG_ACCEPT = ".png,.svg,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/jpeg,image/webp";
+
+/** Reads one asset; reloads when assetsVersion changes. */
+function useAsset(name: AssetName) {
+  const { assetsVersion } = useSettings();
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    settingsStore().getAsset(name).then((b) => { if (live) setBlob(b); }, () => { if (live) setBlob(null); });
+    return () => { live = false; };
+  }, [name, assetsVersion]);
+  useEffect(() => {
+    if (!blob) { setUrl(null); return; }
+    const u = URL.createObjectURL(blob);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [blob]);
+  return { blob, url };
+}
+
+function ArtRow({ name, label }: { name: AssetName; label: string }) {
+  const { setAsset } = useSettings();
+  const st = useStatus();
+  const { blob, url } = useAsset(name);
+  const file = useRef<HTMLInputElement>(null);
+  return (
+    <div style={lbl}>{label}<br />
+      {url && <img src={url} alt={label} style={{ maxHeight: 60, maxWidth: 240, objectFit: "contain", display: "block", margin: "4px 0 6px" }} />}
+      <input ref={file} type="file" accept={IMG_ACCEPT} style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) st.run(() => setAsset(name, f)); }} />
+      <button style={btn} onClick={() => file.current?.click()}>Upload…</button>
+      <button style={btn} onClick={() => st.run(() => setAsset(name, null))} disabled={!blob}>Remove</button>
+      {st.view}
+    </div>
+  );
+}
+
+function FontRow({ name, label }: { name: AssetName; label: string }) {
+  const { setAsset } = useSettings();
+  const st = useStatus();
+  const { blob } = useAsset(name);
+  const [fileName, setFileName] = useState("");
+  const file = useRef<HTMLInputElement>(null);
+  return (
+    <div style={lbl}>{label}: <span style={{ opacity: 0.7 }}>{blob ? fileName || "Uploaded" : "Not set"}</span><br />
+      <input ref={file} type="file" accept=".ttf,.otf,font/ttf,font/otf" style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) st.run(async () => { await setAsset(name, f); setFileName(f.name); }); }} />
+      <button style={btn} onClick={() => file.current?.click()}>Upload…</button>
+      <button style={btn} onClick={() => st.run(async () => { await setAsset(name, null); setFileName(""); })} disabled={!blob}>Remove</button>
+      {st.view}
+    </div>
+  );
+}
+
+function Reports() {
+  const { system, saveSystem } = useSettings();
+  const st = useStatus();
+  const [sec, setSec] = useState(system.report_secondary ?? "");
+  const [addr, setAddr] = useState(system.address_line ?? "");
+  const [font, setFont] = useState(system.report_font_name ?? "");
+  useEffect(() => { setSec(system.report_secondary ?? ""); setAddr(system.address_line ?? ""); setFont(system.report_font_name ?? ""); }, [system.report_secondary, system.address_line, system.report_font_name]);
+  const valid = sec === "" || isHex6(sec);
+  return (
+    <>
+      <h2 style={{ ...h2, marginTop: 24 }}>Reports</h2>
+      <div style={lbl}>Secondary colour<br />
+        <input type="color" value={isHex6(sec) ? sec : LIGHT.text} onChange={(e) => setSec(e.target.value)} style={{ verticalAlign: "middle", marginRight: 6 }} />
+        <input style={{ ...inp, width: 90, marginRight: 6 }} value={sec} placeholder={LIGHT.text} onChange={(e) => setSec(e.target.value)} />
+        <button style={btn} onClick={() => setSec("")}>Use default</button>
+        {!valid && <span style={{ ...errStyle, marginLeft: 6 }}>Use a colour like {LIGHT.text}.</span>}
+      </div>
+      <label style={lbl}>Address line<br /><input style={{ ...inp, width: 360 }} maxLength={200} value={addr} onChange={(e) => setAddr(e.target.value)} /></label>
+      <div style={help}>Shown in the footer of every report page.</div>
+      <FontRow name="font_regular" label="Font, Regular" />
+      <FontRow name="font_bold" label="Font, Bold" />
+      <label style={lbl}>Font name<br /><input style={{ ...inp, width: 280 }} maxLength={100} value={font} onChange={(e) => setFont(e.target.value)} /></label>
+      <div style={help}>Without a font, reports use Noto Sans.</div>
+      {ART.map(([n, l]) => <ArtRow key={n} name={n} label={l} />)}
+      <button style={btn} disabled={!valid} onClick={() => st.run(() => saveSystem({ report_secondary: sec, address_line: addr.trim(), report_font_name: font.trim() }))}>Save</button>
       {st.view}
     </>
   );

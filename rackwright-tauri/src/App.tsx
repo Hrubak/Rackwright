@@ -36,6 +36,7 @@ import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
+const ReportDialog = lazy(() => import("./report/ReportDialog"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
   placeNew, portOf, protoOf, rackUsage, shapeOf, tplRackStatus, MOUNTS, Mount, mountOf, setMount, sidesOf, stepSide, upgradeDoc, widthLabel,
@@ -99,6 +100,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [reportFor, setReportFor] = useState<string | null>(null); // "" = no client preselected
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [clientsTarget, setClientsTarget] = useState<{ client?: string; site?: number }>({});
   const [loc, setLoc] = useState<RackLocation | null | "unassigned">(null);
@@ -494,6 +496,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         { label: "Export PDF", run: () => doExport("pdf"), disabled: noRacks, hint: needRack },
         { label: "Export Visio (.vsdx)", run: () => doExport("visio"), disabled: noRacks, hint: needRack },
         ...(IS_WEB ? [{ label: "Export file (.rack.json)", run: doExportFile }] : []),
+        { label: "Client report…", run: () => setReportFor(loc && loc !== "unassigned" ? loc.clientKey : "") },
       ] },
     ] },
     { label: "Edit", items: [
@@ -523,6 +526,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     ] },
     { label: "Clients", items: [
       { label: "Clients…", run: () => { setClientsImport(false); setClientsOpen(true); } },
+      { label: "Client report…", run: () => setReportFor("") },
       { label: "Import Auvik into a client…", run: () => { setClientsImport(true); setClientsOpen(true); } },
     ] },
     { label: "Help", items: [
@@ -804,6 +808,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
           current={{ label: cur?.name ?? (path ? path.split(/[\\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
           saveCurrentTo={IS_WEB && !cur && doc.racks.length > 0 ? saveCurrentTo : undefined} />
       )}
+      {reportFor != null && <Suspense fallback={null}><ReportDialog clientKey={reportFor || undefined} onClose={() => setReportFor(null)} /></Suspense>}
       {IS_WEB && showRacks && <RackList currentId={cur?.id ?? null} onClose={() => setShowRacks(false)} onOpen={(m) => loadShared(m.id)} />}
       {IS_WEB && nameAsk && <NamePrompt title={nameAsk.title} initial={nameAsk.initial} onOk={nameAsk.cb} onCancel={() => setNameAsk(null)} />}
       {IS_WEB && conflict && <ConflictDialog by={conflict.by} onTheirs={conflictTheirs} onMine={conflictMine} onCancel={() => setConflict(null)} />}

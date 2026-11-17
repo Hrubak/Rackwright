@@ -5,6 +5,7 @@
 import * as A from "../api";
 import { IS_WEB } from "../backend";
 import type { Doc } from "../types";
+import type { ReportOptions } from "../report/types";
 import { absPath, baseOf, relPath } from "./util";
 
 export interface RackItem { key: string; name: string; id?: number; path?: string; updated?: string; by?: string }
@@ -41,6 +42,9 @@ export interface ClientStore {
   /** Web: put a shared rack in a site. Desktop: add .rack.json files (asks with a dialog when `paths` is empty). */
   addRacks(key: string, siteId: number, items?: RackItem[], paths?: string[]): Promise<void>;
   loadDoc(r: RackItem): Promise<Doc>;
+  /** Saved report options, or null when none were saved yet. */
+  getReport(key: string): Promise<ReportOptions | null>;
+  setReport(key: string, o: ReportOptions): Promise<void>;
 }
 
 // ---------------------------------------------------------------- web
@@ -74,6 +78,8 @@ function webStore(): ClientStore {
     async unassigned() { return (await A.listRacks()).filter((m) => m.site_id == null).map(rackItem); },
     async addRacks(_key, siteId, items = []) { for (const r of items) if (r.id != null) await A.setRackSite(r.id, siteId); },
     async loadDoc(r) { return (await A.getRack(r.id!)).doc; },
+    async getReport(key) { const o = await A.getClientReport(Number(key)); return o && Object.keys(o).length ? (o as unknown as ReportOptions) : null; },
+    async setReport(key, o) { await A.putClientReport(Number(key), o); },
   };
 }
 
@@ -83,6 +89,7 @@ interface ClientFile {
   rackwright: "client"; v: 1; name: string; notes: string; nid: number;
   sites: { id: number; name: string; address: string; notes: string; racks: { path: string; name: string }[] }[];
   links?: LinkItem[];
+  report?: unknown;
 }
 
 const RECENT = "rw.clientFiles";
@@ -197,6 +204,8 @@ function desktopStore(): ClientStore {
         }
       });
     },
+    async getReport(key) { const o = (await read(key)).report; return o && typeof o === "object" && Object.keys(o).length ? (o as ReportOptions) : null; },
+    async setReport(key, o) { await change(key, (f) => { f.report = o; }); },
     async loadDoc(r) {
       if (!r.path) throw new Error("No file for this rack.");
       return (await core()).invoke<Doc>("open_doc", { path: r.path });

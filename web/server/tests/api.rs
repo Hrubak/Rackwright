@@ -748,6 +748,84 @@ async fn logo_upload() {
 }
 
 #[tokio::test]
+async fn report_settings_and_assets() {
+    let (app, _d) = make_app();
+    let mut admin = Client::new(&app);
+    setup_admin(&mut admin).await;
+    let mut user = make_member(&app, &mut admin, "u@example.com").await;
+
+    let body = json!({
+        "company_name": "Example IT",
+        "report_secondary": "#1f2328",
+        "address_line": "1 Example Street",
+        "report_font_name": "Example Sans"
+    });
+    let (s, v) = admin.put("/api/settings", body.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(user.get("/api/settings").await.1["settings"], body);
+    assert_eq!(admin.put("/api/settings", json!({"report_secondary": ""})).await.0, StatusCode::OK);
+    assert_eq!(admin.put("/api/settings", json!({"report_secondary": "red"})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!({"address_line": "x".repeat(201)})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!({"report_font_name": "x".repeat(101)})).await.0, StatusCode::BAD_REQUEST);
+
+    // a font needs the right magic bytes
+    let mut ttf = vec![0x00u8, 0x01, 0x00, 0x00];
+    ttf.extend_from_slice(&[0u8; 64]);
+    let (s, _, b) = admin
+        .raw(Method::PUT, "/api/assets/font_regular", Some("application/octet-stream"), ttf.clone())
+        .await;
+    assert_eq!(s, StatusCode::OK, "{}", String::from_utf8_lossy(&b));
+    let png = b"\x89PNG\r\n\x1a\nxxxx".to_vec();
+    let (s, _, _) = admin
+        .raw(Method::PUT, "/api/assets/font_bold", Some("application/octet-stream"), png.clone())
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // artwork is limited to 5 MB
+    let (s, _, _) = admin
+        .raw(Method::PUT, "/api/assets/cover_art", Some("image/png"), vec![0u8; 6 * 1024 * 1024])
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, _) = admin.raw(Method::PUT, "/api/assets/header_art", Some("image/png"), png.clone()).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // a member can read an asset but not write one
+    let (s, _, b) = user.raw(Method::GET, "/api/assets/font_regular", None, Vec::new()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b, ttf);
+    let (s, _, _) = user.raw(Method::PUT, "/api/assets/header_art", Some("image/png"), png.clone()).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn client_report_options() {
+    let (app, _d) = make_app();
+    let mut a = Client::new(&app);
+    setup_admin(&mut a).await;
+    let mut anon = Client::new(&app);
+
+    let (s, v) = a.post("/api/clients", json!({"name": "Example Client"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let id = v["id"].as_i64().unwrap();
+    let uri = format!("/api/clients/{id}/report");
+
+    assert_eq!(anon.get(&uri).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(a.get(&uri).await, (StatusCode::OK, json!({})));
+    let opts = json!({"mode": "detailed", "summary": "All good.", "pick": [1, 2]});
+    let (s, v) = a.put(&uri, opts.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, opts);
+    assert_eq!(a.get(&uri).await.1, opts);
+
+    assert_eq!(a.get("/api/clients/9999/report").await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.put("/api/clients/9999/report", json!({})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.put(&uri, json!([1])).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.put(&uri, json!({"summary": "x".repeat(70 * 1024)})).await.0, StatusCode::BAD_REQUEST);
+    // the refused requests changed nothing
+    assert_eq!(a.get(&uri).await.1, opts);
+}
+
+#[tokio::test]
 async fn me_patch_and_prefs() {
     let (app, _d) = make_app();
     let mut admin = Client::new(&app);
