@@ -2,6 +2,13 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.10.0 — 2026-11-17
+Web and desktop. Update the LXC as usual; this is the last update you need to look for yourself.
+- **Update prompts on the web.** When the server has been updated, everyone with Rackwright open sees "Rackwright was updated. Reload" so they are not left on the old version. Admins also see a banner when a newer Rackwright is available for the server, with Update now (the same as Update server in your account menu) and Later. Admins are checked at most once a day.
+- **Update prompts on the desktop.** Rackwright checks for a newer desktop release on start and once a day. A banner offers Download (opens the release page, where you get the new Rackwright.exe), Skip this version, or close. Help › Check for updates checks right away. You first see the prompt when the release after 3.10.0 comes out.
+- Checks that fail (no internet, GitHub busy) stay quiet; only Help › Check for updates tells you.
+- For scripts: `GET /api/version` returns the running server version without signing in.
+
 ## 3.9.0 — 2026-11-17
 Web and desktop. The web server gets new upload types and a saved report per client, so update the LXC as usual.
 - **Client report.** A quarterly-review PDF for one client. Open it from the Clients screen (Client report), the Clients menu or File › Export. Pick Overview or Detailed, the sites to include, the date and who it is prepared for, and write an executive summary and recommendations. The text is remembered for each client, so next quarter starts from the last one.
