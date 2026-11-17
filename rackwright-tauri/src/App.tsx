@@ -27,7 +27,7 @@ import { useSettings } from "./settings/context";
 import SettingsScreen, { SettingsTab } from "./settings/SettingsScreen";
 import { RACK_MODELS, genericDefaultU, kindLabel, specOf, modelById } from "./racks";
 import { AuvikInfo, EndpointTable, UnplacedDialog } from "./auvik/Panels";
-import PortsEditor from "./PortsEditor";
+import DevicePanel from "./panel/DevicePanel";
 import ModelPicker from "./ModelPicker";
 import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
@@ -682,7 +682,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
               background: toast.bad ? v("danger-bg") : v("ok-bg"), border: `1px solid ${toast.bad ? v("danger") : v("ok")}`, pointerEvents: "none" }}>{toast.text}</div>
           )}
         </div>
-        <div style={{ width: 240, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 10, overflow: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ width: selDev ? 360 : 240, flexShrink: 0, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 10, overflow: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
           {!sel && <>
             <Sec title="Overview" first />
             <div style={{ fontSize: 12, lineHeight: 1.7 }}>
@@ -723,17 +723,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
             {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {fmtDims(selRack.width_mm, selRack.depth_mm, settings.prefs.units ?? "mm")}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
-          {selDev && <>
-            <Sec title="Device" first />
-            {field("Type", selDev.type, (v) => devSet(selDev, "type", v), 0, lockIcon(selDev, "type"))}
-            {field("Name", selDev.name, (v) => devSet(selDev, "name", v), 0, lockIcon(selDev, "name"))}
-            {field("Model", selDev.model ?? "", (v) => devSet(selDev, "model", v), 0, lockIcon(selDev, "model"))}
-            {field("IP", selDev.ip ?? "", (v) => devSet(selDev, "ip", v), 0, lockIcon(selDev, "ip"))}
-            {field("MAC", selDev.mac ?? "", (v) => devSet(selDev, "mac", v), 0, lockIcon(selDev, "mac"))}
-            {field("Serial", selDev.serial ?? "", (v) => devSet(selDev, "serial", v), 0, lockIcon(selDev, "serial"))}
-            <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Notes{lockIcon(selDev, "notes")}<br />
-              <textarea style={{ ...inp, width: "100%", boxSizing: "border-box", height: 46 }} value={selDev.notes ?? ""} onChange={(e) => devSet(selDev, "notes", e.target.value)} /></label>
-            <Sec title="Placement" />
+          {selDev && <DevicePanel doc={doc} dev={selDev} edit={edit} epFocus={epFocus?.dev === selDev.id ? epFocus.idx : null}
+            onSelect={(id) => setSel({ kind: "dev", id })} onClose={() => setSel(null)} onLocate={() => { setView("rack"); setFitTick((k) => k + 1); }}
+            onDuplicate={doDuplicate} onChangeModel={() => setModelFor(selDev.id)} onDelete={del} onCopied={(ok) => say(ok ? "Copied" : "Could not copy", !ok)}
+            lockIcon={(k) => lockIcon(selDev, k)} devSet={(k, val) => devSet(selDev, k, val)}
+            placement={<>
             <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Rack<br />
               <select style={{ ...inp, width: "100%" }} value={selDev.rack ?? ""} onChange={(e) => {
                 const v = e.target.value;
@@ -766,17 +760,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
                 onChange={(e) => { const n = parseInt(e.target.value); if (n >= 1) edit((d) => { const x = resizeDevice(d, selDev.id, n); return x.ok ? x.msg : "!" + x.msg; }, `hu${selDev.id}`); }} /></label>
               {!selDev.plate && <label style={{ color: v("text") }}><input type="checkbox" checked={!!selDev.half} onChange={(e) => edit((d) => { const x = resizeDevice(d, selDev.id, selDev.u_size, e.target.checked); return x.ok ? x.msg : "!" + x.msg; })} /> Half width</label>}
             </div>
-            <Sec title="Ports" />
-            <div style={{ fontSize: 12, opacity: 0.7 }}>
-              {selDev.u_size}U, {selDev.ports.length} ports ({portsCabled(selDev)} cabled). Drag to move; click a port, then another, to cable.
-            </div>
-            <PortsEditor key={selDev.id} dev={selDev} doc={doc} edit={edit} />
-            {(selDev.type === "Endpoints" || selDev.type === "Virtual machines") &&
-              <EndpointTable dev={selDev} doc={doc} edit={edit} focusIdx={epFocus?.dev === selDev.id ? epFocus.idx : null} />}
-            <Sec title="Actions" />
-            <button style={btn} onClick={() => setModelFor(selDev.id)}>Change model…</button>
-            <button style={btn} onClick={() => { let id = 0; if (edit((d) => { id = duplicateDevice(d, selDev.id)?.id ?? 0; })) setSel({ kind: "dev", id }); }}>Duplicate</button>
-          </>}
+            </>} />}
           {selCable && <>
             <Sec title="Cable" first />
             <div style={{ fontSize: 12 }}>{endp(selCable.a)}<br />to {endp(selCable.b)}</div>
@@ -788,7 +772,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
                 <option>solid</option><option>dashed</option>
               </select></label>
           </>}
-          {sel && <button style={{ ...btn, color: v("danger"), marginRight: 0 }} onClick={del}>Delete</button>}
+          {sel && !selDev && <button style={{ ...btn, color: v("danger"), marginRight: 0 }} onClick={del}>Delete</button>}
         </div>
       </div>
       {routes.hints.length > 0 && (
