@@ -3,6 +3,7 @@ import type { Doc } from "../types";
 import type { ClientItem } from "../clients/store";
 import { Stats, addStats, docStats, zero } from "../clients/util";
 import type { Token } from "../theme";
+import { clientAlerts, countLevels, type Level } from "../attention/model";
 
 export interface CardStats {
   stats: Stats;
@@ -10,9 +11,11 @@ export interface CardStats {
   /** Names of racks whose document could not be read; they are left out of the numbers. */
   failed: string[];
   sites: { id: number; name: string; racks: number }[];
+  /** Alert counts for this client (info included; cards show critical and warning only). */
+  alerts: Record<Level, number>;
 }
 
-export function cardStats(client: ClientItem, docs: Record<string, Doc | string>): CardStats {
+export function cardStats(client: ClientItem, docs: Record<string, Doc | string>, today = new Date().toLocaleDateString("en-CA")): CardStats {
   let stats: Stats = zero;
   const failed: string[] = [];
   for (const s of client.sites) for (const r of s.racks) {
@@ -24,6 +27,7 @@ export function cardStats(client: ClientItem, docs: Record<string, Doc | string>
     stats,
     usedPct: stats.totalU ? Math.round((stats.usedU / stats.totalU) * 100) : 0,
     failed,
+    alerts: countLevels(clientAlerts(client, docs, today)),
     sites: client.sites.map((s) => ({ id: s.id, name: s.name, racks: s.racks.length })),
   };
 }

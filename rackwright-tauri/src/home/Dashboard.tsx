@@ -6,6 +6,9 @@ import { ClientItem, clientStore } from "../clients/store";
 import MiniRack from "../clients/MiniRack";
 import { cardStats, clientToken, initials } from "./cards";
 import { addStats, zero } from "../clients/util";
+import type { RackItem } from "../clients/store";
+import AttentionList from "../attention/AttentionList";
+import { allClientAlerts, stillLoading } from "../attention/lists";
 
 const ImportToClient = lazy(() => import("../clients/ImportToClient"));
 
@@ -16,7 +19,7 @@ const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export type ClientTab = "floor" | "sites" | "racks" | "inventory" | "cabling" | "links";
 export interface OpenOpts { tab?: ClientTab; site?: number }
 
-export default function Dashboard({ onOpen, importTick }: { onOpen: (key: string, o?: OpenOpts) => void; importTick?: number }) {
+export default function Dashboard({ onOpen, onOpenRack, importTick }: { onOpen: (key: string, o?: OpenOpts) => void; onOpenRack?: (clientKey: string, r: RackItem, devId?: number) => void; importTick?: number }) {
   const store = clientStore();
   const [clients, setClients] = useState<ClientItem[] | null>(null);
   const [docs, setDocs] = useState<Record<string, Doc | string>>({});
@@ -58,6 +61,13 @@ export default function Dashboard({ onOpen, importTick }: { onOpen: (key: string
     for (const c of list) st = addStats(st, cardStats(c, docs).stats);
     return { clients: list.length, sites: list.reduce((n, c) => n + c.sites.length, 0), racks: list.reduce((n, c) => n + c.sites.reduce((m, s) => m + s.racks.length, 0), 0), devices: st.devices };
   }, [clients, docs]);
+  const attention = useMemo(() => allClientAlerts(clients ?? [], docs, new Date().toLocaleDateString("en-CA")), [clients, docs]);
+  const checking = !!clients && stillLoading(clients, docs);
+  const openAlert = (a: { clientKey?: string; rackKey?: string; devId?: number; kind: string }) => {
+    const c = clients?.find((x) => x.key === a.clientKey);
+    const r = c?.sites.flatMap((s) => s.racks).find((x) => x.key === a.rackKey);
+    if (c && r) onOpenRack?.(c.key, r, a.kind === "stale" ? undefined : a.devId);
+  };
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   return (
@@ -105,6 +115,13 @@ export default function Dashboard({ onOpen, importTick }: { onOpen: (key: string
                 {!minis.length && <span style={{ fontSize: 12, color: v("text-muted") }}>{c.sites.length ? "No racks in these sites yet." : "Add a site to start."}</span>}
               </div>
               <div style={{ display: "flex" }}>{big(cs.stats.racks, "racks")}{big(cs.stats.devices, "devices")}{big(cs.stats.cables, "cables")}{big(`${cs.usedPct}%`, "rack space")}</div>
+              {cs.alerts.critical + cs.alerts.warning > 0
+                ? <div style={{ fontSize: 12, textAlign: "center" }}>
+                    {cs.alerts.critical > 0 && <span style={{ color: v("danger") }}>{cs.alerts.critical} critical</span>}
+                    {cs.alerts.critical > 0 && cs.alerts.warning > 0 && " · "}
+                    {cs.alerts.warning > 0 && <span style={{ color: v("warn") }}>{cs.alerts.warning} warning{cs.alerts.warning === 1 ? "" : "s"}</span>}
+                  </div>
+                : <div style={{ fontSize: 12, textAlign: "center", color: v("text-muted") }}>Nothing needs attention</div>}
               {cs.failed.length > 0 && <div style={{ fontSize: 11, color: v("error-text") }}>Could not read: {cs.failed.join(", ")}</div>}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                 {cs.sites.map((s) => <button key={s.id} style={{ ...small, borderRadius: 10 }} onClick={() => onOpen(c.key, { tab: "racks", site: s.id })} title={`Open ${s.name}`}>{s.name} · {s.racks}</button>)}
@@ -118,7 +135,8 @@ export default function Dashboard({ onOpen, importTick }: { onOpen: (key: string
         <button onClick={newClient} style={{ border: `2px dashed ${v("border")}`, borderRadius: 8, background: "none", color: v("text-muted"), minHeight: 120, cursor: "pointer", fontSize: 14 }}>+ New client</button>
       </div>
       <h2 style={{ fontSize: 15, margin: "26px 0 6px" }}>Needs attention across clients</h2>
-      <div style={{ fontSize: 13, color: v("text-muted") }}>Nothing needs attention.</div>
+      {checking && <div style={{ fontSize: 13, color: v("text-muted") }}>Checking racks…</div>}
+      <AttentionList alerts={attention} onOpen={openAlert} />
       {importFor && <Suspense fallback={null}><ImportToClient client={importFor} onDone={load} onClose={() => setImportFor(null)} /></Suspense>}
     </div>
   );

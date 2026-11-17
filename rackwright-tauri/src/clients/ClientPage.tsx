@@ -5,6 +5,8 @@ import type { Doc } from "../types";
 import { Stats, addStats, docStats, statText, zero } from "./util";
 import MiniRack from "./MiniRack";
 import Inventory from "./Inventory";
+import AttentionList from "../attention/AttentionList";
+import { clientAlerts } from "../attention/model";
 import Links from "./Links";
 import Cabling from "./Cabling";
 import type { RackLocation } from "../location";
@@ -160,6 +162,11 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
       )}
       {tab === "sites" && (
         <>
+          <div style={{ marginBottom: 12 }}>
+            <h3 style={{ fontSize: 14, margin: "0 0 4px" }}>Needs attention</h3>
+            {sites.some((s) => s.racks.some((r) => docs[r.key] === undefined)) && <div style={{ fontSize: 12, color: v("text-muted") }}>Checking racks…</div>}
+            <AttentionList alerts={clientAlerts(scoped, docs, new Date().toLocaleDateString("en-CA"))} onOpen={(a) => { const r = sites.flatMap((s) => s.racks).find((x) => x.key === a.rackKey); if (r) open(r, { devId: a.kind === "stale" ? undefined : a.devId }); }} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <input key={`n${client.key}${client.name}`} style={{ ...inp, fontSize: 17, fontWeight: 600, flex: 1, maxWidth: 480 }} defaultValue={client.name}
               onBlur={(e) => { const nv = e.target.value.trim(); if (nv && nv !== client.name) run(() => store.update(client.key, { name: nv }), refresh); }} />
