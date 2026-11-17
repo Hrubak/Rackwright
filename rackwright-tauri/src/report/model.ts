@@ -4,7 +4,7 @@ import type { ClientItem } from "../clients/store";
 import type { ReportOptions } from "./types";
 import { addStats, docStats, inventoryRows, typeTotals, zero } from "../clients/util";
 import type { InvRow } from "../clients/util";
-import { clientAlerts } from "../attention/model";
+import { clientAlerts, todayIso } from "../attention/model";
 import type { Alert } from "../attention/model";
 import { powerBudget } from "../power/model";
 import { switchPorts, switchesOf } from "../views/switchPorts";
@@ -21,7 +21,7 @@ export interface ReportModel {
   summary: string; recommendations: string;
   totals: { sites: number; racks: number; usedU: number; totalU: number; devices: number; byType: [string, number][] };
   attention: Alert[];
-  power: { site: string; rack: string; w: number; unknown: number; circuit: string; amps: number }[];
+  power: { siteId: number; site: string; rack: string; w: number; unknown: number; circuit: string; amps: number }[];
   sites: SiteSection[]; links: LinkRow[]; inventory: InvRow[];
   /** Chosen sites only, and the links touching them; for the links diagram. */
   client: ClientItem; docs: Record<string, Doc | string>;
@@ -69,13 +69,14 @@ export function buildReportModel(input: { client: ClientItem; docs: Record<strin
       to: l.site_b == null ? "Internet" : nameOf.get(l.site_b) ?? "Unknown site",
       provider: l.provider, circuit: l.circuit, bandwidth: l.bandwidth,
     }));
-  const today = options.date || new Date().toLocaleDateString("en-CA");
-  const attention = clientAlerts({ ...client, sites: chosen }, docs, today);
+  const today = options.date || todayIso();
+  // Run on the whole client so IP clashes with other sites still show, then keep the chosen sites; "not checked on site" waits for Site visit.
+  const attention = clientAlerts(client, docs, today).filter((a) => a.kind !== "stale" && a.rackKey != null && keep.has(a.rackKey));
   const power: ReportModel["power"] = [];
   for (const sec of sites) for (const r of sec.racks) {
     if (!r.doc) continue;
     for (const p of powerBudget(r.doc).racks) {
-      power.push({ site: sec.name, rack: r.doc.racks.find((x) => x.id === p.rackId)?.name || r.name, w: p.w, unknown: p.unknown, circuit: p.circuit, amps: p.amps });
+      power.push({ siteId: sec.id, site: sec.name, rack: r.doc.racks.find((x) => x.id === p.rackId)?.name || r.name, w: p.w, unknown: p.unknown, circuit: p.circuit, amps: p.amps });
     }
   }
   return {

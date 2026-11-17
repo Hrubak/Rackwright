@@ -1,5 +1,5 @@
 // npx tsx scripts/attention.test.ts — attention model (synthetic data only)
-import { addYears, clientAlerts, countLevels, daysUntil, deviceAlerts, docAlerts, groupInfo, ipClashes, ipsOf, ipEntries } from "../src/attention/model";
+import { addYears, clientAlerts, countLevels, daysUntil, deviceAlerts, docAlerts, groupInfo, ipClashes, ipsOf, ipEntries, todayIso } from "../src/attention/model";
 import type { Device, Doc } from "../src/types";
 import type { ClientItem } from "../src/clients/store";
 
@@ -54,6 +54,14 @@ function loadDoc(w: number, extra: Partial<Device> = {}) {
 { const { doc, ups } = loadDoc(1100); eq("load crit", deviceAlerts(doc, ups, TODAY).map((a) => [a.level, a.msg]), [["critical", "Load 1,100 W is 110% of 1,000 W"]]); }
 { const { doc, ups } = loadDoc(900, { name: "x" }); eq("load unknown", deviceAlerts(doc, ups, TODAY).map((a) => [a.level, a.msg]), [["warning", "Load at least 900 W is 90% of 1,000 W"]]); }
 { const { doc, ups } = loadDoc(500); eq("load fine", deviceAlerts(doc, ups, TODAY), []); }
+
+// wording for today and one day
+eq("warranty today", w("2026-11-17"), [["warning", "warranty", "Warranty ends today"]]);
+eq("warranty 1 day", w("2026-11-18"), [["warning", "warranty", "Warranty ends in 1 day"]]);
+eq("battery today", deviceAlerts(mkDoc([]), mk(1, "UPS-01", "UPS", { battery_date: "2023-11-17" }), TODAY).map((x) => x.msg), ["UPS battery due today"]);
+eq("battery 1 day", deviceAlerts(mkDoc([]), mk(1, "UPS-01", "UPS", { battery_date: "2023-11-18" }), TODAY).map((x) => x.msg), ["UPS battery due in 1 day"]);
+eq("todayIso", /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(todayIso()), true);
+eq("ipsOf cidr", ipsOf(mk(1, "X", "NAS", { ip: "10.0.0.5/24, 10.0.0.6" })), ["10.0.0.5", "10.0.0.6"]);
 
 // stale racks
 const st = (rack: Partial<Doc["racks"][0]>, devs = [mk(1, "NAS-01", "NAS")]) => docAlerts("k", mkDoc(devs, rack), TODAY, new Map()).map((a) => [a.level, a.kind, a.msg, a.rackKey, a.rackId, a.rackName]);

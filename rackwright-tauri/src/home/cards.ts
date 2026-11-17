@@ -3,7 +3,7 @@ import type { Doc } from "../types";
 import type { ClientItem } from "../clients/store";
 import { Stats, addStats, docStats, zero } from "../clients/util";
 import type { Token } from "../theme";
-import { clientAlerts, countLevels, type Level } from "../attention/model";
+import { clientAlerts, countLevels, todayIso, type Alert, type Level } from "../attention/model";
 
 export interface CardStats {
   stats: Stats;
@@ -13,13 +13,17 @@ export interface CardStats {
   sites: { id: number; name: string; racks: number }[];
   /** Alert counts for this client (info included; cards show critical and warning only). */
   alerts: Record<Level, number>;
+  /** True while any rack document of this client is still loading. */
+  checking: boolean;
 }
 
-export function cardStats(client: ClientItem, docs: Record<string, Doc | string>, today = new Date().toLocaleDateString("en-CA")): CardStats {
+export function cardStats(client: ClientItem, docs: Record<string, Doc | string>, alerts?: Alert[], today = todayIso()): CardStats {
   let stats: Stats = zero;
   const failed: string[] = [];
+  let checking = false;
   for (const s of client.sites) for (const r of s.racks) {
     const d = docs[r.key];
+    if (d === undefined) checking = true;
     if (typeof d === "string") failed.push(r.name);
     else if (d) stats = addStats(stats, docStats(d));
   }
@@ -27,7 +31,8 @@ export function cardStats(client: ClientItem, docs: Record<string, Doc | string>
     stats,
     usedPct: stats.totalU ? Math.round((stats.usedU / stats.totalU) * 100) : 0,
     failed,
-    alerts: countLevels(clientAlerts(client, docs, today)),
+    alerts: countLevels(alerts ?? clientAlerts(client, docs, today)),
+    checking,
     sites: client.sites.map((s) => ({ id: s.id, name: s.name, racks: s.racks.length })),
   };
 }

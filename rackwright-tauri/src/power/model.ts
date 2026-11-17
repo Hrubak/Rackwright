@@ -42,6 +42,21 @@ export function fmtW(w: number, unknown: number): string {
   if (unknown > 0) return `at least ${n}, ${unknown} ${unknown === 1 ? "device" : "devices"} unknown`;
   return n;
 }
+const plural = (n: number) => `${n} ${n === 1 ? "device" : "devices"}`;
+/** One wording for a UPS/PDU load, used by the rack panel and the device panel. */
+export function fmtLoad(f: Feed): string {
+  const rated = f.ratedW ? f.ratedW.toLocaleString("en-US") : "";
+  if (f.loadW === 0 && f.unknown > 0) return rated ? `Load unknown (rated ${rated} W)` : "Load unknown";
+  const n = `${Math.round(f.loadW).toLocaleString("en-US")} W`;
+  const pct = f.ratedW ? ` of ${rated} W (${Math.round((f.loadW / f.ratedW) * 100)}%)` : "";
+  return `${f.unknown > 0 ? "at least " : ""}${n}${pct}${f.unknown > 0 ? `, ${plural(f.unknown)} unknown` : ""}`;
+}
+/** Load as a share of the rating, unrounded, or null when unknown. Over 1 is danger, over 0.8 is warn. */
+export function loadRatio(f: Feed): number | null {
+  return f.ratedW && !(f.loadW === 0 && f.unknown > 0) ? f.loadW / f.ratedW : null;
+}
+/** A device with no power inlet (patch panel, cable manager, blank, shelf, PoE-only access point). */
+export const isUnpowered = (d: Device): boolean => !d.ports.some((p) => p.type === "Power" && !isOutlet(p));
 export const feedFor = (b: { feeds: Feed[] }, devId: number): Feed | undefined => b.feeds.find((f) => f.devId === devId);
 
 // Far end of a cable from port id, or null.
@@ -76,7 +91,7 @@ function computeFeed(doc: Doc, root: Device): Feed {
   for (const [id, n] of reached) {
     const d = doc.devices.find((x) => x.id === id)!;
     const w = devWatts(d);
-    if (w == null) { unknown++; continue; }
+    if (w == null) { if (!isUnpowered(d)) unknown++; continue; }
     loadW += (w * n) / Math.max(1, connectedInlets(doc, d));
   }
   for (const d of nested) if (d.power_w != null) loadW += d.power_w;
@@ -93,7 +108,8 @@ export function powerBudget(doc: Doc): PowerBudget {
   const counts = (d: Device): { w: number; unknown: number } => {
     if (isFeedDev(d)) return { w: d.power_w ?? 0, unknown: 0 };
     const w = devWatts(d);
-    return w == null ? { w: 0, unknown: 1 } : { w, unknown: 0 };
+    if (w != null) return { w, unknown: 0 };
+    return isUnpowered(d) ? { w: 0, unknown: 0 } : { w: 0, unknown: 1 };
   };
   const racks: RackPower[] = doc.racks.map((r) => {
     let w = 0, unknown = 0;

@@ -55,5 +55,18 @@ eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), tru
   eq("power site", m2.power[0]?.site, "Head Office");
 }
 
+// a site filter keeps cross-site IP clashes; stale rack alerts are left out; power rows carry the site id
+{
+  const mkDoc = (name: string, ip: string): Doc => ({ v: 1, nid: 10, racks: [{ id: 1, name: "Rack " + name, u: 12, x: 0, y: 0 }],
+    devices: [{ id: 1, name, type: "NAS", u_size: 1, rack: 1, u: 1, side: 0, half: false, rows: 1, fx: 0, fy: 0, face: "front", model: "", ports: [], ip } as any], cables: [] });
+  const c3: ClientItem = { ...client, links: [], sites: [
+    { id: 1, name: "Site A", address: "", notes: "", racks: [{ key: "a", name: "A" }] },
+    { id: 2, name: "Site B", address: "", notes: "", racks: [{ key: "b", name: "B" }] }] };
+  const m3 = buildReportModel({ client: c3, docs: { a: mkDoc("NAS-A", "10.0.0.5"), b: mkDoc("NAS-B", "10.0.0.5") }, options: { ...opts, sites: [1] }, company: "x" });
+  eq("ip clash kept for site A", m3.attention.map((a) => [a.kind, a.rackKey]), [["ip", "a"]]);
+  eq("no stale in report", m3.attention.some((a) => a.kind === "stale"), false);
+  eq("power site id", m3.power.map((p) => p.siteId), [1]);
+}
+
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);

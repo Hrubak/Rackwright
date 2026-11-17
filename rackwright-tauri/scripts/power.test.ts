@@ -1,5 +1,5 @@
 // npx tsx scripts/power.test.ts — power model (synthetic data only)
-import { btu, catalogFor, feedFor, fmtW, isPdu, isUps, powerBudget } from "../src/power/model";
+import { btu, catalogFor, feedFor, fmtLoad, fmtW, loadRatio, isPdu, isUps, powerBudget } from "../src/power/model";
 import { CATALOG } from "../src/edit";
 import type { Device, Doc } from "../src/types";
 
@@ -112,6 +112,31 @@ eq("catalog ups rated count", CATALOG.filter((t) => t.type === "UPS" && t.rated_
 eq("fmt unknown some", fmtW(1200, 2), "at least 1,200 W, 2 devices unknown");
 eq("fmt one", fmtW(1200, 1), "at least 1,200 W, 1 device unknown");
 eq("fmt plain", fmtW(1200, 0), "1,200 W");
+
+// fmtLoad wording
+const F = (loadW: number, unknown: number, ratedW: number | null) => ({ devId: 1, kind: "ups" as const, loadW, unknown, ratedW, pct: null });
+eq("load unknown rated", fmtLoad(F(0, 2, 1500)), "Load unknown (rated 1,500 W)");
+eq("load unknown", fmtLoad(F(0, 1, null)), "Load unknown");
+eq("load plain", fmtLoad(F(900, 0, 1000)), "900 W of 1,000 W (90%)");
+eq("load at least", fmtLoad(F(900, 1, 1000)), "at least 900 W of 1,000 W (90%), 1 device unknown");
+eq("load no rating", fmtLoad(F(900, 2, null)), "at least 900 W, 2 devices unknown");
+eq("ratio", loadRatio(F(1001, 0, 1000))! > 1, true);
+eq("ratio unknown", loadRatio(F(0, 1, 1000)), null);
+
+// a device with no power inlet is 0 W and not unknown
+{
+  pid = 100;
+  const pp = mk(1, "Patch panel", "Patch panel", {}, []);
+  pp.ports = [{ id: 900, name: "1", type: "RJ45", label: "" }];
+  const d: Doc = { v: 1, nid: 10, racks: [{ id: 1, name: "Rack A", u: 12, x: 0, y: 0 }], devices: [pp], cables: [] };
+  const r = powerBudget(d);
+  eq("patch panel", [r.w, r.unknown, r.racks[0].unknown], [0, 0, 0]);
+  const srv = mk(2, "Server", "Server", {}, ["Inlet"]);
+  d.devices.push(srv);
+  eq("server still unknown", powerBudget(d).unknown, 1);
+  pp.power_w = 20;
+  eq("unpowered with watts counts", powerBudget(d).w, 20);
+}
 eq("btu", btu(1000), 3412);
 
 console.log(fail ? `${fail} failed` : "all passed");

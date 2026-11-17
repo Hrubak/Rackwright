@@ -1,5 +1,5 @@
 // Attention model: what needs a look (warranty, UPS battery, load, stale racks, duplicate IPs). Pure, no UI.
-import { feedFor, isPdu, isUps, powerBudget } from "../power/model";
+import { feedFor, isPdu, isUps, powerBudget, type PowerBudget } from "../power/model";
 import type { ClientItem } from "../clients/store";
 import type { Device, Doc } from "../types";
 
@@ -11,6 +11,12 @@ export interface Alert {
 export interface IpEntry { rackKey: string; devId: number; name: string; ip: string }
 
 const DAY = 86400000;
+/** Today's local date as YYYY-MM-DD. */
+export function todayIso(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+const inDays = (n: number) => (n === 1 ? "in 1 day" : `in ${n} days`);
 const parse = (s: string): number | null => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
   if (!m) return null;
@@ -39,10 +45,20 @@ function validIp(s: string): boolean {
   return true;
 }
 export function ipsOf(d: Device): string[] {
-  const raw = [...(d.ip || "").split(/[,;\s]+/), ...(d.oobm?.ip || "").split(/[,;\s]+/)];
+  const raw = [...(d.ip || "").split(/[,;\s]+/), ...(d.oobm?.ip || "").split(/[,;\s]+/)].map((s) => s.replace(/[/][0-9]+$/, ""));
   const out: string[] = [];
   for (const s of raw) if (validIp(s) && !out.includes(s)) out.push(s);
   return out;
+}
+
+// Per-document work is cached; documents are replaced, not changed in place, when edited.
+const cache = new WeakMap<Doc, { budget?: PowerBudget; ips: Map<string, IpEntry[]> }>();
+const slot = (doc: Doc) => { let c = cache.get(doc); if (!c) cache.set(doc, c = { ips: new Map() }); return c; };
+export function cachedBudget(doc: Doc): PowerBudget { const c = slot(doc); return c.budget ??= powerBudget(doc); }
+export function cachedIpEntries(rackKey: string, doc: Doc): IpEntry[] {
+  const c = slot(doc); let l = c.ips.get(rackKey);
+  if (!l) c.ips.set(rackKey, l = ipEntries(rackKey, doc));
+  return l;
 }
 
 export function ipEntries(rackKey: string, doc: Doc): IpEntry[] {
@@ -67,25 +83,25 @@ export function ipClashes(entries: IpEntry[]): Map<string, IpEntry[]> {
   return out;
 }
 
-export function deviceAlerts(doc: Doc, dev: Device, today: string, others: IpEntry[] = []): Alert[] {
+export function deviceAlerts(doc: Doc, dev: Device, today: string, others: IpEntry[] = [], budget?: PowerBudget): Alert[] {
   if (dev.status === "planned") return [];
   const out: Alert[] = [];
   const base = { devId: dev.id, devName: dev.name };
   const wd = daysUntil(dev.warranty_exp, today);
   if (wd != null) {
     if (wd < 0) out.push({ ...base, level: "critical", kind: "warranty", msg: `Warranty ended ${dev.warranty_exp}` });
-    else if (wd <= 60) out.push({ ...base, level: "warning", kind: "warranty", msg: `Warranty ends in ${wd} days` });
+    else if (wd <= 60) out.push({ ...base, level: "warning", kind: "warranty", msg: wd === 0 ? "Warranty ends today" : `Warranty ends ${inDays(wd)}` });
   }
   if (isUps(dev) && dev.battery_date) {
     const due = addYears(dev.battery_date, 3);
     const bd = daysUntil(due, today);
     if (bd != null) {
       if (bd < 0) out.push({ ...base, level: "critical", kind: "battery", msg: `UPS battery replacement overdue (due ${due})` });
-      else if (bd <= 60) out.push({ ...base, level: "warning", kind: "battery", msg: `UPS battery due in ${bd} days` });
+      else if (bd <= 60) out.push({ ...base, level: "warning", kind: "battery", msg: bd === 0 ? "UPS battery due today" : `UPS battery due ${inDays(bd)}` });
     }
   }
   if (isUps(dev) || isPdu(dev)) {
-    const f = feedFor(powerBudget(doc), dev.id);
+    const f = feedFor(budget ?? powerBudget(doc), dev.id);
     if (f && f.ratedW && f.loadW > 0) {
       const ratio = f.loadW / f.ratedW;
       if (ratio > 0.8) {
@@ -104,9 +120,10 @@ export function deviceAlerts(doc: Doc, dev: Device, today: string, others: IpEnt
 
 export function docAlerts(rackKey: string, doc: Doc, today: string, clashes: Map<string, IpEntry[]>): Alert[] {
   const out: Alert[] = [];
+  const budget = doc.devices.some((d) => isUps(d) || isPdu(d)) ? cachedBudget(doc) : undefined; // once per doc, only when a UPS/PDU needs it
   for (const d of doc.devices) {
     const rack = doc.racks.find((r) => r.id === d.rack);
-    for (const a of deviceAlerts(doc, d, today, clashes.get(`${rackKey}:${d.id}`) || []))
+    for (const a of deviceAlerts(doc, d, today, clashes.get(`${rackKey}:${d.id}`) || [], budget))
       out.push({ ...a, rackKey, ...(rack ? { rackName: rack.name } : {}) });
   }
   for (const r of doc.racks) {
@@ -128,7 +145,7 @@ export function clientAlerts(client: ClientItem, docs: Record<string, Doc | stri
     const d = docs[r.key];
     if (d && typeof d !== "string") loaded.push({ key: r.key, doc: d });
   }
-  const clashes = ipClashes(loaded.flatMap((l) => ipEntries(l.key, l.doc)));
+  const clashes = ipClashes(loaded.flatMap((l) => cachedIpEntries(l.key, l.doc)));
   const all = loaded.flatMap((l) => docAlerts(l.key, l.doc, today, clashes));
   return all.sort((a, b) => ORDER[a.level] - ORDER[b.level] || a.msg.localeCompare(b.msg));
 }
