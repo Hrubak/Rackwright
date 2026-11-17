@@ -4,7 +4,7 @@ import type { RackSpec } from "./racks";
 
 export interface Tpl {
   name: string; type: string; u_size: number; color: string; half?: boolean; cols?: number; rows?: number;
-  model?: string; ip?: string; short?: string; group?: string; plate?: any;
+  model?: string; ip?: string; short?: string; group?: string; plate?: any; power_w?: number; rated_w?: number;
   ports: { name: string; type: string; label?: string }[];
 }
 export const CATALOG = catalog as Tpl[];
