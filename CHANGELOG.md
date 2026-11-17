@@ -2,6 +2,10 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.8.1 — 2026-11-17
+Web and desktop.
+- **New devices** in the device list: Starlink router (Gen 3), Synology DS1815+ (8-bay desktop NAS), UniFi AC Mesh Pro (UAP-AC-M-PRO), UniFi Switch Flex Mini (USW-Flex-Mini) and UniFi Switch 8 60W (US-8-60W). Search by name or model. The desktop ones go off-rack or on a shelf, like other desktop devices.
+
 ## 3.8.0 — 2026-11-17
 Web and desktop.
 - **Light theme.** Settings › Profile › Theme: Dark (the default), Light, or Match my computer. Match my computer follows your Windows or browser setting and changes with it. The choice applies at once and is kept per person (web) or per computer (desktop).

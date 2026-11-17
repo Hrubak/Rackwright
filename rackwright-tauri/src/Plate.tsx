@@ -117,11 +117,12 @@ export function drawPlate(d: Device, l: number, t: number, r: number, b: number,
   }
   if (k === "syn_desk") {
     rc(l + 1, t + 1, r - 1, b - 1, "#202226", "#3a3d42");
-    const bx = l + 112, by = t + 4, bw = 84, bh = h - 8;
+    const nb = p.bays === 8 ? 8 : 4;
+    const bx = l + 112, by = t + 4, bw = nb === 8 ? 120 : 84, bh = h - 8;
     rc(bx, by, bx + bw, by + bh, "#2d2f33", "#6b717a");
     if (!rear) {
-      const tw = (bw - 12 - 6) / 4;
-      for (let i = 0; i < 4; i++) {
+      const tw = (bw - 12 - 2 * (nb - 1)) / nb;
+      for (let i = 0; i < nb; i++) {
         const x0 = bx + 6 + i * (tw + 2);
         rc(x0, by + 7, x0 + tw, by + bh - 28, "#17181b", "#4a4e54"); rc(x0 + 1, by + bh - 36, x0 + tw - 1, by + bh - 29, "#3a3d42");
         ov(x0 + tw / 2, by + bh - 22, 1.6, "#3ddc5b");
