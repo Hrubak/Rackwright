@@ -10,10 +10,16 @@ export interface Device {
   vm_host?: number; // "Virtual machines" box: id of the device the VMs run on
   cols?: number; // partial-width gear: the row is split into this many columns (default 2 = half width); `side` is the column
   rev?: boolean; // turned around: ports face the rear (the rear view shows its front panel)
+  status?: DevStatus; manufacturer?: string; hostname?: string; asset_tag?: string; os?: string; role?: string; owner?: string;
+  purchase_date?: string; warranty_exp?: string; power_w?: number; battery_date?: string; rated_w?: number; last_verified?: string;
+  services?: Service[]; specs?: Record<string, string>;
 }
+export type DevStatus = "active" | "spare" | "offline" | "planned";
+export interface Service { name: string; port: string; proto: string; status: string; notes: string }
 export interface Rack {
   id: number; name: string; u: number; x: number; y: number;
   kind?: string; model?: string; model_name?: string; width_mm?: number; depth_mm?: number;
+  last_verified?: string; circuit?: string;
 }
 export interface Cable { id: number; a: number; b: number; color: string; type?: string; style?: string; label?: string; length?: number; unit?: string }
 export interface AuvikMeta { site: string; imported: string; unplaced: { name: string; type: string; model: string; ip: string; mac: string; status: string; reason: string }[]; virtual: string[] }
