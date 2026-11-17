@@ -9,7 +9,10 @@ import { absPath, baseOf, relPath } from "./util";
 
 export interface RackItem { key: string; name: string; id?: number; path?: string; updated?: string; by?: string }
 export interface SiteItem { id: number; name: string; address: string; notes: string; racks: RackItem[] }
-export interface ClientItem { key: string; name: string; notes: string; sites: SiteItem[] }
+export type LinkEnd = A.LinkEnd;
+export type LinkBody = A.LinkBody;
+export interface LinkItem { id: number; site_a: number; site_b: number | null; kind: string; provider: string; circuit: string; bandwidth: string; notes: string; a_end: LinkEnd | null; b_end: LinkEnd | null }
+export interface ClientItem { key: string; name: string; notes: string; sites: SiteItem[]; links: LinkItem[] }
 export interface ClientListItem { key: string; name: string; sub: string }
 export type SitePatch = { name?: string; address?: string; notes?: string };
 
@@ -28,6 +31,9 @@ export interface ClientStore {
   updateSite(key: string, siteId: number, p: SitePatch): Promise<void>;
   /** The racks are kept (web: they become Unassigned; desktop: the files stay). */
   removeSite(key: string, siteId: number): Promise<void>;
+  addLink(key: string, body: LinkBody): Promise<void>;
+  updateLink(key: string, id: number, body: Partial<LinkBody>): Promise<void>;
+  removeLink(key: string, id: number): Promise<void>;
   /** Take a rack out of a site (the rack itself is kept). */
   removeRack(key: string, siteId: number, r: RackItem): Promise<void>;
   /** Web: shared racks that are in no site. */
@@ -52,6 +58,7 @@ function webStore(): ClientStore {
       return {
         key, name: c.name, notes: c.notes,
         sites: c.sites.map((s) => ({ id: s.id, name: s.name, address: s.address, notes: s.notes, racks: s.racks.map(rackItem) })),
+        links: (c.links ?? []).map((l) => ({ id: l.id, site_a: l.site_a, site_b: l.site_b, kind: l.kind, provider: l.provider || "", circuit: l.circuit || "", bandwidth: l.bandwidth || "", notes: l.notes || "", a_end: l.a_end ?? null, b_end: l.b_end ?? null })),
       };
     },
     async create(name) { return String((await A.createClient(name)).id); },
@@ -60,6 +67,9 @@ function webStore(): ClientStore {
     async addSite(key, s) { await A.createSite(Number(key), s); },
     async updateSite(_key, id, p) { await A.patchSite(id, p); },
     async removeSite(_key, id) { await A.deleteSite(id); },
+    async addLink(key, b) { await A.createLink(Number(key), b); },
+    async updateLink(_key, id, b) { await A.patchLink(id, b); },
+    async removeLink(_key, id) { await A.deleteLink(id); },
     async removeRack(_key, _site, r) { if (r.id != null) await A.setRackSite(r.id, null); },
     async unassigned() { return (await A.listRacks()).filter((m) => m.site_id == null).map(rackItem); },
     async addRacks(_key, siteId, items = []) { for (const r of items) if (r.id != null) await A.setRackSite(r.id, siteId); },
@@ -72,6 +82,7 @@ function webStore(): ClientStore {
 interface ClientFile {
   rackwright: "client"; v: 1; name: string; notes: string; nid: number;
   sites: { id: number; name: string; address: string; notes: string; racks: { path: string; name: string }[] }[];
+  links?: LinkItem[];
 }
 
 const RECENT = "rw.clientFiles";
@@ -115,6 +126,7 @@ function desktopStore(): ClientStore {
           id: s.id, name: s.name, address: s.address || "", notes: s.notes || "",
           racks: s.racks.map((r) => ({ key: r.path, path: absPath(key, r.path), name: r.name || rackName(r.path) })),
         })),
+        links: (f.links ?? []).map((l) => ({ ...l, provider: l.provider || "", circuit: l.circuit || "", bandwidth: l.bandwidth || "", notes: l.notes || "", a_end: l.a_end ?? null, b_end: l.b_end ?? null })),
       };
     },
     async create(name) {
@@ -147,7 +159,28 @@ function desktopStore(): ClientStore {
         Object.assign(s, p);
       });
     },
-    async removeSite(key, id) { await change(key, (f) => { f.sites = f.sites.filter((x) => x.id !== id); }); },
+    async removeSite(key, id) { await change(key, (f) => { f.sites = f.sites.filter((x) => x.id !== id); f.links = (f.links ?? []).filter((l) => l.site_a !== id && l.site_b !== id); }); },
+    async addLink(key, b) {
+      await change(key, (f) => {
+        site(f, b.site_a);
+        if (b.site_b != null) site(f, b.site_b);
+        if (b.site_a === b.site_b) throw new Error("A link needs two different sites.");
+        f.links = f.links ?? [];
+        f.links.push({ id: f.nid++, site_a: b.site_a, site_b: b.site_b, kind: b.kind, provider: b.provider || "", circuit: b.circuit || "", bandwidth: b.bandwidth || "", notes: b.notes || "", a_end: b.a_end ?? null, b_end: b.b_end ?? null });
+      });
+    },
+    async updateLink(key, id, b) {
+      await change(key, (f) => {
+        const l = (f.links ?? []).find((x) => x.id === id);
+        if (!l) throw new Error("That link is gone. Reload the client.");
+        const n = { ...l, ...b } as LinkItem;
+        site(f, n.site_a);
+        if (n.site_b != null) site(f, n.site_b);
+        if (n.site_a === n.site_b) throw new Error("A link needs two different sites.");
+        Object.assign(l, n);
+      });
+    },
+    async removeLink(key, id) { await change(key, (f) => { f.links = (f.links ?? []).filter((l) => l.id !== id); }); },
     async removeRack(key, id, r) { await change(key, (f) => { const s = site(f, id); s.racks = s.racks.filter((x) => x.path !== r.key); }); },
     async addRacks(key, id, _items, paths) {
       let ps = paths ?? [];

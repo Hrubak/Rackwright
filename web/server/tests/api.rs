@@ -427,6 +427,113 @@ async fn clients_sites_and_racks() {
 }
 
 #[tokio::test]
+async fn site_links() {
+    let (app, _d) = make_app();
+    let mut a = Client::new(&app);
+    let mut anon = Client::new(&app);
+    assert_eq!(anon.post("/api/clients/1/links", json!({"site_a": 1, "kind": "VPN"})).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anon.patch("/api/links/1", json!({"kind": "VPN"})).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anon.delete("/api/links/1").await.0, StatusCode::UNAUTHORIZED);
+
+    setup_admin(&mut a).await;
+    let (_, c1) = a.post("/api/clients", json!({"name": "Acme Dental"})).await;
+    let c1 = c1["id"].as_i64().unwrap();
+    let (_, c2) = a.post("/api/clients", json!({"name": "Beta Logistics"})).await;
+    let c2 = c2["id"].as_i64().unwrap();
+    let (_, sa) = a.post(&format!("/api/clients/{c1}/sites"), json!({"name": "Main Office"})).await;
+    let sa = sa["id"].as_i64().unwrap();
+    let (_, sb) = a.post(&format!("/api/clients/{c1}/sites"), json!({"name": "Branch"})).await;
+    let sb = sb["id"].as_i64().unwrap();
+    let (_, so) = a.post(&format!("/api/clients/{c2}/sites"), json!({"name": "Depot"})).await;
+    let so = so["id"].as_i64().unwrap();
+
+    // create A-B with ends
+    let end_a = json!({"rack": 1, "dev": 7, "name": "edge-fw"});
+    let end_b = json!({"rack": "branch.rack.json", "dev": 3, "name": "branch-rtr"});
+    let (s, l1) = a
+        .post(
+            &format!("/api/clients/{c1}/links"),
+            json!({"site_a": sa, "site_b": sb, "kind": " VPN ", "provider": "ExampleNet", "bandwidth": "100M", "a_end": end_a, "b_end": end_b}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{l1}");
+    assert_eq!(l1["kind"], "VPN");
+    assert_eq!(l1["client_id"], c1);
+    assert_eq!(l1["circuit"], "");
+    assert_eq!(l1["notes"], "");
+    assert_eq!(l1["a_end"], end_a);
+    assert_eq!(l1["b_end"], end_b);
+    let l1_id = l1["id"].as_i64().unwrap();
+
+    // A-Internet, no ends
+    let (s, l2) = a.post(&format!("/api/clients/{c1}/links"), json!({"site_a": sa, "site_b": null, "kind": "Internet"})).await;
+    assert_eq!(s, StatusCode::OK, "{l2}");
+    assert!(l2["site_b"].is_null());
+    assert!(l2["a_end"].is_null());
+    assert!(l2["b_end"].is_null());
+    let l2_id = l2["id"].as_i64().unwrap();
+
+    // client shows both, by id
+    let (_, cl) = a.get(&format!("/api/clients/{c1}")).await;
+    let ids: Vec<i64> = cl["links"].as_array().unwrap().iter().map(|l| l["id"].as_i64().unwrap()).collect();
+    assert_eq!(ids, vec![l1_id, l2_id]);
+    let (_, other) = a.get(&format!("/api/clients/{c2}")).await;
+    assert_eq!(other["links"], json!([]));
+
+    // patch: bandwidth changes, a_end kept
+    let (s, v) = a.patch(&format!("/api/links/{l1_id}"), json!({"bandwidth": "1G"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bandwidth"], "1G");
+    assert_eq!(v["a_end"], end_a);
+    assert_eq!(v["site_b"], sb);
+    // explicit null clears site_b and an end
+    let (s, v) = a.patch(&format!("/api/links/{l1_id}"), json!({"site_b": null, "b_end": null})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["site_b"].is_null());
+    assert!(v["b_end"].is_null());
+    assert_eq!(v["a_end"], end_a);
+    assert_eq!(v["provider"], "ExampleNet");
+
+    // validation
+    let url = format!("/api/clients/{c1}/links");
+    assert_eq!(a.post(&url, json!({"site_a": sa, "site_b": sa, "kind": "VPN"})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post(&url, json!({"site_a": sa, "site_b": so, "kind": "VPN"})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post(&url, json!({"site_a": so, "kind": "VPN"})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post(&url, json!({"site_a": sa, "kind": "  "})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post(&url, json!({"site_a": sa, "kind": "k".repeat(41)})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.post(&url, json!({"site_a": sa, "kind": "VPN", "a_end": {"rack": 1}})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.patch(&format!("/api/links/{l1_id}"), json!({"site_b": sa})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.patch(&format!("/api/links/{l1_id}"), json!({"site_b": so})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(a.patch(&format!("/api/links/{l1_id}"), json!({"kind": ""})).await.0, StatusCode::BAD_REQUEST);
+
+    // 404s
+    assert_eq!(a.post("/api/clients/9999/links", json!({"site_a": sa, "kind": "VPN"})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.patch("/api/links/9999", json!({"kind": "VPN"})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(a.delete("/api/links/9999").await.0, StatusCode::NOT_FOUND);
+
+    // delete one link
+    assert_eq!(a.delete(&format!("/api/links/{l2_id}")).await.0, StatusCode::OK);
+    assert_eq!(a.delete(&format!("/api/links/{l2_id}")).await.0, StatusCode::NOT_FOUND);
+
+    // deleting a site removes its links
+    let (_, l3) = a.post(&url, json!({"site_a": sa, "site_b": sb, "kind": "Fiber"})).await;
+    assert!(l3["id"].is_i64(), "{l3}");
+    assert_eq!(a.delete(&format!("/api/sites/{sb}")).await.0, StatusCode::OK);
+    let (_, cl) = a.get(&format!("/api/clients/{c1}")).await;
+    // l3 (A-B) is gone; l1 (A-Internet since the patch) stays
+    let ids: Vec<i64> = cl["links"].as_array().unwrap().iter().map(|l| l["id"].as_i64().unwrap()).collect();
+    assert_eq!(ids, vec![l1_id]);
+
+    // moving a site to another client removes its links
+    let (_, l4) = a.post(&url, json!({"site_a": sa, "kind": "Internet"})).await;
+    assert!(l4["id"].is_i64(), "{l4}");
+    let (s, v) = a.patch(&format!("/api/sites/{sa}"), json!({"client_id": c2})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (_, cl) = a.get(&format!("/api/clients/{c1}")).await;
+    assert_eq!(cl["links"], json!([]));
+}
+
+#[tokio::test]
 async fn compute_endpoints() {
     let (app, _d) = make_app();
     let mut a = Client::new(&app);

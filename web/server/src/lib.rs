@@ -702,6 +702,8 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
         )
         .route("/api/clients/:id/sites", post(clients::create_site))
         .route("/api/sites/:id", axum::routing::patch(clients::patch_site).delete(clients::delete_site))
+        .route("/api/clients/:id/links", post(clients::create_link))
+        .route("/api/links/:id", axum::routing::patch(clients::patch_link).delete(clients::delete_link))
         .route("/api/route_cables", post(route_cables))
         .route("/api/port_positions", post(port_positions))
         .route("/api/admin/update", get(update::get_update).post(update::post_update))

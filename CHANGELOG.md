@@ -2,6 +2,13 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.3.0 — 2026-11-16
+Web and desktop.
+- **Site-to-site links.** The Clients screen has a third tab, Links. It draws the client's sites and the WAN links between them: VPN, MPLS, fiber, internet, wireless, SD-WAN or other. Each type has its own colour and the label shows the bandwidth. A link can also go from a site to the Internet / provider cloud.
+  - Add link, or click a line or a row, to set the two sites, the type, provider, circuit ID, bandwidth and notes. You can also pick the device each end lands on (firewalls and routers are listed first), and its name is shown at that end of the line.
+  - Two links between the same sites are drawn side by side, so a primary circuit and a backup VPN are both visible.
+  - Deleting a site deletes its links. On the web, moving a site to another client also deletes its links. On the desktop, links are saved in the `.client.json` file.
+
 ## 3.2.0 — 2026-11-16
 Web and desktop.
 - **Inventory and search for a client.** The Clients screen has a new tab, Inventory and search. It lists every device in every rack of the client's sites, with site, rack, name, type, model, IP, MAC, serial and where it sits (rack and U, or off-rack).

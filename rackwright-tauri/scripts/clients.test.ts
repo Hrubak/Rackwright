@@ -1,6 +1,7 @@
 // npx tsx scripts/clients.test.ts — client file paths and site stats (synthetic data only)
 import { absPath, relPath } from "../src/clients/util";
 import { docStats, inventoryCsv, inventoryRows, matchRow, typeTotals } from "../src/clients/util";
+import { LINK_KINDS, layoutSites, linkColor, linkLabel } from "../src/clients/util";
 import type { Doc } from "../src/types";
 
 let fail = 0;
@@ -52,6 +53,22 @@ eq("match serial", withEp.filter((r) => matchRow(r, "sn-test")).map((r) => r.nam
 eq("totals", typeTotals(rows), [["Switch", 3], ["Firewall", 1]]);
 const csv = inventoryCsv([{ ...rows[0], notes: 'says "hi", ok', name: "=cmd" }]);
 eq("csv", csv.split("\r\n")[1], `Main Office,Main MDF,device,"'=cmd",Switch,Example 48P,192.0.2.10,AA:BB:CC:00:11:22,SN-TEST-1,A U1-2,"says ""hi"", ok"`);
+
+// links
+eq("kinds", LINK_KINDS.length, 7);
+eq("label", linkLabel({ kind: "VPN", bandwidth: "500 Mbps" }), "VPN · 500 Mbps");
+eq("label no bandwidth", linkLabel({ kind: "MPLS", bandwidth: " " }), "MPLS");
+eq("colors differ", new Set(LINK_KINDS.map(linkColor)).size, 7);
+eq("color fallback", linkColor("Weird"), linkColor("Other"));
+const l1 = layoutSites([5], false, 800, 500);
+eq("one centred", l1.sites[5], { x: 400, y: 250 });
+eq("no internet", l1.internet, null);
+const l2 = layoutSites([1, 2], true, 800, 500);
+eq("two side by side", l2.sites[1].y === l2.sites[2].y && l2.sites[1].x < l2.sites[2].x, true);
+eq("internet top centre", l2.internet?.x === 400 && l2.internet.y < l2.sites[1].y, true);
+const l4 = layoutSites([1, 2, 3, 4], false, 800, 500);
+eq("four distinct in bounds", new Set(Object.values(l4.sites).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)).size === 4 && Object.values(l4.sites).every((p) => p.x > 0 && p.x < 800 && p.y > 0 && p.y < 500), true);
+eq("empty", layoutSites([], true, 800, 500).sites, {});
 
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);

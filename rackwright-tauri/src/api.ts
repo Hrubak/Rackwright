@@ -60,7 +60,10 @@ export const setRackSite = (id: number, site_id: number | null) => api<RackMeta>
 
 export interface ClientMeta { id: number; name: string; notes: string; sites: number; racks: number; updated_at: string }
 export interface SiteRow { id: number; client_id: number; name: string; address: string; notes: string; updated_at: string }
-export type ClientFull = Omit<ClientMeta, "sites"> & { sites: (SiteRow & { racks: RackMeta[] })[] };
+export interface LinkEnd { rack: number | string; dev: number; name: string }
+export interface LinkBody { site_a: number; site_b: number | null; kind: string; provider?: string; circuit?: string; bandwidth?: string; notes?: string; a_end?: LinkEnd | null; b_end?: LinkEnd | null }
+export interface Link { id: number; client_id: number; site_a: number; site_b: number | null; kind: string; provider: string; circuit: string; bandwidth: string; notes: string; a_end: LinkEnd | null; b_end: LinkEnd | null; updated_at: string }
+export type ClientFull = Omit<ClientMeta, "sites"> & { sites: (SiteRow & { racks: RackMeta[] })[]; links: Link[] };
 export const listClients = () => api<ClientMeta[]>("GET", "/api/clients");
 export const getClient = (id: number) => api<ClientFull>("GET", `/api/clients/${id}`);
 export const createClient = (name: string, notes = "") => api<ClientMeta>("POST", "/api/clients", { name, notes });
@@ -69,6 +72,9 @@ export const deleteClient = (id: number) => api("DELETE", `/api/clients/${id}`);
 export const createSite = (clientId: number, s: { name: string; address?: string; notes?: string }) => api<SiteRow>("POST", `/api/clients/${clientId}/sites`, s);
 export const patchSite = (id: number, p: { name?: string; address?: string; notes?: string; client_id?: number }) => api<SiteRow>("PATCH", `/api/sites/${id}`, p);
 export const deleteSite = (id: number) => api("DELETE", `/api/sites/${id}`);
+export const createLink = (clientId: number, b: LinkBody) => api<Link>("POST", `/api/clients/${clientId}/links`, b);
+export const patchLink = (id: number, b: Partial<LinkBody>) => api<Link>("PATCH", `/api/links/${id}`, b);
+export const deleteLink = (id: number) => api("DELETE", `/api/links/${id}`);
 export const updateRack = (id: number, name: string, doc: Doc, version: number) => api<RackMeta>("PUT", `/api/racks/${id}`, { name, doc, version });
 export const deleteRack = (id: number) => api("DELETE", `/api/racks/${id}`);
 

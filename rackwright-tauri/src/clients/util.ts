@@ -91,3 +91,32 @@ export function inventoryCsv(rows: InvRow[]): string {
   const lines = [head, ...rows.map((r) => [r.site, r.rackFile, r.kind, r.name, r.type, r.model, r.ip, r.mac, r.serial, r.where, r.notes])];
   return lines.map((l) => l.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }
+
+// ---------------------------------------------------------------- site-to-site links
+
+export const LINK_KINDS = ["VPN", "MPLS", "Fiber", "Internet", "Wireless", "SD-WAN", "Other"] as const;
+export const LINK_COLORS: Record<string, string> = {
+  VPN: "#58a6ff", MPLS: "#d29922", Fiber: "#3fb950", Internet: "#a371f7", Wireless: "#f778ba", "SD-WAN": "#39c5cf", Other: "#8b949e",
+};
+export const linkColor = (kind: string) => LINK_COLORS[kind] ?? LINK_COLORS.Other;
+/** Short text for a link, e.g. "VPN · 500 Mbps". */
+export const linkLabel = (l: { kind: string; bandwidth?: string }) => [l.kind || "Other", (l.bandwidth || "").trim()].filter(Boolean).join(" · ");
+
+export interface Pt { x: number; y: number }
+/** Centres for the site boxes (by site id) and the Internet cloud (null when no link goes to the Internet). */
+export function layoutSites(siteIds: number[], hasInternet: boolean, w: number, h: number): { sites: Record<number, Pt>; internet: Pt | null } {
+  const sites: Record<number, Pt> = {};
+  const n = siteIds.length;
+  const top = hasInternet ? 0.22 : 0;
+  const cy = h * (top + (1 - top) / 2);
+  if (n === 1) sites[siteIds[0]] = { x: w / 2, y: cy };
+  else if (n === 2) { sites[siteIds[0]] = { x: w * 0.25, y: cy }; sites[siteIds[1]] = { x: w * 0.75, y: cy }; }
+  else {
+    const rx = w * 0.36, ry = (1 - top) * h * 0.36;
+    siteIds.forEach((id, i) => {
+      const a = Math.PI / 2 + (2 * Math.PI * i) / n;
+      sites[id] = { x: w / 2 + rx * Math.cos(a), y: cy + ry * Math.sin(a) };
+    });
+  }
+  return { sites, internet: hasInternet ? { x: w / 2, y: h * 0.11 } : null };
+}

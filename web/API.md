@@ -115,12 +115,27 @@ An MSP client has sites; each site holds shared racks (`racks.site_id`). A rack 
 |--------------------------------|----------------------------------------|--------|
 | `GET /api/clients`             | —                                      | `[ClientMeta]`, by name (case-insensitive) |
 | `POST /api/clients`            | `{name, notes?}`                       | `ClientMeta`. 409 if another client has the same name (case-insensitive) |
-| `GET /api/clients/:id`         | —                                      | `ClientMeta` + `"sites": [Site + "racks": [RackMeta]]` (sites by name, racks by name) |
+| `GET /api/clients/:id`         | —                                      | `ClientMeta` + `"sites": [Site + "racks": [RackMeta]]` (sites by name, racks by name) + `"links": [Link]` (by id) |
 | `PATCH /api/clients/:id`       | `{name?, notes?}`                      | `ClientMeta`. 409 on a duplicate name |
 | `DELETE /api/clients/:id`      | —                                      | `{}`. 409 `{"error": "Delete or move its sites first."}` while it has sites |
 | `POST /api/clients/:id/sites`  | `{name, address?, notes?}`             | `Site`. 409 if the client already has a site with that name |
 | `PATCH /api/sites/:id`         | `{name?, address?, notes?, client_id?}` | `Site`. `client_id` moves the site (and its racks) to another client |
-| `DELETE /api/sites/:id`        | —                                      | `{}`. Its racks are kept and become Unassigned (`site_id` null) |
+| `DELETE /api/sites/:id`        | —                                      | `{}`. Its racks are kept and become Unassigned (`site_id` null). Its links are deleted |
+| `POST /api/clients/:id/links`  | `LinkBody`                             | `Link` |
+| `PATCH /api/links/:id`         | any `LinkBody` fields                  | `Link` |
+| `DELETE /api/links/:id`        | —                                      | `{}` |
+
+### Site-to-site links
+
+A link joins two sites of the same client (a WAN circuit, VPN tunnel...). `site_b` null means the link goes to the Internet / a provider cloud rather than another site.
+
+`LinkEnd` = `{"rack": int|str, "dev": int, "name": str}` or null — the device the link ends on (web: `rack` is the rack id; desktop: the rack file key). The server stores it as given and only checks it is an object with those three fields, or null.
+`LinkBody` = `{"site_a": int, "site_b": int|null, "kind": str, "provider": str?, "circuit": str?, "bandwidth": str?, "notes": str?, "a_end": LinkEnd?, "b_end": LinkEnd?}`
+`Link` = `LinkBody` with every field present (missing strings become "", missing ends null) + `"id": int, "client_id": int, "updated_at": str`
+
+`kind` is free text, max 40 characters, not empty; the app offers VPN, MPLS, Fiber, Internet, Wireless, SD-WAN, Other. `provider`, `circuit`, `bandwidth` max 200 characters, `notes` max 10 000.
+400 when `site_a` or `site_b` is not a site of this client, or `site_a` = `site_b`. 404 for an unknown client or link.
+On PATCH, sending `"site_b": null` sets it to null; leaving it out keeps it (same for `a_end` / `b_end`).
 
 Names are trimmed and must not be empty (400), max 200 characters. `notes` and `address` max 10 000 characters.
 Deleting a client or site never deletes racks.
