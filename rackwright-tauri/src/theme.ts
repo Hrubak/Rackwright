@@ -14,6 +14,7 @@ export const DARK = {
   "text-faint": "#6b717a",
   accent: "#2a6fdb",
   "accent-soft": "#2a3a52",
+  "on-accent": "#ffffff",
   select: "#ffd33d",
   danger: "#f85149",
   ok: "#2ea043",

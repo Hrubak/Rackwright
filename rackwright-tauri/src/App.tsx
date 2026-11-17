@@ -8,7 +8,9 @@ import { backend, IS_WEB } from "./backend";
 import * as A from "./api";
 import { ConflictDialog, NamePrompt, RackList, UserBar, WebProps } from "./web";
 import RackView, { Resolver, Sel } from "./RackView";
-import ExportMenu from "./export/ExportMenu";
+import { DropButton, MenuBar, MenuItem, SEP } from "./Menu";
+import { SHORTCUTS, commandFor } from "./shortcuts";
+import { ShortcutsDialog, WhatsNewDialog } from "./HelpDialogs";
 import { Device, Doc, PortPos, RouteResult } from "./types";
 import { LiveRouter, provisionalDoc, targetKey } from "./liveRoute";
 import type { Target } from "./edit";
@@ -26,6 +28,8 @@ import ModelPicker from "./ModelPicker";
 import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
 import ClientsPanel from "./clients/ClientsPanel";
+import { Breadcrumb } from "./Breadcrumb";
+import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
@@ -51,6 +55,8 @@ interface Cur { id: number; name: string; version: number }
 export default function App({ web }: { web?: WebProps } = {}) {
   const [doc, setDoc] = useState<Doc>(empty);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [helpDlg, setHelpDlg] = useState<"shortcuts" | "news" | null>(null);
+  const [clientsImport, setClientsImport] = useState(false);
   const [undo, setUndo] = useState<Doc[]>([]);
   const [redo, setRedo] = useState<Doc[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -89,6 +95,10 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [clientsTarget, setClientsTarget] = useState<{ client?: string; site?: number }>({});
+  const [loc, setLoc] = useState<RackLocation | null | "unassigned">(null);
+  const [wide, setWide] = useState(() => window.innerWidth >= 1280);
+  useEffect(() => { const r = () => setWide(window.innerWidth >= 1280); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [modelFor, setModelFor] = useState<number | null>(null);
   const [picker, setPicker] = useState<"new" | "add" | null>(null);
@@ -388,22 +398,28 @@ export default function App({ web }: { web?: WebProps } = {}) {
       return p.warn || "";
     }, `place${id}`), [edit]);
 
+  const doDuplicate = () => {
+    if (selDev) { let id = 0; if (edit((d) => { id = duplicateDevice(d, selDev.id)?.id ?? 0; })) setSel({ kind: "dev", id }); }
+  };
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement).tagName;
-      const k = e.key.toLowerCase();
-      if (e.ctrlKey && k === "s") { e.preventDefault(); doSave(e.shiftKey); return; }
+      const cmd = commandFor(e);
+      if (cmd === "save" || cmd === "saveAs") { e.preventDefault(); doSave(cmd === "saveAs"); return; }
       if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return;
-      if (e.ctrlKey && k === "z" && e.shiftKey) { e.preventDefault(); doRedo(); }
-      else if (e.ctrlKey && k === "z") { e.preventDefault(); doUndo(); }
-      else if (e.ctrlKey && k === "y") { e.preventDefault(); doRedo(); }
-      else if (e.ctrlKey && k === "d") {
-        e.preventDefault();
-        if (selDev) { let id = 0; if (edit((d) => { id = duplicateDevice(d, selDev.id)?.id ?? 0; })) setSel({ kind: "dev", id }); }
+      if (cmd) {
+        switch (cmd) {
+          case "new": e.preventDefault(); doNew(); break;
+          case "open": e.preventDefault(); doOpen(); break;
+          case "redo": e.preventDefault(); doRedo(); break;
+          case "undo": e.preventDefault(); doUndo(); break;
+          case "duplicate": e.preventDefault(); doDuplicate(); break;
+          case "delete": del(); break;
+          case "deselect": setPending(null); setSel(null); break;
+          case "fit": setFitTick((n) => n + 1); break;
+        }
       }
-      else if (e.key === "Delete") del();
-      else if (e.key === "Escape") { setPending(null); setSel(null); }
-      else if (k === "home") setFitTick((n) => n + 1);
       else if (selDev && selDev.rack != null && e.key.startsWith("Arrow")) {
         e.preventDefault();
         const du = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
@@ -413,7 +429,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [doUndo, doRedo, del, doSave, edit, selDev, place]);
+  }, [doUndo, doRedo, del, doSave, doNew, doOpen, doDuplicate, edit, selDev, place]);
 
   const rackForTags = targetRack();
   const list = useMemo(() => {
@@ -434,9 +450,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
     <button title="Next Auvik import may update this field" onClick={(e) => { e.preventDefault(); edit((d) => { const x = d.devices.find((y) => y.id === dv.id)!; x.locked = (x.locked ?? []).filter((f) => f !== k); if (!x.locked.length) delete x.locked; }); }}
       style={{ background: "none", border: "none", cursor: "pointer", padding: "0 3px", fontSize: 11, color: v("warn") }}>{"\u{1F512}"}</button>
   ) : null;
-  const field = (label: string, val: string | number, set: (v: string) => void, w = 200, lock?: ReactNode) => (
-    <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>{label}{lock}<br />
-      <input style={{ ...inp, width: w }} value={val} onChange={(e) => set(e.target.value)} /></label>
+  const field = (label: string, val: string | number, set: (v: string) => void, w = 0, lock?: ReactNode) => (
+    <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>{label}{lock}<br />
+      <input style={{ ...inp, width: "100%", boxSizing: "border-box" }} value={val} onChange={(e) => set(e.target.value)} /></label>
   );
   const devSet = (dv: Device, k: "name" | "type" | "ip" | "model" | "serial" | "notes" | "mac", v: string) =>
     edit((d) => {
@@ -454,59 +470,128 @@ export default function App({ web }: { web?: WebProps } = {}) {
     return { total, used, off: doc.devices.filter((d) => d.rack == null).length };
   })();
 
+  const noRacks = !doc.racks.length;
+  const needRack = noRacks ? "Add a rack first" : undefined;
+  const setCable = (patch: Partial<CableOpts>) => { const o = { ...cableOpts, ...patch }; setCableOpts(o); saveOpts(o); };
+  const menus: { label: string; items: MenuItem[] }[] = [
+    { label: "File", items: [
+      { label: "New", shortcut: IS_WEB ? undefined : SHORTCUTS.new, run: doNew },
+      { label: "Open…", shortcut: SHORTCUTS.open, run: doOpen },
+      { label: "Save", shortcut: SHORTCUTS.save, run: () => doSave() },
+      { label: "Save as…", shortcut: SHORTCUTS.saveAs, run: () => doSave(true) },
+      SEP,
+      ...(IS_WEB ? [{ label: "Import file…", run: doImportFile }] : []),
+      { label: "Import list…", run: () => setImportOpen(true) },
+      { label: "Import Auvik…", run: () => setAuvikOpen(true) },
+      SEP,
+      { label: "Export", items: [
+        { label: "Export PDF", run: () => doExport("pdf"), disabled: noRacks, hint: needRack },
+        { label: "Export Visio (.vsdx)", run: () => doExport("visio"), disabled: noRacks, hint: needRack },
+        ...(IS_WEB ? [{ label: "Export file (.rack.json)", run: doExportFile }] : []),
+      ] },
+    ] },
+    { label: "Edit", items: [
+      { label: "Undo", shortcut: SHORTCUTS.undo, run: doUndo, disabled: !undo.length },
+      { label: "Redo", shortcut: SHORTCUTS.redo, run: doRedo, disabled: !redo.length },
+      SEP,
+      { label: "Add rack…", run: () => setPicker("add") },
+      { label: "Duplicate", shortcut: SHORTCUTS.duplicate, run: doDuplicate, disabled: !selDev, hint: selDev ? undefined : "Select a device first" },
+      { label: "Delete", shortcut: SHORTCUTS.delete, run: del, disabled: !sel, hint: sel ? undefined : "Select something first" },
+    ] },
+    { label: "View", items: [
+      ...VIEWS.map(([id, label]): MenuItem => ({ label, checked: view === id, run: () => setView(id) })),
+      SEP,
+      { label: "Flip front/rear", run: () => setFace(face === "front" ? "rear" : "front"), disabled: view !== "rack", hint: view === "rack" ? undefined : "Only in the Rack view" },
+      { label: "Fit to screen", shortcut: SHORTCUTS.fit, run: () => setFitTick((n) => n + 1) },
+      SEP,
+      { label: "Cables", items: [
+        { label: "Show all", checked: cableOpts.show === "all", run: () => setCable({ show: "all" }) },
+        { label: "Show selected only", checked: cableOpts.show === "selected", run: () => setCable({ show: "selected" }) },
+        { label: "Show none", checked: cableOpts.show === "none", run: () => setCable({ show: "none" }) },
+        SEP,
+        { label: "Routed", checked: cableOpts.style === "routed", run: () => setCable({ style: "routed" }) },
+        { label: "Stubs", checked: cableOpts.style === "stubs", run: () => setCable({ style: "stubs" }) },
+        SEP,
+        { label: "Hide endpoint cables", checked: cableOpts.hideEndpoints, run: () => setCable({ hideEndpoints: !cableOpts.hideEndpoints }) },
+      ] },
+    ] },
+    { label: "Clients", items: [
+      { label: "Clients…", run: () => { setClientsImport(false); setClientsOpen(true); } },
+      { label: "Import Auvik into a client…", run: () => { setClientsImport(true); setClientsOpen(true); } },
+    ] },
+    { label: "Help", items: [
+      { label: "Keyboard shortcuts…", run: () => setHelpDlg("shortcuts") },
+      { label: "What's new…", run: () => setHelpDlg("news") },
+      { label: "About Rackwright…", run: () => setAboutOpen(true) },
+    ] },
+  ];
+  const rackName = IS_WEB ? (cur?.name ?? "New rack") : (path ? path.split(/[\\/]/).pop()! : "New rack");
+  useEffect(() => {
+    if (clientsOpen) return;
+    let stop = false;
+    (async () => {
+      try {
+        if (IS_WEB) {
+          if (!cur?.id) { setLoc(null); return; }
+          const m = (await A.listRacks()).find((r) => r.id === cur.id);
+          if (stop) return;
+          setLoc(m && m.site_id != null && m.client_id != null ? { clientKey: String(m.client_id), client: m.client ?? "", siteId: m.site_id, site: m.site ?? "" } : m ? "unassigned" : null);
+        } else {
+          if (!path) { setLoc(null); return; }
+          const st = clientStore();
+          const all = await Promise.all((await st.list()).map((c) => st.get(c.key)));
+          if (!stop) setLoc(findRackLocation(all, (r) => !!r.path && sameFile(r.path, path)) ?? "unassigned");
+        }
+      } catch { if (!stop) setLoc(null); }
+    })();
+    return () => { stop = true; };
+  }, [IS_WEB ? cur?.id : path, clientsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sepBar = <span style={{ width: 1, alignSelf: "stretch", background: v("border"), margin: "2px 10px" }} />;
+  const seg = (opts: [string, string][], curId: string, pick: (id: string) => void, title: (l: string) => string) => opts.map(([id, label], i) => (
+    <button key={id} onClick={() => pick(id)} title={title(label)}
+      style={{ ...btn, marginRight: 0, borderRadius: i === 0 ? "4px 0 0 4px" : i === opts.length - 1 ? "0 4px 4px 0" : 0, marginLeft: i ? -1 : 0, background: curId === id ? v("accent-soft") : btn.background, borderColor: curId === id ? v("accent-border") : v("border") }}>{label}</button>
+  ));
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: v("text"), fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
-      <div style={{ minHeight: 42, padding: "6px 10px", background: v("panel"), borderBottom: `1px solid ${v("border-subtle")}`, boxSizing: "border-box", display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 4, whiteSpace: "nowrap" }}>
+      <div style={{ minHeight: 42, padding: "6px 10px", background: v("panel"), borderBottom: `1px solid ${v("border-subtle")}`, boxSizing: "border-box", display: "flex", flexWrap: "nowrap", alignItems: "center", whiteSpace: "nowrap" }}>
         <button style={{ background: "none", border: "none", padding: "0 8px 0 0", cursor: "pointer", display: "flex" }} onClick={() => setAboutOpen(true)} title="About Rackwright"><Logo size={24} /></button>
-        <button style={btn} onClick={doNew}>New</button>
-        <button style={btn} onClick={() => setClientsOpen(true)} title="Clients, their sites and the racks in each">Clients</button>
-        <button style={btn} onClick={doOpen}>Open</button>
-        <button style={btn} onClick={() => doSave()}>Save{dirty ? " *" : ""}</button>
-        <button style={btn} onClick={() => doSave(true)}>Save as</button>
-        <button style={btn} onClick={doUndo} disabled={!undo.length}>Undo</button>
-        <button style={btn} onClick={doRedo} disabled={!redo.length}>Redo</button>
-        <button style={btn} onClick={() => setPicker("add")}>+ Rack</button>
-        {IS_WEB && <button style={btn} onClick={doImportFile} title="Load a .rack.json file from this computer">Import file</button>}
-        <ExportMenu items={[
-          { label: "Export PDF", run: () => doExport("pdf"), disabled: !doc.racks.length, hint: doc.racks.length ? undefined : "Add a rack first" },
-          { label: "Export Visio (.vsdx)", run: () => doExport("visio"), disabled: !doc.racks.length, hint: doc.racks.length ? undefined : "Add a rack first" },
-          ...(IS_WEB ? [{ label: "Export file (.rack.json)", run: doExportFile }] : []),
-        ]} />
-        <button style={btn} onClick={() => setImportOpen(true)}>Import list</button>
-        <button style={btn} onClick={() => setAuvikOpen(true)} title="Build racks from an Auvik device export (.xlsx)">Import Auvik</button>
-        <button style={btn} onClick={() => setFitTick((n) => n + 1)} title="Home">Fit</button>
-        <span style={{ display: "inline-flex", marginRight: 8 }}>
-          {VIEWS.map(([id, label], i) => (
-            <button key={id} onClick={() => setView(id)} title={`${label} view`}
-              style={{ ...btn, marginRight: 0, borderRadius: i === 0 ? "4px 0 0 4px" : i === VIEWS.length - 1 ? "0 4px 4px 0" : 0, marginLeft: i ? -1 : 0, background: view === id ? v("accent-soft") : btn.background, borderColor: view === id ? v("accent-border") : v("border") }}>{label}</button>
-          ))}
-        </span>
-        {view === "rack" && <button style={btn} onClick={() => setFace(face === "front" ? "rear" : "front")}>Showing: {face} (flip)</button>}
-        <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8 }}>
-          {IS_WEB ? (cur ? `${cur.name} (v${cur.version})` : "unsaved rack") : (path ?? "no file")} | {doc.racks.length}R {doc.devices.length}D {doc.cables.length}C {msg}
-        </span>
+        <MenuBar menus={menus} />
+        {sepBar}
+        <Breadcrumb loc={loc} rackName={rackName} dirty={dirty}
+          onClient={(k) => { setClientsTarget({ client: k }); setClientsImport(false); setClientsOpen(true); }}
+          onSite={(k, id) => { setClientsTarget({ client: k, site: id }); setClientsImport(false); setClientsOpen(true); }} />
+        {msg && <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{msg}</span>}
+        {sepBar}
+        {wide
+          ? <span style={{ display: "inline-flex", marginRight: 8 }}>{seg(VIEWS, view, (id) => setView(id as ViewId), (l) => `${l} view`)}</span>
+          : <span style={{ marginRight: 8 }}><DropButton label={`${VIEWS.find(([id]) => id === view)?.[1]} ▾`} title="Change view" items={VIEWS.map(([id, label]): MenuItem => ({ label, checked: view === id, run: () => setView(id) }))} /></span>}
+        {view === "rack" && <span style={{ display: "inline-flex", marginRight: 8 }}>{seg([["front", "Front"], ["rear", "Rear"]], face, (id) => setFace(id as "front" | "rear"), (l) => `Show the ${l.toLowerCase()}`)}</span>}
+        <button style={{ ...btn, padding: "5px 9px" }} onClick={doUndo} disabled={!undo.length} title={`Undo (${SHORTCUTS.undo})`}>{"↶"}</button>
+        <button style={{ ...btn, padding: "5px 9px" }} onClick={doRedo} disabled={!redo.length} title={`Redo (${SHORTCUTS.redo})`}>{"↷"}</button>
+        <button style={{ ...btn, background: v("accent"), color: v("on-accent"), borderColor: v("accent") }} onClick={() => doSave()} title={`Save (${SHORTCUTS.save})`}>Save</button>
         {IS_WEB && webGuarded && <UserBar web={webGuarded} />}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: v("panel"), borderRight: `1px solid ${v("border-subtle")}`, flexDirection: "column", fontSize: 12 }}>
-          <input style={{ ...inp, margin: "6px 6px 3px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
-          <div style={{ display: "flex", gap: 6, margin: "0 6px 4px", alignItems: "center" }}>
+          <input style={{ ...inp, margin: "10px 10px 8px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div style={{ display: "flex", gap: 6, margin: "0 10px 8px", alignItems: "center" }}>
             <select style={{ ...inp, flex: 1, minWidth: 0 }} value={typeF} onChange={(e) => setTypeF(e.target.value)}>
               <option value="">All types</option>
               {TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
             <label title="Hide items with no free slot in the selected rack"><input type="checkbox" checked={fitsOnly} onChange={(e) => setFitsOnly(e.target.checked)} /> fits</label>
           </div>
-          <div style={{ padding: "0 8px 4px", opacity: 0.55 }}>Drag into a rack, or double-click to add</div>
+          <div style={{ padding: "0 10px 8px", color: v("text-dim") }}>Drag into a rack, or double-click to add</div>
           <div style={{ flex: 1, overflow: "auto" }}>
             {list.map(({ c, i }) => {
               const st = rackForTags ? tplRackStatus(doc, rackForTags, c) : c.plate?.off ? "off" : "none";
               return (
                 <div className="cat" key={i} onMouseDown={(e) => startPdrag(e, i)} onDoubleClick={() => addFromCatalog(i)}
                   title="Drag into the rack, or double-click to add"
-                  style={{ padding: "4px 8px", borderBottom: `1px solid ${v("panel-2")}`, cursor: "grab", background: palSel === i ? v("accent-soft") : undefined, opacity: st === "full" ? 0.5 : 1 }}>
+                  style={{ padding: "6px 10px", borderBottom: `1px solid ${v("panel-2")}`, cursor: "grab", background: palSel === i ? v("accent-soft") : undefined, opacity: st === "full" ? 0.5 : 1 }}>
                   <span style={{ opacity: 0.6, marginRight: 6 }}>{icon(i)}</span>{c.name}{" "}
-                  <span style={{ opacity: 0.55 }}>{c.u_size}U {c.type}{widthLabel(c)}</span>
+                  <span style={{ color: v("text-dim") }}>{c.u_size}U {c.type}{widthLabel(c)}</span>
                   {st === "off" && <span style={{ color: v("warn") }}> off-rack</span>}
                   {st === "full" && <span style={{ color: v("danger") }}> no room</span>}
                 </div>
@@ -534,10 +619,10 @@ export default function App({ web }: { web?: WebProps } = {}) {
               background: toast.bad ? v("danger-bg") : v("ok-bg"), border: `1px solid ${toast.bad ? v("danger") : v("ok")}`, pointerEvents: "none" }}>{toast.text}</div>
           )}
         </div>
-        <div style={{ width: 240, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 8, overflow: "auto" }}>
+        <div style={{ width: 240, background: v("panel"), borderLeft: `1px solid ${v("border-subtle")}`, padding: 10, overflow: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
           {!sel && <>
-            <b>Overview</b>
-            <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.7 }}>
+            <Sec title="Overview" first />
+            <div style={{ fontSize: 12, lineHeight: 1.7 }}>
               {doc.racks.length} rack(s), {sum.used}/{sum.total}U used<br />
               {doc.devices.length} devices ({sum.off} off-rack)<br />
               {doc.cables.length} cables<br />
@@ -546,7 +631,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             <AuvikInfo doc={doc} onOpen={() => setUnplacedOpen(true)} />
           </>}
           {selRack && <>
-            <b>Rack</b>
+            <Sec title="Rack" first />
             {field("Name", selRack.name, (v) => edit((d) => { d.racks.find((r) => r.id === selRack.id)!.name = v; }, `rn${selRack.id}`))}
             {field("Height (U)", selRack.u, (v) => edit((d) => {
               const r = d.racks.find((x) => x.id === selRack.id)!;
@@ -554,8 +639,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
               const why = resizeRack(d, r, n);
               if (why) return "!" + why;
             }, `rh${selRack.id}`), 60)}
-            <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>Model<br />
-              <select style={{ ...inp, width: 208 }} value={selRack.model ?? ""} onChange={(e) => {
+            <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Model<br />
+              <select style={{ ...inp, width: "100%" }} value={selRack.model ?? ""} onChange={(e) => {
                 const mod = modelById(e.target.value); if (!mod) return;
                 edit((d) => {
                   const r = d.racks.find((x) => x.id === selRack.id)!;
@@ -572,20 +657,22 @@ export default function App({ web }: { web?: WebProps } = {}) {
                   </optgroup>
                 ))}
               </select></label>
-            {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>{kindLabel(selRack.kind)}, {dimsText(selRack.width_mm, selRack.depth_mm)}</div>}
+            {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {dimsText(selRack.width_mm, selRack.depth_mm)}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
           {selDev && <>
-            {field("Type", selDev.type, (v) => devSet(selDev, "type", v), 200, lockIcon(selDev, "type"))}
-            {field("Name", selDev.name, (v) => devSet(selDev, "name", v), 200, lockIcon(selDev, "name"))}
-            {field("Model", selDev.model ?? "", (v) => devSet(selDev, "model", v), 200, lockIcon(selDev, "model"))}
-            {field("IP", selDev.ip ?? "", (v) => devSet(selDev, "ip", v), 200, lockIcon(selDev, "ip"))}
-            {field("MAC", selDev.mac ?? "", (v) => devSet(selDev, "mac", v), 200, lockIcon(selDev, "mac"))}
-            {field("Serial", selDev.serial ?? "", (v) => devSet(selDev, "serial", v), 200, lockIcon(selDev, "serial"))}
-            <label style={{ display: "block", marginBottom: 6, fontSize: 12 }}>Notes{lockIcon(selDev, "notes")}<br />
-              <textarea style={{ ...inp, width: 200, height: 46 }} value={selDev.notes ?? ""} onChange={(e) => devSet(selDev, "notes", e.target.value)} /></label>
-            <label style={{ fontSize: 12 }}>Rack<br />
-              <select style={{ ...inp, width: 208 }} value={selDev.rack ?? ""} onChange={(e) => {
+            <Sec title="Device" first />
+            {field("Type", selDev.type, (v) => devSet(selDev, "type", v), 0, lockIcon(selDev, "type"))}
+            {field("Name", selDev.name, (v) => devSet(selDev, "name", v), 0, lockIcon(selDev, "name"))}
+            {field("Model", selDev.model ?? "", (v) => devSet(selDev, "model", v), 0, lockIcon(selDev, "model"))}
+            {field("IP", selDev.ip ?? "", (v) => devSet(selDev, "ip", v), 0, lockIcon(selDev, "ip"))}
+            {field("MAC", selDev.mac ?? "", (v) => devSet(selDev, "mac", v), 0, lockIcon(selDev, "mac"))}
+            {field("Serial", selDev.serial ?? "", (v) => devSet(selDev, "serial", v), 0, lockIcon(selDev, "serial"))}
+            <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Notes{lockIcon(selDev, "notes")}<br />
+              <textarea style={{ ...inp, width: "100%", boxSizing: "border-box", height: 46 }} value={selDev.notes ?? ""} onChange={(e) => devSet(selDev, "notes", e.target.value)} /></label>
+            <Sec title="Placement" />
+            <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Rack<br />
+              <select style={{ ...inp, width: "100%" }} value={selDev.rack ?? ""} onChange={(e) => {
                 const v = e.target.value;
                 if (v === "") { edit((d) => { const x = d.devices.find((y) => y.id === selDev.id)!; x.fx = x.fx || 40; x.fy = x.fy || 40; x.rack = null; }); return; }
                 const r = doc.racks.find((x) => x.id === Number(v))!;
@@ -597,13 +684,13 @@ export default function App({ web }: { web?: WebProps } = {}) {
                 <option value="">(off-rack)</option>
                 {doc.racks.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select></label>
-            {selDev.rack != null && <div style={{ display: "flex", gap: 8, margin: "6px 0", fontSize: 12 }}>
+            {selDev.rack != null && <div style={{ display: "flex", gap: 8, fontSize: 11, color: v("text-dim") }}>
               <label>U<br /><input type="number" style={{ ...inp, width: 56 }} value={selDev.u} min={1}
                 onChange={(e) => { const n = parseInt(e.target.value); if (n) place(selDev.id, selDev.rack!, n, selDev.side); }} /></label>
               {selDev.half && <label>Side<br /><select style={inp} value={selDev.side} onChange={(e) => place(selDev.id, selDev.rack!, selDev.u, Number(e.target.value))}>
                 {sidesOf(selDev).map((s, i, a) => <option key={s} value={s}>{a.length === 2 ? ["left", "right"][i] : a.length === 3 ? ["left", "middle", "right"][i] : `column ${i + 1}`}</option>)}</select></label>}
-              <label>Mounted<br />
-                <select style={inp} value={mountOf(selDev)} title="Which rails it hangs on (its ports face that way). Short gear leaves the other side of the U free." onChange={(e) => edit((d) => {
+              <label style={{ flex: 1, minWidth: 0 }}>Mounted<br />
+                <select style={{ ...inp, width: "100%" }} value={mountOf(selDev)} title="Which rails it hangs on (its ports face that way). Short gear leaves the other side of the U free." onChange={(e) => edit((d) => {
                   const x = d.devices.find((y) => y.id === selDev.id)!; setMount(x, e.target.value as Mount);
                   const r = d.racks.find((z) => z.id === x.rack);
                   if (r) { const p = checkPlace(d, x, r, x.u, x.side); if (!p.ok) return "!" + p.why; }
@@ -611,32 +698,34 @@ export default function App({ web }: { web?: WebProps } = {}) {
                   {MOUNTS.map((m) => <option key={m.v} value={m.v}>{m.label}</option>)}
                 </select></label>
             </div>}
-            <div style={{ display: "flex", gap: 8, margin: "6px 0", fontSize: 12, alignItems: "flex-end" }}>
+            <div style={{ display: "flex", gap: 8, fontSize: 11, color: v("text-dim"), alignItems: "flex-end" }}>
               <label>Height (U)<br /><input type="number" style={{ ...inp, width: 56 }} value={selDev.u_size} min={1} max={selDev.rack != null ? doc.racks.find((r) => r.id === selDev.rack)?.u : undefined}
                 onChange={(e) => { const n = parseInt(e.target.value); if (n >= 1) edit((d) => { const x = resizeDevice(d, selDev.id, n); return x.ok ? x.msg : "!" + x.msg; }, `hu${selDev.id}`); }} /></label>
-              {!selDev.plate && <label><input type="checkbox" checked={!!selDev.half} onChange={(e) => edit((d) => { const x = resizeDevice(d, selDev.id, selDev.u_size, e.target.checked); return x.ok ? x.msg : "!" + x.msg; })} /> Half width</label>}
+              {!selDev.plate && <label style={{ color: v("text") }}><input type="checkbox" checked={!!selDev.half} onChange={(e) => edit((d) => { const x = resizeDevice(d, selDev.id, selDev.u_size, e.target.checked); return x.ok ? x.msg : "!" + x.msg; })} /> Half width</label>}
             </div>
-            <button style={btn} onClick={() => setModelFor(selDev.id)}>Change model…</button>
-            <div style={{ fontSize: 12, margin: "6px 0", opacity: 0.7 }}>
+            <Sec title="Ports" />
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
               {selDev.u_size}U, {selDev.ports.length} ports ({portsCabled(selDev)} cabled). Drag to move; click a port, then another, to cable.
             </div>
             <PortsEditor key={selDev.id} dev={selDev} doc={doc} edit={edit} />
             {(selDev.type === "Endpoints" || selDev.type === "Virtual machines") &&
               <EndpointTable dev={selDev} doc={doc} edit={edit} focusIdx={epFocus?.dev === selDev.id ? epFocus.idx : null} />}
+            <Sec title="Actions" />
+            <button style={btn} onClick={() => setModelFor(selDev.id)}>Change model…</button>
             <button style={btn} onClick={() => { let id = 0; if (edit((d) => { id = duplicateDevice(d, selDev.id)?.id ?? 0; })) setSel({ kind: "dev", id }); }}>Duplicate</button>
           </>}
           {selCable && <>
-            <b>Cable</b>
-            <div style={{ fontSize: 12, margin: "6px 0" }}>{endp(selCable.a)}<br />to {endp(selCable.b)}</div>
+            <Sec title="Cable" first />
+            <div style={{ fontSize: 12 }}>{endp(selCable.a)}<br />to {endp(selCable.b)}</div>
             {field("Label", selCable.label ?? "", (v) => cab(selCable, { label: v }))}
-            <label style={{ fontSize: 12 }}>Colour<br />
+            <label style={{ fontSize: 11, color: v("text-dim") }}>Colour<br />
               <input type="color" value={selCable.color || "#1f6feb"} onChange={(e) => cab(selCable, { color: e.target.value })} /></label> // theme-ok
-            <label style={{ fontSize: 12, display: "block", margin: "6px 0" }}>Style<br />
-              <select style={inp} value={selCable.style ?? "solid"} onChange={(e) => cab(selCable, { style: e.target.value })}>
+            <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Style<br />
+              <select style={{ ...inp, width: "100%" }} value={selCable.style ?? "solid"} onChange={(e) => cab(selCable, { style: e.target.value })}>
                 <option>solid</option><option>dashed</option>
               </select></label>
           </>}
-          {sel && <button style={{ ...btn, marginTop: 10, color: v("danger") }} onClick={del}>Delete</button>}
+          {sel && <button style={{ ...btn, color: v("danger"), marginRight: 0 }} onClick={del}>Delete</button>}
         </div>
       </div>
       {routes.hints.length > 0 && (
@@ -649,6 +738,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
           borderRadius: 4, padding: "2px 8px", fontSize: 12, zIndex: 50 }}>{icon(pdrag.i)} {CATALOG[pdrag.i].name}</div>
       )}
       {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
+      {helpDlg === "shortcuts" && <ShortcutsDialog onClose={() => setHelpDlg(null)} />}
+      {helpDlg === "news" && <WhatsNewDialog onClose={() => setHelpDlg(null)} />}
       {offer && (
         <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120 }}>
           <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 460, maxWidth: "94vw", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 13 }}>
@@ -664,7 +755,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         </div>
       )}
       {clientsOpen && (
-        <ClientsPanel onClose={() => setClientsOpen(false)} onOpenRack={openFromClient}
+        <ClientsPanel startImport={clientsImport} openClient={clientsTarget.client} focusSite={clientsTarget.site} onClose={() => { setClientsOpen(false); setClientsTarget({}); }} onOpenRack={openFromClient}
           current={{ label: cur?.name ?? (path ? path.split(/[\\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
           saveCurrentTo={IS_WEB && !cur && doc.racks.length > 0 ? saveCurrentTo : undefined} />
       )}
@@ -693,4 +784,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
       )}
     </div>
   );
+}
+
+function Sec({ title, first }: { title: string; first?: boolean }) {
+  return <div style={{ fontSize: 12, fontWeight: 600, color: v("text-muted"), marginTop: 14, paddingTop: first ? 0 : 8, borderTop: first ? "none" : `1px solid ${v("border-subtle")}` }}>{title}</div>;
 }

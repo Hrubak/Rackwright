@@ -2,6 +2,20 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.6.0 — 2026-11-17
+Web and desktop.
+- **New top bar.** The row of buttons is now five menus: File, Edit, View, Clients and Help. Hover across the menu names to move between them. Press Escape or click elsewhere to close a menu.
+  - File: New, Open, Save, Save as, Import file (web), Import list, Import Auvik, Export (PDF, Visio, .rack.json on the web).
+  - Edit: Undo, Redo, Add rack, Duplicate, Delete.
+  - View: the four views, Flip front/rear, Fit to screen, and Cables (the same cable choices as the box at the bottom left).
+  - Clients: the Clients screen, and Import Auvik into a client.
+  - Help: Keyboard shortcuts, What's new (the latest changes) and About.
+- **Always at hand.** The view switcher, Front/Rear, Undo, Redo and Save stay on the bar. In a window narrower than 1280 pixels the four views fold into one dropdown.
+- **Where you are.** The bar shows Client › Site › Rack for the open rack. Click the client or site to open it on the Clients screen. A rack in no site shows Unassigned. A dot after the name means there are unsaved changes.
+- **Your account menu (web).** Click your initials at the top right for Change password, Users and Update server (admins), and Sign out.
+- **Shortcuts.** New shortcuts: Ctrl+O opens, and Ctrl+N starts a new rack on the desktop (browsers keep Ctrl+N for a new window). Menus show each shortcut next to the item.
+- **Tidier side panels.** The properties panel is grouped into Device, Placement, Ports and Actions, with labels above each field.
+
 ## 3.5.0 — 2026-11-16
 Web and desktop. First step of the look-and-feel work (plan: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`).
 - **New logo and app icon.** Rackwright has a logo: three rack units on a blue tile. It is the desktop app icon (exe, taskbar), the browser tab icon, and it heads the sign-in page.

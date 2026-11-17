@@ -1,5 +1,6 @@
 // Web-only UI pieces: users panel, shared rack list, dialogs. Only rendered when VITE_TARGET === "web".
 import { v } from "./theme";
+import { DropButton, MenuItem, SEP } from "./Menu";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import * as A from "./api";
 import { RackMeta, UpdateCheck, UpdateStatus, User } from "./api";
@@ -29,18 +30,30 @@ export const Field = ({ label, children }: { label: string; children: ReactNode 
 
 export interface WebProps { user: User; signOut: () => void; setUser: (u: User) => void }
 
-/** Header controls: user name, Change password, Users and Update server (admin), Sign out. */
+/** Avatar menu: user name, Change password, Users and Update server (admin), Sign out. */
 export function UserBar({ web }: { web: WebProps }) {
   const [pw, setPw] = useState(false);
   const [users, setUsers] = useState(false);
   const [upd, setUpd] = useState(false);
+  const name = web.user.name || "?";
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  const admin = web.user.is_admin;
+  const items: MenuItem[] = [
+    { label: name, disabled: true },
+    ...(admin ? [{ label: "Admin", disabled: true }] : []),
+    SEP,
+    { label: "Change password…", run: () => setPw(true) },
+    ...(admin ? [
+      { label: "Users…", run: () => setUsers(true) },
+      { label: "Update server…", run: () => setUpd(true), hint: "Update this server to the newest version" },
+    ] : []),
+    SEP,
+    { label: "Sign out", run: web.signOut },
+  ];
+  const circle = <span style={{ display: "inline-flex", width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", background: v("accent-soft"), border: `1px solid ${v("accent-border")}`, fontSize: 11 }}>{initials}</span>;
   return (
-    <span style={{ marginLeft: "auto", paddingLeft: 12, fontSize: 12, display: "inline-flex", alignItems: "center" }}>
-      <span style={{ opacity: 0.8, marginRight: 8 }}>{web.user.name}{web.user.is_admin ? " (admin)" : ""}</span>
-      <button style={btn} onClick={() => setPw(true)}>Change password</button>
-      {web.user.is_admin && <button style={btn} onClick={() => setUsers(true)}>Users</button>}
-      {web.user.is_admin && <button style={btn} onClick={() => setUpd(true)} title="Update this server to the newest version">Update server</button>}
-      <button style={{ ...btn, marginRight: 0 }} onClick={web.signOut}>Sign out</button>
+    <span style={{ display: "inline-flex", alignItems: "center", marginLeft: 6 }}>
+      <DropButton label={circle} items={items} title={name} />
       {pw && <ChangePassword onClose={() => setPw(false)} />}
       {users && <UsersPanel me={web.user} onMe={web.setUser} onClose={() => setUsers(false)} />}
       {upd && <UpdatePanel onClose={() => setUpd(false)} />}

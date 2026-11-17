@@ -29,6 +29,12 @@ export interface ClientsPanelProps {
   /** Open a rack; with `devId`, select that device. */
   onOpenRack: (r: RackItem, devId?: number) => void;
   onClose: () => void;
+  /** Open with the Auvik import dialog already showing. */
+  startImport?: boolean;
+  /** Select this client when the screen opens. */
+  openClient?: string;
+  /** Scroll this site's card into view. */
+  focusSite?: number;
 }
 
 /** Small elevation drawing of every rack in a document. */
@@ -56,17 +62,17 @@ export function MiniRack({ doc }: { doc: Doc }) {
   );
 }
 
-export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClose }: ClientsPanelProps) {
+export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClose, startImport, openClient, focusSite }: ClientsPanelProps) {
   const store = clientStore();
   const [list, setList] = useState<ClientListItem[] | null>(null);
   const [q, setQ] = useState("");
-  const [key, setKey] = useState<string | null>(() => { try { return localStorage.getItem("rw.client") || null; } catch { return null; } });
+  const [key, setKey] = useState<string | null>(() => { if (openClient) return openClient; try { return localStorage.getItem("rw.client") || null; } catch { return null; } });
   const [client, setClient] = useState<ClientItem | null>(null);
   const [docs, setDocs] = useState<Record<string, Doc | string>>({}); // rack key -> doc, or an error text
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [siteForm, setSiteForm] = useState<{ id: number | null; name: string; address: string; notes: string } | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(!!startImport);
   const [picker, setPicker] = useState<{ siteId: number; items: RackItem[] | null } | null>(null);
   const [tab, setTab] = useState<"sites" | "inventory" | "links">(() => { try { const t = localStorage.getItem("rw.clientTab"); return t === "inventory" || t === "links" ? t : "sites"; } catch { return "sites"; } });
   useEffect(() => { try { localStorage.setItem("rw.clientTab", tab); } catch { /* ignore */ } }, [tab]);
@@ -78,6 +84,11 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
   }, [store]);
   useEffect(() => { reloadList(); }, [reloadList]);
   useEffect(() => { reloadClient(key); try { if (key) localStorage.setItem("rw.client", key); } catch { /* ignore */ } }, [key, reloadClient]);
+
+  useEffect(() => {
+    if (focusSite == null || !client) return;
+    document.querySelector(`[data-site="${focusSite}"]`)?.scrollIntoView({ block: "center" });
+  }, [focusSite, client]);
 
   // Load each rack's document once, for the thumbnails and the counts.
   useEffect(() => {
@@ -208,7 +219,7 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                   {client.sites.map((s) => {
                     const st = siteStats(s);
                     return (
-                      <div key={s.id} style={{ border: `1px solid ${v("scrollbar")}`, borderRadius: 6, padding: 10, background: v("card") }}>
+                      <div key={s.id} data-site={s.id} style={{ border: `1px solid ${v("scrollbar")}`, borderRadius: 6, padding: 10, background: v("card") }}>
                         <div style={{ display: "flex", alignItems: "flex-start" }}>
                           <div style={{ flex: 1 }}>
                             <b style={{ fontSize: 14 }}>{s.name}</b>
