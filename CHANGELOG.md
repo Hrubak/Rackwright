@@ -2,6 +2,13 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.8.0 — 2026-11-17
+Web and desktop.
+- **Light theme.** Settings › Profile › Theme: Dark (the default), Light, or Match my computer. Match my computer follows your Windows or browser setting and changes with it. The choice applies at once and is kept per person (web) or per computer (desktop).
+- **Drawings follow the theme.** In Light the page is white and empty rack space is light grey; racks stay graphite, like real ones. Device faceplates, device colours and your own cable colours look the same in both themes.
+- **PDF exports are always light**, whichever theme you use, so they print well and look the same for everyone.
+- Your company accent colour works in both themes.
+
 ## 3.7.0 — 2026-11-17
 Web and desktop. The web server gets new tables and endpoints for settings, so update the LXC as usual.
 - **Settings.** Open Settings from your account menu (web) or the gear at the right end of the top bar (desktop). Press Escape or Close to go back.

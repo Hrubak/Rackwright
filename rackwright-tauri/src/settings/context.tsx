@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { applyAccent, isHex6 } from "../theme";
+import { applyAccent, applyTheme, isHex6, resolveTheme } from "../theme";
 import { settingsStore } from "./store";
 import type { Branding, Prefs, SystemSettings } from "./types";
 
@@ -35,6 +35,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [store]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  const themePref = prefs.theme ?? "dark";
+  useEffect(() => {
+    try { localStorage.setItem("rw.theme", themePref); } catch { /* ignore */ }
+    let mq: MediaQueryList | null = null;
+    try { if (typeof matchMedia === "function") mq = matchMedia("(prefers-color-scheme: dark)"); } catch { mq = null; }
+    const apply = () => applyTheme(resolveTheme(themePref, mq ? mq.matches : true));
+    apply();
+    if (themePref !== "system" || !mq) return;
+    mq.addEventListener?.("change", apply);
+    return () => mq!.removeEventListener?.("change", apply);
+  }, [themePref]);
 
   const savePrefs = useCallback(async (p: Partial<Prefs>) => {
     setPrefs(await store.setPrefs({ ...prefs, ...p }));

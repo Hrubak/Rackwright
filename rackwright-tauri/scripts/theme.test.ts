@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DARK, resolveVars, resolveSvgVars, v } from "../src/theme";
+import { DARK, LIGHT, resolveTheme, resolveVars, resolveSvgVars, v } from "../src/theme";
 
 let fail = 0;
 const eq = (name: string, a: unknown, b: unknown) => {
@@ -15,6 +15,13 @@ eq("resolve", resolveVars("fill:var(--rw-bg);stroke:var(--rw-border)", DARK), "f
 eq("fallback", resolveVars("var(--rw-nope, #123456)", DARK), "#123456");
 eq("unknown kept", resolveVars("var(--rw-nope)", DARK), "var(--rw-nope)");
 eq("values are hex", Object.values(DARK).every((c) => /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(c)), true);
+
+eq("light keys", Object.keys(LIGHT), Object.keys(DARK));
+eq("light hex", Object.values(LIGHT).every((c) => /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(c)), true);
+eq("system dark", resolveTheme("system", true), "dark");
+eq("system light", resolveTheme("system", false), "light");
+eq("light wins", resolveTheme("light", true), "light");
+eq("light vars", resolveVars("var(--rw-bg)", LIGHT), "#f4f5f7");
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const skip = new Set(["src/theme.ts", "src/Plate.tsx", "src/catalog.json", "src/export/vsdx.ts", "src/export/pdf.ts"]);

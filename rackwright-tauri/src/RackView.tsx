@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DARK, v } from "./theme";
+import { DARK, currentTheme, palette, v } from "./theme";
 import RackFrame from "./RackFrame";
 import { kindLabel } from "./racks";
 import { Target, devDims, mountOf, rackUsage, resolveTarget, shapeOf, showsRear, xOffset } from "./edit";
@@ -153,7 +153,7 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
           <g key={r.id} onClick={(e) => { e.stopPropagation(); onSelect({ kind: "rack", id: r.id }); }}>
             <rect stroke={selected?.kind === "rack" && selected.id === r.id ? v("select") : v("border")} x={r.x} y={r.y} width={RW + 2 * RAIL} height={HDR + r.u * UH + PADB} rx={4} fill={v("rack-body")} />
             {r.kind && <RackFrame kind={r.kind} x={r.x} y={r.y} w={RW + 2 * RAIL} h={HDR + r.u * UH + PADB} />}
-            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill={v("text")} fontSize={16} fontWeight={600}>{r.name}</text>
+            <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 20} textAnchor="middle" fill={v("rack-title")} fontSize={16} fontWeight={600}>{r.name}</text>
             <text x={r.x + (RW + 2 * RAIL) / 2} y={r.y + 36} textAnchor="middle" fill={v("rack-subtitle")} fontSize={10.5}>{r.kind ? `${r.model_name || kindLabel(r.kind)} · ${r.u}U · ${rackUsage(doc, r).used}U used, ${rackUsage(doc, r).free}U free` : `${rackUsage(doc, r).used}/${r.u}U used, ${rackUsage(doc, r).free}U free`}</text>
             <rect x={r.x + RAIL - 3} y={r.y + HDR - 3} width={RW + 6} height={r.u * UH + 6} fill={v("rack-well")} stroke={v("rack-well-edge")} />
             {Array.from({ length: r.u }, (_, i) => {
@@ -230,7 +230,8 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
             const q = devRect(doc, { ...dev, rack: t.r.id, u: t.u, side: t.side }); x = q.l; y = q.t; ok = t.p.ok; why = t.p.why || t.p.warn || ""; warn = !!t.p.warn;
           } else if (t.kind === "float") { x = t.fx; y = t.fy; why = "Off-rack"; warn = true; }
           else return null;
-          const col = !ok ? DARK["danger"] : warn ? DARK["warn"] : DARK["ok"];
+          const pal = palette(currentTheme());
+          const col = !ok ? pal["danger"] : warn ? pal["warn"] : pal["ok"];
           const round = shapeOf({ ...dev, rack: null });
           return <g style={{ pointerEvents: "none" }}>
             {round === "disc" ? <circle cx={x + 32} cy={y + 32} r={29} fill={col + "55"} stroke={col} strokeWidth={2} />

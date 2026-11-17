@@ -3,13 +3,13 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { createElement } from "react";
 import RackView from "../RackView";
-import { resolveSvgVars } from "../theme";
+import { LIGHT, resolveSvgVars } from "../theme";
 import { Doc } from "../types";
 import { CableRow, DeviceRow, ExportData, Face, cableRows, contentBounds, deviceRows, docTitle } from "./data";
 
 const PAGE_W = 792, PAGE_H = 612, MARGIN = 36, HEAD_H = 34; // US Letter landscape, points
 const SVG_NS = "http://www.w3.org/2000/svg";
-const BG = "#14161a";
+const BG = LIGHT.panel; // white page
 
 /** Render RackView for one face into a hidden container and return a standalone, fitted copy of its SVG. */
 async function faceSvg(doc: Doc, data: ExportData, face: Face, host: HTMLElement): Promise<{ svg: SVGSVGElement; w: number; h: number }> {
@@ -38,7 +38,7 @@ async function faceSvg(doc: Doc, data: ExportData, face: Face, host: HTMLElement
     const bg = document.createElementNS(SVG_NS, "rect");
     for (const [k, v] of Object.entries({ x: "0", y: "0", width: String(w), height: String(h), fill: BG })) bg.setAttribute(k, v);
     svg.insertBefore(bg, svg.firstChild);
-    resolveSvgVars(svg);
+    resolveSvgVars(svg, LIGHT);
     fixColors(svg);
     return { svg, w, h };
   } finally {

@@ -6,7 +6,7 @@ import * as A from "../api";
 import { RACK_MODELS, GENERIC_MAX_U, GENERIC_MIN_U, kindLabel } from "../racks";
 import { UpdateBody, UsersBody, WebProps, errStyle, msgOf } from "../web";
 import { useSettings } from "./context";
-import type { StartScreen, Units } from "./types";
+import type { StartScreen, ThemePref, Units } from "./types";
 
 export type SettingsTab = "profile" | "company" | "racks" | "users" | "update";
 
@@ -69,6 +69,11 @@ function Profile({ web }: { web?: WebProps }) {
         </>
       )}
       <h2 style={{ ...h2, marginTop: web ? 24 : 0 }}>Preferences</h2>
+      <label style={lbl}>Theme<br />
+        <select style={inp} value={prefs.theme ?? "dark"} onChange={(e) => pref.run(() => savePrefs({ theme: e.target.value as ThemePref }))}>
+          <option value="dark">Dark</option><option value="light">Light</option><option value="system">Match my computer</option>
+        </select>
+      </label>
       <label style={lbl}>Units<br />
         <select style={inp} value={units} onChange={(e) => pref.run(() => savePrefs({ units: e.target.value as Units }))}>
           <option value="mm">Millimetres</option><option value="in">Inches</option>
