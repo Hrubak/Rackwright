@@ -1,3 +1,4 @@
+import EquipmentSidebar from "./equip/EquipmentSidebar";
 import { v } from "./theme";
 import pkg from "../package.json";
 import { About } from "./About";
@@ -52,7 +53,6 @@ const btn = { background: v("control"), color: v("text"), border: `1px solid ${v
 const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
 
 const PROTOS = CATALOG.map((t) => protoOf(t));
-const TYPES = Array.from(new Set(CATALOG.map((t) => t.type))).sort();
 const icon = (i: number) => {
   const s = shapeOf({ ...PROTOS[i], rack: null });
   return s === "disc" ? "●" : s === "squircle" ? "▢" : "▬";
@@ -92,8 +92,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [pending, setPending] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
-  const [q, setQ] = useState("");
-  const [typeF, setTypeF] = useState("");
   const [fitsOnly, setFitsOnly] = useState(false);
   const [palSel, setPalSel] = useState<number | null>(null);
   const [pdrag, setPdrag] = useState<{ i: number; x: number; y: number; active: boolean } | null>(null);
@@ -111,6 +109,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [loc, setLoc] = useState<RackLocation | null | "unassigned">(null);
   const [wide, setWide] = useState(() => window.innerWidth >= 1280);
   useEffect(() => { const r = () => setWide(window.innerWidth >= 1280); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
+  const [equipCollapsed, setEquipCollapsedRaw] = useState(() => {
+    try { const s = localStorage.getItem("rw.equipCollapsed"); if (s === "1" || s === "0") return s === "1"; } catch { /* ignore */ }
+    return window.innerWidth < 1280;
+  });
+  const setEquipCollapsed = (b: boolean) => { setEquipCollapsedRaw(b); try { localStorage.setItem("rw.equipCollapsed", b ? "1" : "0"); } catch { /* ignore */ } };
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [modelFor, setModelFor] = useState<number | null>(null);
   const [picker, setPicker] = useState<"new" | "add" | null>(null);
@@ -459,16 +462,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
   }, [doUndo, doRedo, del, doSave, doNew, doOpen, doDuplicate, edit, selDev, place, pending, panelOpen]);
 
   const rackForTags = targetRack();
-  const list = useMemo(() => {
-    const t = q.toLowerCase().split(/\s+/).filter(Boolean);
-    return CATALOG.map((c, i) => ({ c, i })).filter(({ c, i }) => {
-      if (typeF && c.type !== typeF) return false;
-      const hay = `${c.name} ${c.type} ${c.group || ""} ${c.model || ""}`.toLowerCase();
-      if (!t.every((w) => hay.includes(w))) return false;
-      if (fitsOnly && rackForTags) { const s = tplRackStatus(doc, rackForTags, c); if (s === "full") return false; if (s === "ok" || s === "off") return true; }
-      void i; return true;
-    }).slice(0, 200);
-  }, [q, typeF, fitsOnly, rackForTags, doc]);
 
   const endp = (pid: number) => { const o = portOf(doc, pid); return o ? `${o.d.name} ${o.p.name}` : "?"; };
   const cab = (c: NonNullable<typeof selCable>, patch: Record<string, unknown>) =>
@@ -645,32 +638,10 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {IS_WEB && webUpd.reload && <UpdateBanner kind="reload" text={`Rackwright was updated to ${webUpd.reload}. Reload to use the new version.`} primary="Reload" onPrimary={() => location.reload()} />}
       {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
       <div style={{ flex: 1, minHeight: 0, display: "flex", position: "relative" }}>
-        <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: v("panel"), borderRight: `1px solid ${v("border-subtle")}`, flexDirection: "column", fontSize: 12 }}>
-          <input style={{ ...inp, margin: "10px 10px 8px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
-          <div style={{ display: "flex", gap: 6, margin: "0 10px 8px", alignItems: "center" }}>
-            <select style={{ ...inp, flex: 1, minWidth: 0 }} value={typeF} onChange={(e) => setTypeF(e.target.value)}>
-              <option value="">All types</option>
-              {TYPES.map((t) => <option key={t}>{t}</option>)}
-            </select>
-            <label title="Hide items with no free slot in the selected rack"><input type="checkbox" checked={fitsOnly} onChange={(e) => setFitsOnly(e.target.checked)} /> fits</label>
-          </div>
-          <div style={{ padding: "0 10px 8px", color: v("text-dim") }}>Drag into a rack, or double-click to add</div>
-          <div style={{ flex: 1, overflow: "auto" }}>
-            {list.map(({ c, i }) => {
-              const st = rackForTags ? tplRackStatus(doc, rackForTags, c) : c.plate?.off ? "off" : "none";
-              return (
-                <div className="cat" key={i} onMouseDown={(e) => startPdrag(e, i)} onDoubleClick={() => addFromCatalog(i)}
-                  title="Drag into the rack, or double-click to add"
-                  style={{ padding: "6px 10px", borderBottom: `1px solid ${v("panel-2")}`, cursor: "grab", background: palSel === i ? v("accent-soft") : undefined, opacity: st === "full" ? 0.5 : 1 }}>
-                  <span style={{ opacity: 0.6, marginRight: 6 }}>{icon(i)}</span>{c.name}{" "}
-                  <span style={{ color: v("text-dim") }}>{c.u_size}U {c.type}{widthLabel(c)}</span>
-                  {st === "off" && <span style={{ color: v("warn") }}> off-rack</span>}
-                  {st === "full" && <span style={{ color: v("danger") }}> no room</span>}
-                </div>
-              );
-            })}
-            {!list.length && <div style={{ padding: 10, opacity: 0.6 }}>Nothing matches.</div>}
-          </div>
+        <div style={{ display: view === "rack" ? "flex" : "none" }}>
+          <EquipmentSidebar list={CATALOG} fitsOnly={fitsOnly} onFits={setFitsOnly} onDragStart={startPdrag} onAdd={addFromCatalog}
+            statusOf={(c) => rackForTags ? tplRackStatus(doc, rackForTags, c) : c.plate?.off ? "off" : "none"}
+            icon={icon} widthLabel={widthLabel} selected={palSel} collapsed={equipCollapsed} onCollapse={setEquipCollapsed} />
         </div>
         <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
           {view !== "rack" && selDev && (
@@ -699,7 +670,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
               {doc.racks.length} rack(s), {sum.used}/{sum.total}U used<br />
               {doc.devices.length} devices ({sum.off} off-rack)<br />
               {doc.cables.length} cables<br />
-              <span style={{ opacity: 0.6 }}>Click a device, rack or cable to edit it. Arrow keys nudge a selected device, Ctrl+D duplicates, Home fits the view.</span>
+              <span style={{ opacity: 0.6 }}>Double-click a device, rack or cable to edit it. Arrow keys nudge a selected device, Ctrl+D duplicates, Home fits the view.</span>
             </div>
             <AuvikInfo doc={doc} onOpen={() => setUnplacedOpen(true)} />
           </>}
