@@ -34,6 +34,7 @@ import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
 import ClientsPanel from "./clients/ClientsPanel";
 import { Breadcrumb } from "./Breadcrumb";
+import Dashboard, { type ClientTab } from "./home/Dashboard";
 import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
 import { UpdateBanner } from "./version/UpdateBanner";
@@ -58,6 +59,9 @@ const icon = (i: number) => {
   return s === "disc" ? "●" : s === "squircle" ? "▢" : "▬";
 };
 
+export type { ClientTab };
+type Screen = { kind: "home" } | { kind: "client"; key: string; tab: ClientTab; site?: number } | { kind: "editor" };
+
 interface Cur { id: number; name: string; version: number }
 
 export default function App({ web }: { web?: WebProps } = {}) {
@@ -66,6 +70,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [helpDlg, setHelpDlg] = useState<"shortcuts" | "news" | null>(null);
   const [clientsImport, setClientsImport] = useState(false);
+  const [screen, setScreen] = useState<Screen>({ kind: "home" });
+  const [importTick, setImportTick] = useState(0);
   const [undo, setUndo] = useState<Doc[]>([]);
   const [redo, setRedo] = useState<Doc[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -539,7 +545,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     { label: "Clients", items: [
       { label: "Clients…", run: () => { setClientsImport(false); setClientsOpen(true); } },
       { label: "Client report…", run: () => setReportFor("") },
-      { label: "Import Auvik into a client…", run: () => { setClientsImport(true); setClientsOpen(true); } },
+      { label: "Import Auvik into a client…", run: () => { setScreen({ kind: "home" }); setImportTick((n) => n + 1); } },
     ] },
     { label: "Help", items: [
       { label: "Keyboard shortcuts…", run: () => setHelpDlg("shortcuts") },
@@ -582,6 +588,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     if (!settings.loaded || startDone.current) return;
     startDone.current = true;
     const start = settings.prefs.start ?? "new";
+    if (start !== "clients") setScreen({ kind: "editor" });
     const last = settings.prefs.last_rack;
     if (start === "last" && last) {
       reopening.current = true;
@@ -593,7 +600,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         } catch { ok = false; }
         if (!ok) say("Could not reopen the last rack.", true);
       })().finally(() => { reopening.current = false; });
-    } else if (start === "clients") { setClientsImport(false); setClientsOpen(true); }
+    } else if (start === "clients") setScreen({ kind: "home" });
     else if (start === "racks" && IS_WEB) setShowRacks(true);
   }, [settings.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const lastSent = useRef("");
@@ -611,7 +618,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: v("text"), fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
       <div style={{ minHeight: 42, padding: "6px 10px", background: v("panel"), borderBottom: `1px solid ${v("border-subtle")}`, boxSizing: "border-box", display: "flex", flexWrap: "nowrap", alignItems: "center", whiteSpace: "nowrap" }}>
-        <button style={{ background: "none", border: "none", padding: "0 8px 0 0", cursor: "pointer", display: "flex" }} onClick={() => setAboutOpen(true)} title="About Rackwright"><Logo size={24} /></button>
+        <button style={{ background: "none", border: "none", padding: "0 8px 0 0", cursor: "pointer", display: "flex" }} onClick={() => setScreen({ kind: "home" })} title="Home" aria-label="Home"><Logo size={24} /></button>
+        <button style={{ ...btn, padding: "5px 8px", marginRight: 8, background: screen.kind === "home" ? v("accent-soft") : v("control") }} onClick={() => setScreen({ kind: "home" })} title="Clients dashboard" aria-label="Home" aria-pressed={screen.kind === "home"}>{"▦"}</button>
         {settings.branding.logo_url && <>
           <div style={{ width: 1, alignSelf: "stretch", margin: "2px 8px 2px 0", background: v("border") }} />
           <img src={settings.branding.logo_url} alt={settings.branding.company_name} title={settings.branding.company_name} style={{ height: 24, maxWidth: 120, objectFit: "contain", marginRight: 8 }} />
@@ -637,7 +645,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {!IS_WEB && deskUpd.offer && <UpdateBanner kind="desktop" text={`Rackwright ${deskUpd.offer.version} is available.`} primary="Download" secondary="Skip this version" onPrimary={deskUpd.download} onSecondary={deskUpd.skip} onClose={deskUpd.hide} />}
       {IS_WEB && webUpd.reload && <UpdateBanner kind="reload" text={`Rackwright was updated to ${webUpd.reload}. Reload to use the new version.`} primary="Reload" onPrimary={() => location.reload()} />}
       {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", position: "relative" }}>
+      {screen.kind === "home" && <Dashboard importTick={importTick} onOpen={(key, o) => { setClientsTarget({ client: key, site: o?.site }); setClientsImport(false); setClientsOpen(true); }} />}
+      <div style={{ flex: 1, minHeight: 0, display: screen.kind === "home" ? "none" : "flex", position: "relative" }}>
         <div style={{ display: view === "rack" ? "flex" : "none" }}>
           <EquipmentSidebar list={CATALOG} fitsOnly={fitsOnly} onFits={setFitsOnly} onDragStart={startPdrag} onAdd={addFromCatalog}
             statusOf={(c) => rackForTags ? tplRackStatus(doc, rackForTags, c) : c.plate?.off ? "off" : "none"}
