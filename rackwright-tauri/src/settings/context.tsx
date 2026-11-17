@@ -1,0 +1,57 @@
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { applyAccent, isHex6 } from "../theme";
+import { settingsStore } from "./store";
+import type { Branding, Prefs, SystemSettings } from "./types";
+
+interface Ctx {
+  prefs: Prefs; system: SystemSettings; branding: Branding;
+  savePrefs(p: Partial<Prefs>): Promise<void>;
+  saveSystem(s: Partial<SystemSettings>): Promise<void>;
+  setLogo(f: File | null): Promise<void>;
+  reload(): Promise<void>;
+  loaded: boolean;
+}
+
+const EMPTY: Branding = { company_name: "", accent: null, logo_url: null };
+const noop = async () => {};
+const SettingsCtx = createContext<Ctx>({ prefs: {}, system: {}, branding: EMPTY, savePrefs: noop, saveSystem: noop, setLogo: noop, reload: noop, loaded: false });
+
+const accentOf = (s: SystemSettings) => (typeof s.accent === "string" && isHex6(s.accent) ? s.accent : null);
+
+export function SettingsProvider({ children }: { children: ReactNode }) {
+  const [prefs, setPrefs] = useState<Prefs>({});
+  const [system, setSystem] = useState<SystemSettings>({});
+  const [branding, setBranding] = useState<Branding>(EMPTY);
+  const [loaded, setLoaded] = useState(false);
+  const store = useMemo(() => settingsStore(), []);
+
+  const reload = useCallback(async () => {
+    try {
+      const [p, s, b] = await Promise.all([store.getPrefs(), store.getSystem(), store.getBranding()]);
+      setPrefs(p); setSystem(s); setBranding(b);
+      applyAccent(accentOf(s));
+    } catch { /* leave defaults */ }
+    setLoaded(true);
+  }, [store]);
+
+  useEffect(() => { void reload(); }, [reload]);
+
+  const savePrefs = useCallback(async (p: Partial<Prefs>) => {
+    setPrefs(await store.setPrefs({ ...prefs, ...p }));
+  }, [store, prefs]);
+  const saveSystem = useCallback(async (s: Partial<SystemSettings>) => {
+    const next = await store.setSystem({ ...system, ...s });
+    setSystem(next);
+    applyAccent(accentOf(next));
+    try { setBranding(await store.getBranding()); } catch { /* keep */ }
+  }, [store, system]);
+  const setLogo = useCallback(async (f: File | null) => {
+    await store.setLogo(f);
+    setBranding(await store.getBranding());
+  }, [store]);
+
+  const value = useMemo(() => ({ prefs, system, branding, savePrefs, saveSystem, setLogo, reload, loaded }), [prefs, system, branding, savePrefs, saveSystem, setLogo, reload, loaded]);
+  return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
+}
+
+export function useSettings(): Ctx { return useContext(SettingsCtx); }

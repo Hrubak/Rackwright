@@ -21,7 +21,10 @@ import EndpointsView from "./views/EndpointsView";
 type ViewId = "rack" | "infra" | "switch" | "endpoints";
 const VIEWS: [ViewId, string][] = [["rack", "Rack"], ["infra", "Infrastructure"], ["switch", "Switch"], ["endpoints", "Endpoints"]];
 import RackPicker, { PickResult } from "./RackPicker";
-import { RACK_MODELS, genericDefaultU, kindLabel, dimsText, specOf, modelById } from "./racks";
+import { fmtDims } from "./units";
+import { useSettings } from "./settings/context";
+import SettingsScreen, { SettingsTab } from "./settings/SettingsScreen";
+import { RACK_MODELS, genericDefaultU, kindLabel, specOf, modelById } from "./racks";
 import { AuvikInfo, EndpointTable, UnplacedDialog } from "./auvik/Panels";
 import PortsEditor from "./PortsEditor";
 import ModelPicker from "./ModelPicker";
@@ -53,6 +56,7 @@ const icon = (i: number) => {
 interface Cur { id: number; name: string; version: number }
 
 export default function App({ web }: { web?: WebProps } = {}) {
+  const settings = useSettings();
   const [doc, setDoc] = useState<Doc>(empty);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [helpDlg, setHelpDlg] = useState<"shortcuts" | "news" | null>(null);
@@ -95,6 +99,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [clientsTarget, setClientsTarget] = useState<{ client?: string; site?: number }>({});
   const [loc, setLoc] = useState<RackLocation | null | "unassigned">(null);
   const [wide, setWide] = useState(() => window.innerWidth >= 1280);
@@ -209,12 +214,13 @@ export default function App({ web }: { web?: WebProps } = {}) {
     } catch (e) { setMsg(String(e)); }
   };
 
-  const loadShared = async (id: number) => {
+  const loadShared = async (id: number): Promise<boolean> => {
     try {
       const r = await A.getRack(id);
       reset(r.doc, null, { id: r.id, name: r.name, version: r.version });
       setMsg(""); setShowRacks(false);
-    } catch (e) { say(errText(e), true); }
+      return true;
+    } catch (e) { say(errText(e), true); return false; }
   };
 
   /** Web: PUT the current rack (or POST when new). Handles the 409 conflict flow. */
@@ -552,10 +558,47 @@ export default function App({ web }: { web?: WebProps } = {}) {
       style={{ ...btn, marginRight: 0, borderRadius: i === 0 ? "4px 0 0 4px" : i === opts.length - 1 ? "0 4px 4px 0" : 0, marginLeft: i ? -1 : 0, background: curId === id ? v("accent-soft") : btn.background, borderColor: curId === id ? v("accent-border") : v("border") }}>{label}</button>
   ));
 
+  // Start screen (once, after settings load) and last-rack bookkeeping.
+  const reopening = useRef(false);
+  const startDone = useRef(false);
+  useEffect(() => {
+    if (!settings.loaded || startDone.current) return;
+    startDone.current = true;
+    const start = settings.prefs.start ?? "new";
+    const last = settings.prefs.last_rack;
+    if (start === "last" && last) {
+      reopening.current = true;
+      (async () => {
+        let ok = false;
+        try {
+          if (IS_WEB) { if (last.id != null) ok = await loadShared(last.id); }
+          else if (last.path) { const d = await clientStore().loadDoc({ key: last.path, name: last.name ?? "", path: last.path }); reset(d, last.path); setMsg(""); ok = true; }
+        } catch { ok = false; }
+        if (!ok) say("Could not reopen the last rack.", true);
+      })().finally(() => { reopening.current = false; });
+    } else if (start === "clients") { setClientsImport(false); setClientsOpen(true); }
+    else if (start === "racks" && IS_WEB) setShowRacks(true);
+  }, [settings.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lastSent = useRef("");
+  const lastRackKey = IS_WEB ? (cur ? `w${cur.id}` : "") : (path ?? "");
+  useEffect(() => {
+    if (!settings.loaded || !lastRackKey || reopening.current) return;
+    const lr = IS_WEB ? { id: cur!.id, name: cur!.name } : { path: path!, name: path!.split(/[\\/]/).pop() };
+    const sig = JSON.stringify(lr);
+    const old = settings.prefs.last_rack;
+    if (sig === lastSent.current || (old && JSON.stringify(IS_WEB ? { id: old.id, name: old.name } : { path: old.path, name: old.name }) === sig)) return;
+    const t = window.setTimeout(() => { lastSent.current = sig; settings.savePrefs({ last_rack: lr }).catch(() => {}); }, 1000);
+    return () => window.clearTimeout(t);
+  }, [lastRackKey, cur?.name, settings.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", color: v("text"), fontFamily: "Segoe UI, sans-serif", userSelect: pdrag ? "none" : undefined }}>
       <div style={{ minHeight: 42, padding: "6px 10px", background: v("panel"), borderBottom: `1px solid ${v("border-subtle")}`, boxSizing: "border-box", display: "flex", flexWrap: "nowrap", alignItems: "center", whiteSpace: "nowrap" }}>
         <button style={{ background: "none", border: "none", padding: "0 8px 0 0", cursor: "pointer", display: "flex" }} onClick={() => setAboutOpen(true)} title="About Rackwright"><Logo size={24} /></button>
+        {settings.branding.logo_url && <>
+          <div style={{ width: 1, alignSelf: "stretch", margin: "2px 8px 2px 0", background: v("border") }} />
+          <img src={settings.branding.logo_url} alt={settings.branding.company_name} title={settings.branding.company_name} style={{ height: 24, maxWidth: 120, objectFit: "contain", marginRight: 8 }} />
+        </>}
         <MenuBar menus={menus} />
         {sepBar}
         <Breadcrumb loc={loc} rackName={rackName} dirty={dirty}
@@ -570,7 +613,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <button style={{ ...btn, padding: "5px 9px" }} onClick={doUndo} disabled={!undo.length} title={`Undo (${SHORTCUTS.undo})`}>{"↶"}</button>
         <button style={{ ...btn, padding: "5px 9px" }} onClick={doRedo} disabled={!redo.length} title={`Redo (${SHORTCUTS.redo})`}>{"↷"}</button>
         <button style={{ ...btn, background: v("accent"), color: v("on-accent"), borderColor: v("accent") }} onClick={() => doSave()} title={`Save (${SHORTCUTS.save})`}>Save</button>
-        {IS_WEB && webGuarded && <UserBar web={webGuarded} />}
+        {!IS_WEB && <button style={{ ...btn, padding: "5px 9px", marginLeft: 6, marginRight: 0 }} title="Settings" aria-label="Settings" onClick={() => setSettingsTab("profile")}>{"⚙"}</button>}
+        {IS_WEB && webGuarded && <UserBar web={webGuarded} openSettings={setSettingsTab} />}
       </div>
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: v("panel"), borderRight: `1px solid ${v("border-subtle")}`, flexDirection: "column", fontSize: 12 }}>
@@ -657,7 +701,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
                   </optgroup>
                 ))}
               </select></label>
-            {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {dimsText(selRack.width_mm, selRack.depth_mm)}</div>}
+            {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {fmtDims(selRack.width_mm, selRack.depth_mm, settings.prefs.units ?? "mm")}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
           </>}
           {selDev && <>
@@ -754,6 +798,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
           </div>
         </div>
       )}
+      {settingsTab && <SettingsScreen tab={settingsTab} setTab={setSettingsTab} web={webGuarded} onClose={() => setSettingsTab(null)} />}
       {clientsOpen && (
         <ClientsPanel startImport={clientsImport} openClient={clientsTarget.client} focusSite={clientsTarget.site} onClose={() => { setClientsOpen(false); setClientsTarget({}); }} onOpenRack={openFromClient}
           current={{ label: cur?.name ?? (path ? path.split(/[\\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
@@ -766,7 +811,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <ModelPicker dev={dv} onCancel={() => setModelFor(null)} onPick={(t) => { if (edit((d) => { const x = swapModel(d, dv.id, t); return x.ok ? x.msg : "!" + x.msg; })) setModelFor(null); }} />
       ) : null; })()}
       {picker && <RackPicker title={picker === "new" ? "New rack" : "Add a rack"} okLabel={picker === "new" ? "Create" : "Add rack"}
-        defaultName={picker === "new" ? "Rack 1" : `Rack ${doc.racks.length + 1}`} onPick={onPick} onCancel={() => setPicker(null)} />}
+        defaultName={picker === "new" ? "Rack 1" : `Rack ${doc.racks.length + 1}`}
+        defaults={{ model: typeof settings.system.rack_default_model === "string" ? settings.system.rack_default_model : undefined, u: typeof settings.system.rack_default_u === "number" ? settings.system.rack_default_u : undefined }} onPick={onPick} onCancel={() => setPicker(null)} />}
       {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
       {unplacedOpen && <UnplacedDialog items={doc.auvik?.unplaced ?? []} onClose={() => setUnplacedOpen(false)} />}
       {importOpen && (

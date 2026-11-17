@@ -1,6 +1,8 @@
 import { v } from "./theme";
+import { fmtDims } from "./units";
+import { useSettings } from "./settings/context";
 import { useMemo, useState } from "react";
-import { GENERIC_MAX_U, GENERIC_MIN_U, KINDS, RACK_MODELS, RackKind, RackModel, dimsText, kindLabel } from "./racks";
+import { GENERIC_MAX_U, GENERIC_MIN_U, KINDS, RACK_MODELS, RackKind, RackModel, kindLabel } from "./racks";
 
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
@@ -43,13 +45,19 @@ export function FramePreview({ kind, u = 42 }: { kind: string; u?: number }) {
 export interface PickResult { model: RackModel; u: number; name: string }
 
 /** Modal list of rack models. Enter picks, Esc cancels. */
-export default function RackPicker({ title, okLabel, defaultName, onPick, onCancel }: {
-  title: string; okLabel: string; defaultName: string; onPick: (r: PickResult) => void; onCancel: () => void;
+export default function RackPicker({ title, okLabel, defaultName, defaults, onPick, onCancel }: {
+  title: string; okLabel: string; defaultName: string; defaults?: { model?: string; u?: number }; onPick: (r: PickResult) => void; onCancel: () => void;
 }) {
+  const units = useSettings().prefs.units ?? "mm";
   const [kind, setKind] = useState<RackKind | "">("");
   const [q, setQ] = useState("");
-  const [selId, setSelId] = useState("apc-ar3100");
-  const [gu, setGu] = useState("42");
+  const defModel = defaults?.model ? RACK_MODELS.find((m) => m.id === defaults.model) : undefined;
+  const [selId, setSelId] = useState(defModel ? defModel.id : "apc-ar3100");
+  const [gu, setGu] = useState(() => {
+    if (defModel?.generic && typeof defaults?.u === "number" && Number.isFinite(defaults.u))
+      return String(Math.min(GENERIC_MAX_U, Math.max(GENERIC_MIN_U, Math.round(defaults.u))));
+    return "42";
+  });
   const [name, setName] = useState(defaultName);
 
   const list = useMemo(() => {
@@ -108,7 +116,7 @@ export default function RackPicker({ title, okLabel, defaultName, onPick, onCanc
                   <div style={{ fontSize: 11, opacity: 0.65 }}>{kindLabel(m.kind)}{m.approx ? " (size approximate)" : ""}</div>
                 </div>
                 <div style={{ width: 90, textAlign: "right", fontSize: 12 }}>{m.generic ? "4-52U" : `${m.u}U`}</div>
-                <div style={{ width: 110, textAlign: "right", fontSize: 12, opacity: 0.8 }}>{m.generic ? "" : m.width_mm && m.depth_mm ? `${m.width_mm} x ${m.depth_mm}` : dimsText(m.width_mm, m.depth_mm)}</div>
+                <div style={{ width: 110, textAlign: "right", fontSize: 12, opacity: 0.8 }}>{m.generic ? "" : fmtDims(m.width_mm, m.depth_mm, units)}</div>
               </div>
             );
           })}

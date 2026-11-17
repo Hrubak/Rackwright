@@ -19,4 +19,4 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
 - **Themes and styles.** Dark, light and "match my computer" themes. Clients see Rackwright through exports, not the live app, so there is no in-app presentation mode.
 - **Client report.** A quarterly-review report for one client, Overview or Detailed, with your own summary and recommendations: a branded PDF, and a Word document built from your uploaded master template. Branding (logo, colours, font, artwork, template) is uploaded by an admin and never committed.
 
-Design: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`. Releases: 3.5.0 groundwork and logo (done), 3.6.0 top bar (done), 3.7.0 Settings, 3.8.0 light theme, 3.9.0 client report PDF, 3.10.0 Word report.
+Design: `docs/superpowers/specs/2026-11-16-look-and-feel-design.md`. Releases: 3.5.0 groundwork and logo (done), 3.6.0 top bar (done), 3.7.0 Settings (done), 3.8.0 light theme, 3.9.0 client report PDF, 3.10.0 Word report.

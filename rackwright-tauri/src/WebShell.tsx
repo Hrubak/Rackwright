@@ -3,15 +3,24 @@ import { Logo } from "./Logo";
 import { v } from "./theme";
 import { ReactNode, useEffect, useState } from "react";
 import App from "./App";
+import { SettingsProvider } from "./settings/context";
 import * as A from "./api";
 import { User } from "./api";
 import { Field, btn, inp, msgOf } from "./web";
 
 function Screen({ title, children }: { title: string; children: ReactNode }) {
+  const [brand, setBrand] = useState<{ company_name: string; has_logo: boolean } | null>(null);
+  useEffect(() => { A.getBrandingApi().then(setBrand).catch(() => {}); }, []);
   return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: v("bg"), color: v("text"), fontFamily: "Segoe UI, sans-serif" }}>
       <div style={{ background: v("panel"), padding: 20, borderRadius: 6, width: 320, border: `1px solid ${v("border")}` }}>
         <div style={{ marginBottom: 14 }}><Logo size={28} wordmark /></div>
+        {brand && (brand.has_logo || brand.company_name) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            {brand.has_logo && <img src="/api/branding/logo" alt="" style={{ height: 48, maxWidth: 180, objectFit: "contain" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+            {brand.company_name && <b style={{ fontSize: 15 }}>{brand.company_name}</b>}
+          </div>
+        )}
         <div style={{ fontSize: 13, marginBottom: 10, opacity: 0.8 }}>{title}</div>
         {children}
       </div>
@@ -65,5 +74,5 @@ export default function WebShell() {
   if (phase === "down") return <Screen title="Cannot reach the server."><button style={btn} onClick={() => location.reload()}>Retry</button></Screen>;
   if (phase === "setup") return <AuthForm setupMode onDone={signedIn} />;
   if (phase === "login" || !user) return <AuthForm setupMode={false} onDone={signedIn} />;
-  return <App web={{ user, signOut, setUser }} />;
+  return <SettingsProvider><App web={{ user, signOut, setUser }} /></SettingsProvider>;
 }

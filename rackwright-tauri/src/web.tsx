@@ -7,7 +7,7 @@ import { RackMeta, UpdateCheck, UpdateStatus, User } from "./api";
 
 export const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 export const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px" } as const;
-const errStyle = { color: v("danger"), fontSize: 12, margin: "6px 0" } as const;
+export const errStyle = { color: v("danger"), fontSize: 12, margin: "6px 0" } as const;
 export const msgOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function Modal({ title, onClose, children, width = 520 }: { title: string; onClose?: () => void; children: ReactNode; width?: number }) {
@@ -30,11 +30,8 @@ export const Field = ({ label, children }: { label: string; children: ReactNode 
 
 export interface WebProps { user: User; signOut: () => void; setUser: (u: User) => void }
 
-/** Avatar menu: user name, Change password, Users and Update server (admin), Sign out. */
-export function UserBar({ web }: { web: WebProps }) {
-  const [pw, setPw] = useState(false);
-  const [users, setUsers] = useState(false);
-  const [upd, setUpd] = useState(false);
+/** Avatar menu: user name, Settings, Users and Update server (admin), Sign out. */
+export function UserBar({ web, openSettings }: { web: WebProps; openSettings: (tab: "profile" | "users" | "update") => void }) {
   const name = web.user.name || "?";
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
   const admin = web.user.is_admin;
@@ -42,10 +39,10 @@ export function UserBar({ web }: { web: WebProps }) {
     { label: name, disabled: true },
     ...(admin ? [{ label: "Admin", disabled: true }] : []),
     SEP,
-    { label: "Change password…", run: () => setPw(true) },
+    { label: "Settings…", run: () => openSettings("profile") },
     ...(admin ? [
-      { label: "Users…", run: () => setUsers(true) },
-      { label: "Update server…", run: () => setUpd(true), hint: "Update this server to the newest version" },
+      { label: "Users…", run: () => openSettings("users") },
+      { label: "Update server…", run: () => openSettings("update"), hint: "Update this server to the newest version" },
     ] : []),
     SEP,
     { label: "Sign out", run: web.signOut },
@@ -54,32 +51,11 @@ export function UserBar({ web }: { web: WebProps }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", marginLeft: 6 }}>
       <DropButton label={circle} items={items} title={name} />
-      {pw && <ChangePassword onClose={() => setPw(false)} />}
-      {users && <UsersPanel me={web.user} onMe={web.setUser} onClose={() => setUsers(false)} />}
-      {upd && <UpdatePanel onClose={() => setUpd(false)} />}
     </span>
   );
 }
 
-function ChangePassword({ onClose }: { onClose: () => void }) {
-  const [cur, setCur] = useState("");
-  const [nw, setNw] = useState("");
-  const [err, setErr] = useState("");
-  const [ok, setOk] = useState(false);
-  const go = async () => { setErr(""); try { await A.changePassword(cur, nw); setOk(true); } catch (e) { setErr(msgOf(e)); } };
-  return (
-    <Modal title="Change password" onClose={onClose} width={320}>
-      <Field label="Current password"><input style={{ ...inp, width: "100%" }} type="password" value={cur} onChange={(e) => setCur(e.target.value)} /></Field>
-      <Field label="New password (min 8 characters)"><input style={{ ...inp, width: "100%" }} type="password" value={nw} onChange={(e) => setNw(e.target.value)} /></Field>
-      {err && <div style={errStyle}>{err}</div>}
-      {ok && <div style={{ color: v("ok"), fontSize: 12, margin: "6px 0" }}>Password changed.</div>}
-      <button style={btn} onClick={go} disabled={!cur || !nw || ok}>Change</button>
-      <button style={btn} onClick={onClose}>{ok ? "Close" : "Cancel"}</button>
-    </Modal>
-  );
-}
-
-function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; onClose: () => void }) {
+export function UsersBody({ me, onMe }: { me: User; onMe: (u: User) => void }) {
   const [list, setList] = useState<User[]>([]);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
@@ -100,7 +76,7 @@ function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; 
   const td = { padding: "3px 6px", borderTop: `1px solid ${v("panel-2")}` } as const;
   const sm = { ...btn, padding: "2px 8px", marginRight: 3, fontSize: 11 } as const;
   return (
-    <Modal title="Users" onClose={onClose} width={720}>
+    <>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead><tr><th style={th}>Name</th><th style={th}>Email</th><th style={th}>Admin</th><th style={th}></th></tr></thead>
         <tbody>
@@ -128,12 +104,12 @@ function UsersPanel({ me, onMe, onClose }: { me: User; onMe: (u: User) => void; 
       </div>
       {err && <div style={errStyle}>{err}</div>}
       {note && <div style={{ color: v("ok"), fontSize: 12, margin: "6px 0" }}>{note}</div>}
-    </Modal>
+    </>
   );
 }
 
 /** Admin: check for a newer version and update the LXC (runs the same script as `update`). */
-function UpdatePanel({ onClose }: { onClose: () => void }) {
+export function UpdateBody() {
   const [st, setSt] = useState<UpdateStatus | null>(null);
   const [chk, setChk] = useState<UpdateCheck | null>(null);
   const [err, setErr] = useState("");
@@ -170,7 +146,7 @@ function UpdatePanel({ onClose }: { onClose: () => void }) {
   const ok = { color: v("ok"), fontSize: 12, margin: "6px 0" } as const;
   const when = st?.since ? new Date(st.since).toLocaleString() : "";
   return (
-    <Modal title="Update server" onClose={onClose} width={680}>
+    <>
       {!st && !err && <div style={{ opacity: 0.7 }}>Loading...</div>}
       {st && (
         <div style={{ marginBottom: 10 }}>
@@ -218,7 +194,7 @@ function UpdatePanel({ onClose }: { onClose: () => void }) {
           <pre ref={logRef} style={{ background: v("log-bg"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: 8, maxHeight: 260, overflow: "auto", fontSize: 11, whiteSpace: "pre-wrap", margin: "4px 0 0" }}>{st.log}</pre>
         </>
       )}
-    </Modal>
+    </>
   );
 }
 

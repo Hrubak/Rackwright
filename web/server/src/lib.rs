@@ -10,6 +10,7 @@ pub mod geom;
 pub mod router;
 
 mod clients;
+mod settings;
 mod update;
 
 use std::path::Path as FsPath;
@@ -679,6 +680,7 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
     conn.execute_batch("PRAGMA journal_mode = WAL;").map_err(|e| format!("database setup failed: {e}"))?;
     conn.execute_batch(SCHEMA).map_err(|e| format!("database setup failed: {e}"))?;
     clients::migrate(&conn).map_err(|e| format!("database migration failed: {e}"))?;
+    settings::migrate(&conn).map_err(|e| format!("database migration failed: {e}"))?;
 
     let state: Shared = Arc::new(AppState { db: Mutex::new(conn), update: update::UpdateCfg::new(data_dir) });
     let spa = ServeDir::new(static_dir).fallback(ServeFile::new(static_dir.join("index.html")));
@@ -688,7 +690,15 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
         .route("/api/setup", get(get_setup).post(post_setup))
         .route("/api/login", post(post_login))
         .route("/api/logout", post(post_logout))
-        .route("/api/me", get(get_me))
+        .route("/api/me", get(get_me).patch(settings::patch_me))
+        .route("/api/me/prefs", get(settings::get_prefs).put(settings::put_prefs))
+        .route("/api/settings", get(settings::get_settings).put(settings::put_settings))
+        .route(
+            "/api/assets/:name",
+            get(settings::get_asset).put(settings::put_asset).delete(settings::delete_asset),
+        )
+        .route("/api/branding", get(settings::get_branding))
+        .route("/api/branding/logo", get(settings::get_branding_logo))
         .route("/api/me/password", post(post_me_password))
         .route("/api/users", get(list_users).post(create_user))
         .route("/api/users/:id", axum::routing::patch(patch_user).delete(delete_user))

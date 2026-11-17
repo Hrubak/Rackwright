@@ -590,3 +590,219 @@ async fn admin_update_outside_lxc() {
     assert_eq!(admin.post("/api/admin/update", json!({})).await.0, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(admin.post("/api/admin/update/check", json!({})).await.0, StatusCode::SERVICE_UNAVAILABLE);
 }
+
+// ---------------------------------------------------------------- 3.7.0 settings
+
+impl Client {
+    /// Raw-bytes request with an optional content type; returns status, headers and body.
+    async fn raw(
+        &mut self,
+        method: Method,
+        uri: &str,
+        content_type: Option<&str>,
+        body: Vec<u8>,
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut b = Request::builder().method(method).uri(uri);
+        if let Some(c) = &self.cookie {
+            b = b.header(header::COOKIE, c.as_str());
+        }
+        if let Some(ct) = content_type {
+            b = b.header(header::CONTENT_TYPE, ct);
+        }
+        let req = b.body(Body::from(body)).unwrap();
+        let resp = self.app.clone().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        (status, headers, bytes.to_vec())
+    }
+}
+
+async fn make_member(app: &Router, admin: &mut Client, email: &str) -> Client {
+    let (s, v) = admin
+        .post("/api/users", json!({"email": email, "name": "Member", "password": "password1", "is_admin": false}))
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut c = Client::new(app);
+    let (s, v) = c.post("/api/login", json!({"email": email, "password": "password1"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    c
+}
+
+#[tokio::test]
+async fn settings_roundtrip() {
+    let (app, _d) = make_app();
+    let mut admin = Client::new(&app);
+    setup_admin(&mut admin).await;
+    let mut user = make_member(&app, &mut admin, "u@example.com").await;
+    let mut anon = Client::new(&app);
+
+    assert_eq!(anon.get("/api/settings").await.0, StatusCode::UNAUTHORIZED);
+    let (s, v) = user.get("/api/settings").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v, json!({"settings": {}, "assets": []}));
+
+    let body = json!({"company_name": "Example IT", "accent": "#336699", "extra": {"a": 1}});
+    let (s, v) = admin.put("/api/settings", body.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, body);
+    let (s, v) = user.get("/api/settings").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["settings"], body);
+    assert_eq!(v["settings"]["extra"]["a"], 1);
+
+    assert_eq!(user.put("/api/settings", json!({"company_name": "X"})).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(anon.put("/api/settings", json!({})).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(admin.put("/api/settings", json!({"accent": "blue"})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!({"accent": "#12345"})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!({"rack_default_u": 99})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!({"rack_default_u": 0})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!({"company_name": "x".repeat(101)})).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(admin.put("/api/settings", json!([1])).await.0, StatusCode::BAD_REQUEST);
+    // the refused requests changed nothing
+    assert_eq!(admin.get("/api/settings").await.1["settings"], body);
+    let ok = json!({"rack_default_model": "Generic 19in", "rack_default_u": 42});
+    assert_eq!(admin.put("/api/settings", ok).await.0, StatusCode::OK);
+    assert_eq!(admin.get("/api/settings").await.1["settings"]["rack_default_u"], 42);
+}
+
+#[tokio::test]
+async fn logo_upload() {
+    let (app, _d) = make_app();
+    let mut admin = Client::new(&app);
+    setup_admin(&mut admin).await;
+    let mut user = make_member(&app, &mut admin, "u@example.com").await;
+    let mut anon = Client::new(&app);
+
+    assert_eq!(admin.put("/api/settings", json!({"company_name": "Example IT"})).await.0, StatusCode::OK);
+    let (s, v) = anon.get("/api/branding").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["has_logo"], false);
+    assert_eq!(v["company_name"], "Example IT");
+    assert_eq!(v["accent"], Value::Null);
+    assert_eq!(anon.get("/api/branding/logo").await.0, StatusCode::NOT_FOUND);
+
+    let png = vec![7u8; 10];
+    let (s, _, b) = admin.raw(Method::PUT, "/api/assets/logo", Some("image/png"), png.clone()).await;
+    assert_eq!(s, StatusCode::OK);
+    let v: Value = serde_json::from_slice(&b).unwrap();
+    assert_eq!(v["name"], "logo");
+    assert_eq!(v["mime"], "image/png");
+    assert_eq!(v["size"], 10);
+
+    let (s, v) = anon.get("/api/branding").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["has_logo"], true);
+    assert_eq!(v["company_name"], "Example IT");
+
+    let (s, h, b) = anon.raw(Method::GET, "/api/branding/logo", None, Vec::new()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "image/png");
+    assert_eq!(h.get(header::X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
+    assert_eq!(h.get(header::CONTENT_SECURITY_POLICY).unwrap(), "default-src 'none'; style-src 'unsafe-inline'");
+    assert_eq!(b, png);
+
+    // the signed-in asset route serves the same bytes; signed out is refused
+    let (s, h, b) = user.raw(Method::GET, "/api/assets/logo", None, Vec::new()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "image/png");
+    assert_eq!(b, png);
+    assert_eq!(anon.get("/api/assets/logo").await.0, StatusCode::UNAUTHORIZED);
+
+    // listed in settings
+    let (_, v) = user.get("/api/settings").await;
+    assert_eq!(v["assets"][0]["name"], "logo");
+    assert_eq!(v["assets"][0]["size"], 10);
+
+    // SVG is accepted (charset parameter ignored) and keeps its type
+    let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>".to_vec();
+    let (s, _, _) = admin.raw(Method::PUT, "/api/assets/logo", Some("image/svg+xml; charset=utf-8"), svg).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, h, _) = anon.raw(Method::GET, "/api/branding/logo", None, Vec::new()).await;
+    assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "image/svg+xml");
+
+    // refused uploads
+    let (s, _, _) = admin.raw(Method::PUT, "/api/assets/logo", Some("text/html"), b"<script>".to_vec()).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, _) = admin.raw(Method::PUT, "/api/assets/logo", None, png.clone()).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let big = vec![0u8; 2 * 1024 * 1024 + 1];
+    let (s, _, _) = admin.raw(Method::PUT, "/api/assets/logo", Some("image/png"), big).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, _) = admin.raw(Method::PUT, "/api/assets/nope", Some("image/png"), png.clone()).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = user.raw(Method::PUT, "/api/assets/logo", Some("image/png"), png.clone()).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _, _) = anon.raw(Method::PUT, "/api/assets/logo", Some("image/png"), png.clone()).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    assert_eq!(user.delete("/api/assets/logo").await.0, StatusCode::FORBIDDEN);
+    assert_eq!(anon.delete("/api/assets/logo").await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(admin.get("/api/assets/nope").await.0, StatusCode::NOT_FOUND);
+    // the failed uploads left the logo in place
+    assert_eq!(anon.get("/api/branding").await.1["has_logo"], true);
+
+    assert_eq!(admin.delete("/api/assets/logo").await.0, StatusCode::OK);
+    assert_eq!(admin.delete("/api/assets/logo").await.0, StatusCode::OK); // also when absent
+    assert_eq!(anon.get("/api/branding").await.1["has_logo"], false);
+    assert_eq!(anon.get("/api/branding/logo").await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn me_patch_and_prefs() {
+    let (app, _d) = make_app();
+    let mut admin = Client::new(&app);
+    setup_admin(&mut admin).await;
+    let mut u = make_member(&app, &mut admin, "u@example.com").await;
+    let mut anon = Client::new(&app);
+
+    assert_eq!(anon.patch("/api/me", json!({"name": "X"})).await.0, StatusCode::UNAUTHORIZED);
+    let (s, v) = u.patch("/api/me", json!({"name": "Grace"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["name"], "Grace");
+    assert_eq!(v["email"], "u@example.com");
+    assert_eq!(u.patch("/api/me", json!({"name": "  "})).await.0, StatusCode::BAD_REQUEST);
+
+    // email needs the current password
+    assert_eq!(u.patch("/api/me", json!({"email": "new@example.com"})).await.0, StatusCode::BAD_REQUEST);
+    let (s, _) = u.patch("/api/me", json!({"email": "new@example.com", "current_password": "wrong-pw"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = u.patch("/api/me", json!({"email": "not-an-email", "current_password": "password1"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    // taken by the admin, in a different case
+    let (s, _) = u.patch("/api/me", json!({"email": "ADMIN@example.com", "current_password": "password1"})).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(u.get("/api/me").await.1["email"], "u@example.com");
+
+    let (s, v) = u.patch("/api/me", json!({"email": "New@Example.com", "current_password": "password1"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["email"], "new@example.com");
+    let (s, me) = u.get("/api/me").await; // the session keeps working
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(me["email"], "new@example.com");
+    assert_eq!(me["name"], "Grace");
+    // your own address again is not a conflict
+    let (s, _) = u.patch("/api/me", json!({"email": "new@example.com", "current_password": "password1"})).await;
+    assert_eq!(s, StatusCode::OK);
+    // sign in with the new address
+    let mut again = Client::new(&app);
+    let (s, _) = again.post("/api/login", json!({"email": "new@example.com", "password": "password1"})).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // preferences
+    assert_eq!(anon.get("/api/me/prefs").await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anon.put("/api/me/prefs", json!({})).await.0, StatusCode::UNAUTHORIZED);
+    let (s, v) = u.get("/api/me/prefs").await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v, json!({}));
+    let prefs = json!({"units": "in", "x": {"y": 1}});
+    let (s, v) = u.put("/api/me/prefs", prefs.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, prefs);
+    assert_eq!(u.get("/api/me/prefs").await.1, prefs);
+    // other users keep their own
+    assert_eq!(admin.get("/api/me/prefs").await.1, json!({}));
+    assert_eq!(u.put("/api/me/prefs", json!([1])).await.0, StatusCode::BAD_REQUEST);
+    let huge = json!({"pad": "x".repeat(17 * 1024)});
+    assert_eq!(u.put("/api/me/prefs", huge).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(u.get("/api/me/prefs").await.1, prefs);
+}

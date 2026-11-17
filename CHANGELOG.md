@@ -2,6 +2,16 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.7.0 — 2026-11-17
+Web and desktop. The web server gets new tables and endpoints for settings, so update the LXC as usual.
+- **Settings.** Open Settings from your account menu (web) or the gear at the right end of the top bar (desktop). Press Escape or Close to go back.
+  - Profile (web): change your name and email (a new email asks for your current password) and your password.
+  - Preferences: units (millimetres or inches) and the start screen: a new rack, the last rack you had open, Clients, or the rack list (web). Each person has their own preferences.
+  - Company (admins on the web): company name, logo (PNG, SVG, JPG or WebP, up to 2 MB on the web and 1 MB on the desktop) and accent colour. The logo shows in the top bar and on the sign-in page. The accent colour changes buttons and highlights. The Rackwright logo stays blue. Reports will use these in a later version.
+  - New racks (admins on the web): a default rack model and height. New rack and Add rack start with them selected.
+  - Users and Server update (admins on the web) moved here from their own windows. The account menu opens them directly.
+- **Units.** Rack sizes in the properties panel and the rack picker follow your units setting.
+
 ## 3.6.0 — 2026-11-17
 Web and desktop.
 - **New top bar.** The row of buttons is now five menus: File, Edit, View, Clients and Help. Hover across the menu names to move between them. Press Escape or click elsewhere to close a menu.

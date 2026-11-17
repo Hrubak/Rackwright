@@ -105,3 +105,29 @@ export function exportFile(name: string, doc: Doc) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Settings and branding (web/API.md)
+export interface AssetInfo { name: string; mime: string; size: number; updated_at: string }
+export const getSettings = () => api<{ settings: Record<string, unknown>; assets: AssetInfo[] }>("GET", "/api/settings");
+export const putSettings = (s: Record<string, unknown>) => api<Record<string, unknown>>("PUT", "/api/settings", s);
+export const getBrandingApi = () => api<{ company_name: string; accent: string | null; has_logo: boolean }>("GET", "/api/branding");
+export const getMyPrefs = () => api<Record<string, unknown>>("GET", "/api/me/prefs");
+export const putMyPrefs = (p: Record<string, unknown>) => api<Record<string, unknown>>("PUT", "/api/me/prefs", p);
+export const patchMe = (p: { name?: string; email?: string; current_password?: string }) => api<User>("PATCH", "/api/me", p);
+export const deleteAsset = (name: string) => api("DELETE", `/api/assets/${name}`);
+
+/** Raw body upload (not JSON): sends the file bytes with the file's own Content-Type. */
+export async function apiRaw<T = any>(method: string, path: string, file: File): Promise<T> {
+  let r: Response;
+  try {
+    r = await fetch(path, { method, credentials: "same-origin", headers: { "Content-Type": file.type }, body: file });
+  } catch { throw new ApiError(0, "Cannot reach the server"); }
+  let j: any = {};
+  try { j = await r.json(); } catch { /* empty body */ }
+  if (!r.ok) {
+    if (r.status === 401) onUnauthorized();
+    throw new ApiError(r.status, j?.error || `Request failed (${r.status})`, j);
+  }
+  return j as T;
+}
+export const putAsset = (name: string, file: File) => apiRaw<AssetInfo>("PUT", `/api/assets/${name}`, file);

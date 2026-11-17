@@ -13,6 +13,7 @@ export const DARK = {
   "text-dim": "#8b9097",
   "text-faint": "#6b717a",
   accent: "#2a6fdb",
+  brand: "#2a6fdb",
   "accent-soft": "#2a3a52",
   "on-accent": "#ffffff",
   select: "#ffd33d",
@@ -127,4 +128,19 @@ export function resolveSvgVars(svg: Element, palette: Record<string, string> = D
       if (val && val.includes("var(")) el.setAttribute(a, resolveVars(val, palette));
     }
   }
+}
+
+export const isHex6 = (s: string) => /^#[0-9a-fA-F]{6}$/.test(s);
+
+/** Mix two #rrggbb colours; t is the share of a (0 to 1). */
+export function mixHex(a: string, b: string, t: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  return "#" + [0, 1, 2].map((i) => Math.round(ch(a, i) * t + ch(b, i) * (1 - t)).toString(16).padStart(2, "0")).join("");
+}
+
+export function applyAccent(hex: string | null, el?: HTMLElement): void {
+  const target = el ?? document.documentElement;
+  const ok = !!hex && isHex6(hex);
+  target.style.setProperty("--rw-accent", ok ? hex! : DARK.accent);
+  target.style.setProperty("--rw-accent-soft", ok ? mixHex(hex!, DARK.panel, 0.25) : DARK["accent-soft"]);
 }

@@ -37,7 +37,7 @@ proxmox/install/rackwright-install.sh    runs inside the LXC
 - Session cookie `rw_session`: random 32-byte token (hex), `HttpOnly; SameSite=Lax; Path=/`, 30 days.
   Stored hashed (SHA-256) in the DB.
 - Passwords: argon2id. Minimum length 8.
-- Everything under `/api` except `setup`, `login`, `GET /api/setup` needs a session.
+- Everything under `/api` except `setup`, `login`, `GET /api/setup`, `GET /api/branding` and `GET /api/branding/logo` needs a session.
 - `User` = `{"id": int, "email": str, "name": str, "is_admin": bool}`.
 - Timestamps are RFC 3339 UTC strings.
 
@@ -51,6 +51,9 @@ proxmox/install/rackwright-install.sh    runs inside the LXC
 | `POST /api/logout`       | —                                 | clears session, `{}` |
 | `GET /api/me`            | —                                 | `User` or 401 |
 | `POST /api/me/password`  | `{current, new}`                  | `{}`; 400 if current is wrong |
+| `PATCH /api/me` | any of `{name, email, current_password}`; `email` needs `current_password` | `User`. 400 wrong password or bad email, 409 email taken (case-insensitive). The session keeps working |
+| `GET /api/me/prefs` | — | the stored JSON object, `{}` if none |
+| `PUT /api/me/prefs` | a JSON object, at most 16 KB | the stored object, kept exactly as given so unknown keys survive. 400 if not an object or too large |
 
 Email compare is case-insensitive (store lower-cased).
 
@@ -66,6 +69,24 @@ There is no email delivery. An admin creates an account with a starting password
 | `DELETE /api/users/:id`    | —                                            | `{}`; 400 when deleting yourself or the last admin. Their sessions are removed |
 
 Demoting the last admin is also refused (400).
+
+## Settings and branding
+
+Server-wide settings (admin writes, everyone signed in reads), uploaded assets and the public branding used by the sign-in page.
+
+| Method & path               | Who       | Body | Result |
+|-----------------------------|-----------|------|--------|
+| `GET /api/settings`         | signed in | —    | `{"settings": {...}, "assets": [{name, mime, size, updated_at}]}`; settings default `{}` |
+| `PUT /api/settings`         | admin     | a JSON object, at most 64 KB | the stored object (replaces the old one). Known keys are checked: `company_name` text, 100 characters at most; `accent` `#rrggbb`, or `""` for the default; `rack_default_model` text; `rack_default_u` whole number 1 to 60. Unknown keys are kept. 400 on a bad value |
+| `PUT /api/assets/:name`     | admin     | raw file bytes; the `Content-Type` header is the mime type | `{name, mime, size, updated_at}`. Names allowed now: `logo` (`image/png`, `image/svg+xml`, `image/jpeg`, `image/webp`; at most 2 MB). 404 unknown name, 400 wrong type, empty or too large |
+| `DELETE /api/assets/:name`  | admin     | —    | `{}` (also when absent). 404 unknown name |
+| `GET /api/assets/:name`     | signed in | —    | the bytes with their `Content-Type`; 404 if absent |
+| `GET /api/branding`         | anyone    | —    | `{"company_name": str /* "" if unset */, "accent": str|null, "has_logo": bool}` |
+| `GET /api/branding/logo`    | anyone    | —    | the logo bytes (headers as below) or 404 |
+
+Served assets carry `Content-Type: <mime>`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'` and `Cache-Control: no-cache`, so an uploaded SVG cannot run script.
+
+Tables: `settings` (one row, JSON text), `assets` (name, mime, data, updated_at) and `users.prefs` (JSON text, default `{}`), all created or added on start-up.
 
 ## Server update (admin only)
 
