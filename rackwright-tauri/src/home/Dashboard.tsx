@@ -13,7 +13,7 @@ const btn = { background: v("control"), color: v("text"), border: `1px solid ${v
 const small = { ...btn, padding: "1px 8px", fontSize: 11, marginRight: 0 } as const;
 const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export type ClientTab = "sites" | "racks" | "inventory" | "cabling" | "links";
+export type ClientTab = "floor" | "sites" | "racks" | "inventory" | "cabling" | "links";
 export interface OpenOpts { tab?: ClientTab; site?: number }
 
 export default function Dashboard({ onOpen, importTick }: { onOpen: (key: string, o?: OpenOpts) => void; importTick?: number }) {

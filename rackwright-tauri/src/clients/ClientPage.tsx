@@ -9,6 +9,8 @@ import Links from "./Links";
 import Cabling from "./Cabling";
 import type { RackLocation } from "../location";
 import type { ClientTab } from "../home/Dashboard";
+import { useSettings } from "../settings/context";
+import FloorTab from "../rooms/FloorTab";
 import { ClientItem, RackItem, SiteItem, clientStore } from "./store";
 
 const ImportToClient = lazy(() => import("./ImportToClient"));
@@ -16,6 +18,7 @@ const ImportToClient = lazy(() => import("./ImportToClient"));
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
 const small = { ...btn, padding: "1px 7px", fontSize: 11 } as const;
 const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px", fontSize: 12 } as const;
+const roomCount = (s: SiteItem) => (s.rooms?.length ? s.rooms.length : s.racks.length ? 1 : 0);
 const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface CurrentRack {
@@ -35,7 +38,7 @@ export interface ClientPageProps {
   rev: number;
   /** Tell the client bar (and the home screen) to reload. */
   onChanged: () => void;
-  onTab: (t: ClientTab) => void;
+  onTab: (t: ClientTab, site?: number) => void;
   /** The client was removed from the list. */
   onGone: () => void;
   current: CurrentRack;
@@ -48,6 +51,7 @@ export interface ClientPageProps {
 
 export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev, onChanged, onTab, onGone, current, saveCurrentTo, onOpenRack, startImport }: ClientPageProps) {
   const store = clientStore();
+  const units = useSettings().prefs.units ?? "mm";
   const [client, setClient] = useState<ClientItem | null>(null);
   const [docs, setDocs] = useState<Record<string, Doc | string>>({}); // rack key -> doc, or an error text
   const [err, setErr] = useState("");
@@ -126,6 +130,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
     <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "14px 18px", background: v("bg"), color: v("text"), fontSize: 13 }}>
       {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px", marginBottom: 10 }}>{err}</div>}
       {busy && <div style={{ opacity: 0.7, marginBottom: 6 }}>Working...</div>}
+      {tab === "floor" && <FloorTab client={client} siteId={siteFilter} docs={docs} units={units} onOpenRack={(r) => open(r)} onSaved={refresh} />}
       {tab === "inventory" && <Inventory client={scoped} docs={docs} onOpen={(r, devId) => open(r, { devId })} />}
       {tab === "cabling" && <Cabling client={scoped} docs={docs} onOpen={(r, cableId) => open(r, { cableId })} />}
       {tab === "links" && <Links client={client} docs={docs} store={store} onChanged={refresh} />}
@@ -196,7 +201,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
                           <button style={{ ...small, marginRight: 0, color: v("danger") }} onClick={() => removeSite(s)}>Delete</button>
                         </div>
                         {s.notes && <div style={{ fontSize: 12, opacity: 0.8, whiteSpace: "pre-wrap", marginTop: 4 }}>{s.notes}</div>}
-                        <div style={{ fontSize: 11, opacity: 0.65, margin: "6px 0" }}>{statText(st)}</div>
+                        <div style={{ fontSize: 11, opacity: 0.65, margin: "6px 0" }}>{statText(st)} · {roomCount(s)} room{roomCount(s) === 1 ? "" : "s"} <a href="#" style={{ color: v("link") }} onClick={(e) => { e.preventDefault(); onTab("floor", s.id); }}>Floor plan</a></div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                           {s.racks.map((r) => {
                             const d = docs[r.key];

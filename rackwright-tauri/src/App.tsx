@@ -660,9 +660,9 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
       {barKey && <ClientBar clientKey={barKey} tab={barTab} site={barSite} rev={clientRev}
         onClient={(k) => toClient(k, barTab)} onSite={(id) => toClient(barKey, barTab, id)} onTab={(t) => toClient(barKey, t, barSite)} onReport={() => setReportFor(barKey)} />}
-      {screen.kind === "home" && <Dashboard importTick={importTick} onOpen={(key, o) => setScreen({ kind: "client", key, tab: o?.tab ?? "sites", site: o?.site })} />}
+      {screen.kind === "home" && <Dashboard importTick={importTick} onOpen={(key, o) => setScreen({ kind: "client", key, tab: o?.tab ?? "floor", site: o?.site })} />}
       {screen.kind === "client" && !showEditor && <ClientPage key={screen.key} clientKey={screen.key} tab={screen.tab} site={screen.site} rev={clientRev}
-        onChanged={() => setClientRev((n) => n + 1)} onTab={(t) => toClient(screen.key, t, screen.site)} onGone={() => setScreen({ kind: "home" })}
+        onChanged={() => setClientRev((n) => n + 1)} onTab={(t, st) => toClient(screen.key, t, st ?? screen.site)} onGone={() => setScreen({ kind: "home" })}
         onOpenRack={(r, o) => openFromClient(screen.key, r, o)}
         current={{ label: cur?.name ?? (path ? path.split(/[\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
         saveCurrentTo={IS_WEB && !cur && doc.racks.length > 0 ? saveCurrentTo : undefined} />}
