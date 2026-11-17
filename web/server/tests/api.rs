@@ -92,6 +92,10 @@ async fn setup_login_me() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v, Value::Null); // plain text "ok"
 
+    let (s, v) = c.get("/api/version").await; // public, before sign-in
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v, json!({"version": env!("CARGO_PKG_VERSION")}));
+
     assert_eq!(c.get("/api/setup").await.1, json!({"needs_setup": true}));
     assert_eq!(c.get("/api/me").await.0, StatusCode::UNAUTHORIZED);
 

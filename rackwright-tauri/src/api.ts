@@ -29,6 +29,7 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
   return j as T;
 }
 
+export const getVersion = () => api<{ version: string }>("GET", "/api/version");
 export const getSetup = () => api<{ needs_setup: boolean }>("GET", "/api/setup");
 export const getMe = () => api<User>("GET", "/api/me");
 export const setup = (email: string, name: string, password: string) => api<User>("POST", "/api/setup", { email, name, password });

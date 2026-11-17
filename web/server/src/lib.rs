@@ -251,6 +251,13 @@ async fn healthz() -> &'static str {
     "ok"
 }
 
+/// GET /api/version (no auth): the running server version, for update prompts.
+async fn get_version() -> Response {
+    let mut r = json_ok(&json!({ "version": env!("CARGO_PKG_VERSION") }));
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
+}
+
 async fn api_not_found() -> ApiError {
     ApiError::new(StatusCode::NOT_FOUND, "Not found")
 }
@@ -687,6 +694,7 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
 
     let app = Router::new()
         .route("/healthz", get(healthz))
+        .route("/api/version", get(get_version))
         .route("/api/setup", get(get_setup).post(post_setup))
         .route("/api/login", post(post_login))
         .route("/api/logout", post(post_logout))

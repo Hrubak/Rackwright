@@ -30,6 +30,8 @@ proxmox/install/rackwright-install.sh    runs inside the LXC
 
 `GET /healthz` → `200 ok` (no auth).
 
+`GET /api/version` → `200 {"version":"3.10.0"}` (no auth, `Cache-Control: no-store`): the running server version. Open pages compare it with their own version to offer a reload after an update.
+
 ## Conventions
 
 - JSON in and out. Every error is `{"error": "human readable message"}` with a fitting status
