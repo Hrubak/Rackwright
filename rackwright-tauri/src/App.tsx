@@ -34,6 +34,8 @@ import ClientsPanel from "./clients/ClientsPanel";
 import { Breadcrumb } from "./Breadcrumb";
 import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
+import { UpdateBanner } from "./version/UpdateBanner";
+import { useWebUpdates } from "./version/useWebUpdates";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 const ReportDialog = lazy(() => import("./report/ReportDialog"));
@@ -195,6 +197,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
     ...web,
     signOut: () => { if (dirty && !confirm(LEAVE_TEXT)) return; clearDraft(who); web.signOut(); },
   };
+
+  const webUpd = useWebUpdates(IS_WEB && !!web, !!web?.user.is_admin);
 
   const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(upgradeDoc(d)); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
   const doNew = () => { if (!dirty || confirm("Discard unsaved changes?")) setPicker("new"); };
@@ -620,6 +624,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
         {!IS_WEB && <button style={{ ...btn, padding: "5px 9px", marginLeft: 6, marginRight: 0 }} title="Settings" aria-label="Settings" onClick={() => setSettingsTab("profile")}>{"⚙"}</button>}
         {IS_WEB && webGuarded && <UserBar web={webGuarded} openSettings={setSettingsTab} />}
       </div>
+      {IS_WEB && webUpd.reload && <UpdateBanner kind="reload" text={`Rackwright was updated to ${webUpd.reload}. Reload to use the new version.`} primary="Reload" onPrimary={() => location.reload()} />}
+      {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <div style={{ display: view === "rack" ? "flex" : "none", width: 270, background: v("panel"), borderRight: `1px solid ${v("border-subtle")}`, flexDirection: "column", fontSize: 12 }}>
           <input style={{ ...inp, margin: "10px 10px 8px" }} placeholder="Search devices (dell r650, ups, 48...)" value={q} onChange={(e) => setQ(e.target.value)} />
