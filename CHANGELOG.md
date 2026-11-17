@@ -2,6 +2,14 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.13.0 — 2026-11-17
+Web and desktop. Update the LXC as usual; nothing changes on the server.
+- **Needs attention.** Rackwright now warns you about expired warranties, warranties ending within 60 days, UPS batteries due for replacement (3 years after the battery date) and UPSes or PDUs loaded over 80%. It also flags racks not checked on site in 90 days. The Clients dashboard lists these for all clients; each client card shows how many are critical and how many are warnings; the client's Sites tab lists its own. Click a line to open the rack with that device selected.
+- **IPs used twice.** When two devices of the same client have the same IP (in IP or the management port), both get a red "IP!" tag in the rack, a warning in their device panel, and a red IP cell in Inventory. This works across all the client's racks and sites. Inventory has a "Needs attention only" filter.
+- **Power budget.** Type a device's Power (W) in its Specs tab. Rackwright follows the power cords and adds it up per PDU, UPS, rack, circuit and room. The rack header shows the rack's watts. The rack panel has new Circuit and Voltage (120 V or 208 V) fields, and shows amps, BTU/hr and each UPS and PDU's load against its rating. The floor plan shows watts on each rack and the room total.
+- **Unknown stays unknown.** A device with no wattage is counted as unknown, so totals read "at least 810 W, 4 devices unknown" until you fill them in. Patch panels, cable managers and other gear with no power inlet don't count. APC and Eaton UPS models from the catalog already know their rating; for a PDU, or any other UPS, set Rated (W) in Specs.
+- **Client report.** The report has a Needs attention section, and the detailed report has a Power table for each site. Racks not checked on site are left out of the report until Site visit arrives in 3.14.0.
+
 ## 3.12.0 — 2026-11-17
 Web and desktop. Update the LXC as usual: the server adds a place to store rooms on start. Nothing is saved to a site until you change its floor plan.
 - **Floor plan tab.** A site now holds rooms, and each room has a floor plan of its racks plus doors, cooling, power panels, desks and labels. It is the first tab when you open a client. Every existing site starts with one "Main room" with all its racks placed along the top.
