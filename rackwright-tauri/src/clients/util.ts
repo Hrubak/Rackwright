@@ -1,5 +1,7 @@
 // Pure helpers for clients (no backend imports, so tests can load them under Node).
 import type { Doc } from "../types";
+import { cableKind } from "../cableKind";
+import type { ClientItem } from "./store";
 
 const sepOf = (p: string) => (p.includes("\\") ? "\\" : "/");
 const dirOf = (p: string) => p.slice(0, Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/")));
@@ -119,4 +121,40 @@ export function layoutSites(siteIds: number[], hasInternet: boolean, w: number, 
     });
   }
   return { sites, internet: hasInternet ? { x: w / 2, y: h * 0.11 } : null };
+}
+
+// ---------------------------------------------------------------- cabling (3.11.0)
+
+export interface CableRow {
+  site: string; rack: string; rackKey: string; cableId: number;
+  from: string; fromPort: string; to: string; toPort: string;
+  kind: string; label: string; colour: string; length: string;
+}
+
+/** Every cable in a client's racks, one row each. Racks that could not be read (error text) are skipped. */
+export function cablingRows(client: ClientItem, docs: Record<string, Doc | string>): CableRow[] {
+  const out: CableRow[] = [];
+  for (const s of client.sites) for (const r of s.racks) {
+    const doc = docs[r.key];
+    if (!doc || typeof doc === "string") continue;
+    const at = new Map<number, { dev: string; port: string }>();
+    for (const d of doc.devices) for (const p of d.ports) at.set(p.id, { dev: d.name || "", port: p.name || "" });
+    for (const c of doc.cables) {
+      const a = at.get(c.a), b = at.get(c.b);
+      out.push({
+        site: s.name, rack: r.name, rackKey: r.key, cableId: c.id,
+        from: a?.dev ?? "", fromPort: a?.port ?? "", to: b?.dev ?? "", toPort: b?.port ?? "",
+        kind: cableKind(c.type), label: c.label || "", colour: c.color || "",
+        length: c.length ? `${c.length} ${c.unit || ""}`.trim() : "",
+      });
+    }
+  }
+  const k = (r: CableRow) => [r.site, r.rack, r.from].map((x) => x.toLowerCase());
+  return out.sort((x, y) => { const a = k(x), b = k(y); for (let i = 0; i < 3; i++) { const d = a[i].localeCompare(b[i]); if (d) return d; } return 0; });
+}
+
+export function cablingCsv(rows: CableRow[]): string {
+  const head = ["Site", "Rack", "From", "From port", "To", "To port", "Kind", "Label", "Colour", "Length"];
+  const lines = [head, ...rows.map((r) => [r.site, r.rack, r.from, r.fromPort, r.to, r.toPort, r.kind, r.label, r.colour, r.length])];
+  return lines.map((l) => l.map(csvCell).join(",")).join("\r\n") + "\r\n";
 }

@@ -2,6 +2,8 @@
 import { absPath, relPath } from "../src/clients/util";
 import { docStats, inventoryCsv, inventoryRows, matchRow, typeTotals } from "../src/clients/util";
 import { LINK_KINDS, layoutSites, linkColor, linkLabel } from "../src/clients/util";
+import { cablingCsv, cablingRows } from "../src/clients/util";
+import type { ClientItem } from "../src/clients/store";
 import type { Doc } from "../src/types";
 
 let fail = 0;
@@ -69,6 +71,29 @@ eq("internet top centre", l2.internet?.x === 400 && l2.internet.y < l2.sites[1].
 const l4 = layoutSites([1, 2, 3, 4], false, 800, 500);
 eq("four distinct in bounds", new Set(Object.values(l4.sites).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)).size === 4 && Object.values(l4.sites).every((p) => p.x > 0 && p.x < 800 && p.y > 0 && p.y < 500), true);
 eq("empty", layoutSites([], true, 800, 500).sites, {});
+
+
+// ---- cabling rows (3.11.0)
+const cdev = (id: number, name: string, pid: number, ptype: string) => ({ ...dev(id, 1, 1), name, ports: [{ id: pid, name: "p1", type: ptype, label: "" }] });
+const cdoc: Doc = {
+  v: 1, nid: 99, racks: [{ id: 1, name: "R1", u: 42 }] as Doc["racks"],
+  devices: [cdev(1, "SW1", 11, "RJ45"), cdev(2, "SRV1", 21, "RJ45"), cdev(3, "PDU1", 31, "Power")] as unknown as Doc["devices"],
+  cables: [
+    { id: 1, a: 11, b: 21, color: "#123456", type: "Cat6", label: "Uplink, main", length: 2, unit: "m" },
+    { id: 2, a: 31, b: 11, color: "#000000", type: "Power cord" },
+  ],
+};
+const cclient: ClientItem = { key: "k", name: "Example Client", notes: "", links: [], sites: [
+  { id: 1, name: "Head Office", address: "", notes: "", racks: [{ key: "a", name: "Rack A" }, { key: "bad", name: "Rack Bad" }] },
+] };
+const crows = cablingRows(cclient, { a: cdoc, bad: "Could not read" });
+eq("two rows", crows.length, 2);
+eq("kinds", crows.map((r) => r.kind).sort(), ["power", "rj45"]);
+const rj = crows.find((r) => r.kind === "rj45")!;
+eq("row fields", [rj.site, rj.rack, rj.rackKey, rj.from, rj.to, rj.length, rj.colour], ["Head Office", "Rack A", "a", "SW1", "SRV1", "2 m", "#123456"]);
+eq("sorted by from", crows.map((r) => r.from), ["PDU1", "SW1"]);
+eq("csv quotes comma", cablingCsv(crows).includes('"Uplink, main"'), true);
+eq("csv header", cablingCsv([]).startsWith("Site,Rack,From"), true);
 
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);

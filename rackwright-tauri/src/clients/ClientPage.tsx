@@ -1,15 +1,17 @@
-// Clients screen: pick a client, see its sites and the racks in each, open a rack.
+// Client page body: Sites, Racks list, Inventory, Cabling and Links for one client (the bar above it lives in ClientBar).
 import { v } from "../theme";
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import type { Doc } from "../types";
 import { Stats, addStats, docStats, statText, zero } from "./util";
 import MiniRack from "./MiniRack";
 import Inventory from "./Inventory";
 import Links from "./Links";
-import { ClientItem, ClientListItem, RackItem, SiteItem, clientStore } from "./store";
+import Cabling from "./Cabling";
+import type { RackLocation } from "../location";
+import type { ClientTab } from "../home/Dashboard";
+import { ClientItem, RackItem, SiteItem, clientStore } from "./store";
 
 const ImportToClient = lazy(() => import("./ImportToClient"));
-const ReportDialog = lazy(() => import("../report/ReportDialog"));
 
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
 const small = { ...btn, padding: "1px 7px", fontSize: 11 } as const;
@@ -24,49 +26,40 @@ export interface CurrentRack {
   path: string | null;
 }
 
-export interface ClientsPanelProps {
+export interface ClientPageProps {
+  clientKey: string;
+  tab: ClientTab;
+  /** Show only this site (Racks, Inventory, Cabling). */
+  site?: number;
+  /** Bumps when the client bar changed something, so this page reloads. */
+  rev: number;
+  /** Tell the client bar (and the home screen) to reload. */
+  onChanged: () => void;
+  onTab: (t: ClientTab) => void;
+  /** The client was removed from the list. */
+  onGone: () => void;
   current: CurrentRack;
   /** Web: save the open (unsaved) rack as a new shared rack in this site. */
   saveCurrentTo?: (siteId: number) => Promise<boolean>;
-  /** Open a rack; with `devId`, select that device. */
-  onOpenRack: (r: RackItem, devId?: number) => void;
-  onClose: () => void;
-  /** Open with the Auvik import dialog already showing. */
+  /** Open a rack; with devId select that device, with cableId select that cable. */
+  onOpenRack: (r: RackItem, o?: { devId?: number; cableId?: number; loc?: RackLocation }) => void;
   startImport?: boolean;
-  /** Select this client when the screen opens. */
-  openClient?: string;
-  /** Scroll this site's card into view. */
-  focusSite?: number;
 }
 
-export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClose, startImport, openClient, focusSite }: ClientsPanelProps) {
+export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev, onChanged, onTab, onGone, current, saveCurrentTo, onOpenRack, startImport }: ClientPageProps) {
   const store = clientStore();
-  const [list, setList] = useState<ClientListItem[] | null>(null);
-  const [q, setQ] = useState("");
-  const [key, setKey] = useState<string | null>(() => { if (openClient) return openClient; try { return localStorage.getItem("rw.client") || null; } catch { return null; } });
   const [client, setClient] = useState<ClientItem | null>(null);
   const [docs, setDocs] = useState<Record<string, Doc | string>>({}); // rack key -> doc, or an error text
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [siteForm, setSiteForm] = useState<{ id: number | null; name: string; address: string; notes: string } | null>(null);
-  const [reportOpen, setReportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(!!startImport);
   const [picker, setPicker] = useState<{ siteId: number; items: RackItem[] | null } | null>(null);
-  const [tab, setTab] = useState<"sites" | "inventory" | "links">(() => { try { const t = localStorage.getItem("rw.clientTab"); return t === "inventory" || t === "links" ? t : "sites"; } catch { return "sites"; } });
-  useEffect(() => { try { localStorage.setItem("rw.clientTab", tab); } catch { /* ignore */ } }, [tab]);
 
-  const reloadList = useCallback(async () => { try { setList(await store.list()); } catch (e) { setErr(errOf(e)); setList([]); } }, [store]);
-  const reloadClient = useCallback(async (k: string | null) => {
-    if (!k) { setClient(null); return; }
-    try { setClient(await store.get(k)); setErr(""); } catch (e) { setClient(null); setErr(errOf(e)); }
-  }, [store]);
-  useEffect(() => { reloadList(); }, [reloadList]);
-  useEffect(() => { reloadClient(key); try { if (key) localStorage.setItem("rw.client", key); } catch { /* ignore */ } }, [key, reloadClient]);
-
-  useEffect(() => {
-    if (focusSite == null || !client) return;
-    document.querySelector(`[data-site="${focusSite}"]`)?.scrollIntoView({ block: "center" });
-  }, [focusSite, client]);
+  const reloadClient = useCallback(async () => {
+    try { setClient(await store.get(key)); setErr(""); } catch (e) { setClient(null); setErr(errOf(e)); }
+  }, [store, key]);
+  useEffect(() => { reloadClient(); }, [reloadClient, rev]);
 
   // Load each rack's document once, for the thumbnails and the counts.
   useEffect(() => {
@@ -84,19 +77,13 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
     try { await fn(); await after?.(); } catch (e) { setErr(errOf(e)); }
     setBusy(false);
   };
-  const refresh = async () => { await reloadClient(key); await reloadList(); };
+  const refresh = async () => { await reloadClient(); onChanged(); };
 
-  const newClient = () => {
-    const name = prompt("Name of the new client:")?.trim();
-    if (!name) return;
-    run(async () => { const k = await store.create(name); if (k) { await reloadList(); setKey(k); } });
-  };
-  const openFile = () => run(async () => { const k = await store.open?.(); if (k) { await reloadList(); setKey(k); } });
   const removeClient = () => {
     if (!client) return;
     const msg = store.web ? `Delete the client "${client.name}"? It must have no sites left.` : `Remove "${client.name}" from this list? The client file is not deleted.`;
     if (!confirm(msg)) return;
-    run(() => store.remove(client.key), async () => { setKey(null); await reloadList(); });
+    run(() => store.remove(client.key), async () => { onChanged(); onGone(); });
   };
   const saveSite = () => {
     if (!client || !siteForm) return;
@@ -123,63 +110,64 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
   };
   const canAddCurrent = store.web ? current.id != null || !!saveCurrentTo : !!current.path;
 
-  const shown = useMemo(() => (list ?? []).filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase())), [list, q]);
   const siteStats = (s: SiteItem) => s.racks.reduce((a, r) => { const d = docs[r.key]; return typeof d === "object" ? addStats(a, docStats(d)) : a; }, zero);
   const total = client ? client.sites.reduce((a, s) => addStats(a, siteStats(s)), zero) : zero;
 
+  if (!client) return <div style={{ flex: 1, padding: 18, background: v("bg"), color: v("text"), fontSize: 13 }}>{err ? <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px" }}>{err}</div> : "Loading..."}</div>;
+  const open = (r: RackItem, o: { devId?: number; cableId?: number } = {}) => {
+    const s = client.sites.find((x) => x.racks.some((y) => y.key === r.key));
+    onOpenRack(r, { ...o, loc: s ? { clientKey: client.key, client: client.name, siteId: s.id, site: s.name } : undefined });
+  };
+  const sites = siteFilter ? client.sites.filter((s) => s.id === siteFilter) : client.sites;
+  const scoped: ClientItem = { ...client, sites };
+  const failedNames = sites.flatMap((s) => s.racks.filter((r) => typeof docs[r.key] === "string").map((r) => r.name));
+
   return (
-    <div style={{ position: "fixed", inset: 0, background: v("overlay-strong"), zIndex: 90, display: "flex", alignItems: "stretch", justifyContent: "center", padding: 20 }}>
-      <div style={{ background: v("panel"), border: `1px solid ${v("border")}`, borderRadius: 6, color: v("text"), fontSize: 13, display: "flex", flexDirection: "column", width: "100%", maxWidth: 1400 }}>
-        <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderBottom: `1px solid ${v("border-subtle")}` }}>
-          <b style={{ fontSize: 15, flex: 1 }}>Clients and sites</b>
-          {busy && <span style={{ opacity: 0.7, marginRight: 10 }}>Working...</span>}
-          <button style={{ ...btn, marginRight: 0 }} onClick={onClose}>Close</button>
-        </div>
-        {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px" }}>{err}</div>}
-        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          <div style={{ width: 260, borderRight: `1px solid ${v("border-subtle")}`, display: "flex", flexDirection: "column", padding: 10 }}>
-            <input style={{ ...inp, marginBottom: 8 }} placeholder="Find a client" value={q} onChange={(e) => setQ(e.target.value)} />
-            <div style={{ marginBottom: 8 }}>
-              <button style={btn} onClick={newClient}>New client</button>
-              {!store.web && <button style={btn} onClick={openFile}>Open client file</button>}
+    <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "14px 18px", background: v("bg"), color: v("text"), fontSize: 13 }}>
+      {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px", marginBottom: 10 }}>{err}</div>}
+      {busy && <div style={{ opacity: 0.7, marginBottom: 6 }}>Working...</div>}
+      {tab === "inventory" && <Inventory client={scoped} docs={docs} onOpen={(r, devId) => open(r, { devId })} />}
+      {tab === "cabling" && <Cabling client={scoped} docs={docs} onOpen={(r, cableId) => open(r, { cableId })} />}
+      {tab === "links" && <Links client={client} docs={docs} store={store} onChanged={refresh} />}
+      {tab === "racks" && (
+        <>
+          {!client.sites.length && <div style={{ opacity: 0.8 }}>Add a site to start. <button style={btn} onClick={() => onTab("sites")}>Go to Sites</button></div>}
+          {failedNames.length > 0 && <div style={{ fontSize: 12, color: v("error-text"), marginBottom: 8 }}>Could not read: {failedNames.join(", ")}</div>}
+          {sites.map((s) => (
+            <div key={s.id} style={{ marginBottom: 16 }}>
+              <b style={{ fontSize: 14 }}>{s.name}</b>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                {s.racks.map((r) => {
+                  const d = docs[r.key];
+                  return (
+                    <div key={r.key} onClick={() => open(r)} title="Open this rack" style={{ border: `1px solid ${v("border-subtle")}`, borderRadius: 4, padding: 8, background: v("card"), minWidth: 120, cursor: "pointer" }}>
+                      {d === undefined ? <div style={{ fontSize: 11, opacity: 0.6 }}>Loading...</div> : typeof d === "string" ? <div style={{ fontSize: 11, color: v("error-text"), maxWidth: 160 }}>{d}</div> : <MiniRack doc={d} />}
+                      <div style={{ fontSize: 12, marginTop: 4, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                      {typeof d === "object" && <div style={{ fontSize: 10, opacity: 0.6 }}>{d.devices.length} devices</div>}
+                    </div>
+                  );
+                })}
+                {!s.racks.length && <div style={{ fontSize: 12, opacity: 0.7 }}>No racks in this site yet. Add them on the Sites tab.</div>}
+              </div>
             </div>
-            <div style={{ overflow: "auto", flex: 1 }}>
-              {list === null && <div style={{ opacity: 0.7 }}>Loading...</div>}
-              {list && !list.length && <div style={{ opacity: 0.7, fontSize: 12 }}>No clients yet. Click New client{store.web ? "" : " or Open client file"}.</div>}
-              {shown.map((c) => (
-                <div key={c.key} onClick={() => setKey(c.key)} style={{ padding: "6px 8px", borderRadius: 4, cursor: "pointer", background: c.key === key ? v("accent-soft") : undefined, marginBottom: 2 }}>
-                  <div>{c.name}</div>
-                  <div style={{ fontSize: 11, opacity: 0.65 }}>{c.sub}</div>
-                </div>
-              ))}
-            </div>
+          ))}
+        </>
+      )}
+      {tab === "sites" && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <input key={`n${client.key}${client.name}`} style={{ ...inp, fontSize: 17, fontWeight: 600, flex: 1, maxWidth: 480 }} defaultValue={client.name}
+              onBlur={(e) => { const nv = e.target.value.trim(); if (nv && nv !== client.name) run(() => store.update(client.key, { name: nv }), refresh); }} />
+            <button style={{ ...btn, color: v("danger") }} onClick={removeClient}>{store.web ? "Delete client" : "Remove from list"}</button>
           </div>
-          <div style={{ flex: 1, overflow: "auto", padding: 14 }}>
-            {!client && <div style={{ opacity: 0.7 }}>Pick a client on the left, or add a new one.</div>}
-            {client && (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <input key={`n${client.key}${client.name}`} style={{ ...inp, fontSize: 17, fontWeight: 600, flex: 1, maxWidth: 480 }} defaultValue={client.name}
-                    onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== client.name) run(() => store.update(client.key, { name: v }), refresh); }} />
-                  <button style={{ ...btn, color: v("danger") }} onClick={removeClient}>{store.web ? "Delete client" : "Remove from list"}</button>
-                </div>
-                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>{client.sites.length} site{client.sites.length === 1 ? "" : "s"}, {statText(total)}{!store.web && <> · <span title={client.key}>{client.key}</span></>}</div>
-                <textarea key={`t${client.key}`} style={{ ...inp, width: "100%", maxWidth: 800, minHeight: 44, boxSizing: "border-box", marginBottom: 10 }} placeholder="Notes about this client (contacts, contract, escalation...)"
-                  defaultValue={client.notes} onBlur={(e) => { if (e.target.value !== client.notes) run(() => store.update(client.key, { notes: e.target.value }), refresh); }} />
-                <div style={{ display: "flex", alignItems: "center", borderBottom: `1px solid ${v("border-subtle")}`, marginBottom: 12 }}>
-                  {([["sites", "Sites"], ["inventory", "Inventory and search"], ["links", "Links"]] as const).map(([id, label]) => (
-                    <button key={id} onClick={() => setTab(id)} style={{ background: "none", color: tab === id ? v("text") : v("text-muted-alt"), border: "none", cursor: "pointer", fontSize: 13,
-                      padding: "6px 12px", borderBottom: tab === id ? `2px solid ${v("accent-border")}` : "2px solid transparent", marginBottom: -1 }}>{label}</button>
-                  ))}
-                  <span style={{ flex: 1 }} />
-                  {tab === "sites" && <button style={{ ...btn, marginBottom: 4 }} onClick={() => setImportOpen(true)}>Import Auvik</button>}
-                  {<button style={{ ...btn, marginBottom: 4 }} onClick={() => setReportOpen(true)}>Client report</button>}
-                  {tab === "sites" && <button style={{ ...btn, marginBottom: 4 }} onClick={() => setSiteForm({ id: null, name: "", address: "", notes: "" })}>Add site</button>}
-                </div>
-                {tab === "inventory" && <Inventory client={client} docs={docs} onOpen={onOpenRack} />}
-                {tab === "links" && <Links client={client} docs={docs} store={store} onChanged={refresh} />}
-                {tab === "sites" && <>
-                {siteForm && (
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>{client.sites.length} site{client.sites.length === 1 ? "" : "s"}, {statText(total)}{!store.web && <> · <span title={client.key}>{client.key}</span></>}</div>
+          <textarea key={`t${client.key}`} style={{ ...inp, width: "100%", maxWidth: 800, minHeight: 44, boxSizing: "border-box", marginBottom: 10 }} placeholder="Notes about this client (contacts, contract, escalation...)"
+            defaultValue={client.notes} onBlur={(e) => { if (e.target.value !== client.notes) run(() => store.update(client.key, { notes: e.target.value }), refresh); }} />
+          <div style={{ marginBottom: 12 }}>
+            <button style={btn} onClick={() => setSiteForm({ id: null, name: "", address: "", notes: "" })}>Add site</button>
+            <button style={btn} onClick={() => setImportOpen(true)}>Import Auvik</button>
+          </div>
+          {siteForm && (
                   <div style={{ border: `1px solid ${v("border")}`, borderRadius: 6, padding: 10, marginBottom: 12, maxWidth: 520, background: v("card") }}>
                     <b>{siteForm.id == null ? "New site" : "Edit site"}</b>
                     <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 6, marginTop: 8, alignItems: "center" }}>
@@ -214,12 +202,12 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                             const d = docs[r.key];
                             return (
                               <div key={r.key} style={{ border: `1px solid ${v("border-subtle")}`, borderRadius: 4, padding: 6, background: v("inset"), minWidth: 120 }}>
-                                <div style={{ cursor: "pointer" }} title="Open this rack" onClick={() => onOpenRack(r)}>
+                                <div style={{ cursor: "pointer" }} title="Open this rack" onClick={() => open(r)}>
                                   {d === undefined ? <div style={{ fontSize: 11, opacity: 0.6 }}>Loading...</div> : typeof d === "string" ? <div style={{ fontSize: 11, color: v("error-text"), maxWidth: 160 }}>{d}</div> : <MiniRack doc={d} />}
                                   <div style={{ fontSize: 12, marginTop: 4, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                                   {typeof d === "object" && <div style={{ fontSize: 10, opacity: 0.6 }}>{d.devices.length} devices</div>}
                                 </div>
-                                <button style={{ ...small, marginTop: 4 }} onClick={() => onOpenRack(r)}>Open</button>
+                                <button style={{ ...small, marginTop: 4 }} onClick={() => open(r)}>Open</button>
                                 <button style={{ ...small, marginTop: 4, marginRight: 0 }} title="Take it out of this site (the rack is kept)"
                                   onClick={() => { if (confirm(`Take "${r.name}" out of ${s.name}? The rack is kept.`)) run(() => store.removeRack(client.key, s.id, r), refresh); }}>Remove</button>
                               </div>
@@ -249,14 +237,9 @@ export default function ClientsPanel({ current, saveCurrentTo, onOpenRack, onClo
                     );
                   })}
                 </div>
-                </>}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      {reportOpen && client && <Suspense fallback={null}><ReportDialog clientKey={client.key} onClose={() => setReportOpen(false)} /></Suspense>}
-      {importOpen && client && <Suspense fallback={null}><ImportToClient client={client} onDone={refresh} onClose={() => setImportOpen(false)} /></Suspense>}
+        </>
+      )}
+      {importOpen && <Suspense fallback={null}><ImportToClient client={client} onDone={refresh} onClose={() => setImportOpen(false)} /></Suspense>}
     </div>
   );
 }

@@ -9,16 +9,9 @@ export type CableColorMode = "own" | "type";
 export type Focus = { kind: "cable" | "dev" | "rack"; id: number } | null;
 
 // ---- cable kinds and the by-type palette (Okabe-Ito inspired, readable on the dark canvas)
-export type Kind = "rj45" | "fiber" | "dac" | "power" | "console" | "other";
-export function cableKind(type?: string): Kind {
-  const t = (type || "").toLowerCase();
-  if (/^cat\s?\d|rj45|copper|ethernet/.test(t)) return "rj45";
-  if (/om\d|os\d|fib|\blc\b|\bsc\b|\bmpo\b/.test(t)) return "fiber";
-  if (/dac|twinax|sfp|aoc|qsfp/.test(t)) return "dac";
-  if (/power|iec|c13|c14|mains/.test(t)) return "power";
-  if (/console|rollover|serial/.test(t)) return "console";
-  return "other";
-}
+export type { Kind } from "./cableKind";
+import { cableKind, type Kind } from "./cableKind";
+export { cableKind };
 export const TYPE_COLORS: Record<string, string> = {
   cat5e: "#6fa8f0", cat6: "#2f7be0", cat6a: "#3f5fd6", // theme-ok
   om3: "#3fd6dc", om4: "#1fb4c6", os2: "#f0e442", // theme-ok

@@ -32,7 +32,8 @@ import DevicePanel from "./panel/DevicePanel";
 import ModelPicker from "./ModelPicker";
 import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
-import ClientsPanel from "./clients/ClientsPanel";
+import ClientPage from "./clients/ClientPage";
+import ClientBar from "./clients/ClientBar";
 import { Breadcrumb } from "./Breadcrumb";
 import Dashboard, { type ClientTab } from "./home/Dashboard";
 import { findRackLocation, sameFile, type RackLocation } from "./location";
@@ -59,7 +60,6 @@ const icon = (i: number) => {
   return s === "disc" ? "●" : s === "squircle" ? "▢" : "▬";
 };
 
-export type { ClientTab };
 type Screen = { kind: "home" } | { kind: "client"; key: string; tab: ClientTab; site?: number } | { kind: "editor" };
 
 interface Cur { id: number; name: string; version: number }
@@ -69,7 +69,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [doc, setDoc] = useState<Doc>(empty);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [helpDlg, setHelpDlg] = useState<"shortcuts" | "news" | null>(null);
-  const [clientsImport, setClientsImport] = useState(false);
+  const [clientRev, setClientRev] = useState(0);
   const [screen, setScreen] = useState<Screen>({ kind: "home" });
   const [importTick, setImportTick] = useState(0);
   const [undo, setUndo] = useState<Doc[]>([]);
@@ -108,10 +108,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
-  const [clientsOpen, setClientsOpen] = useState(false);
   const [reportFor, setReportFor] = useState<string | null>(null); // "" = no client preselected
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
-  const [clientsTarget, setClientsTarget] = useState<{ client?: string; site?: number }>({});
   const [loc, setLoc] = useState<RackLocation | null | "unassigned">(null);
   const [wide, setWide] = useState(() => window.innerWidth >= 1280);
   useEffect(() => { const r = () => setWide(window.innerWidth >= 1280); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
@@ -276,17 +274,22 @@ export default function App({ web }: { web?: WebProps } = {}) {
     } catch (e) { say(String(e), true); }
   }, [path, cur, doc, say, saveShared]);
 
-  /** Clients screen: open a rack from a site. */
-  const openFromClient = async (r: RackItem, devId?: number) => {
-    if (dirty && !confirm("Discard unsaved changes?")) return;
-    if (IS_WEB) {
-      if (r.id == null) return;
-      await loadShared(r.id);
-    } else {
-      try { const d = await clientStore().loadDoc(r); reset(d, r.path ?? null); setMsg(""); } catch (e) { say(errText(e), true); return; }
+  /** Client page: open a rack from a site. Opening the rack that is already open just shows it. */
+  const openFromClient = async (clientKey: string, r: RackItem, o: { devId?: number; cableId?: number; loc?: RackLocation } = {}) => {
+    const same = IS_WEB ? r.id != null && cur?.id === r.id : !!r.path && !!path && sameFile(r.path, path);
+    if (!same) {
+      if (dirty && !confirm("Discard unsaved changes?")) return;
+      if (IS_WEB) {
+        if (r.id == null) return;
+        if (!(await loadShared(r.id))) return;
+      } else {
+        try { const d = await clientStore().loadDoc(r); reset(d, r.path ?? null); setMsg(""); } catch (e) { say(errText(e), true); return; }
+      }
     }
-    setClientsOpen(false);
-    if (devId != null) { setView("rack"); setSel({ kind: "dev", id: devId }); }
+    if (o.loc) setLoc(o.loc);
+    setScreen({ kind: "client", key: clientKey, tab: "racks" });
+    if (o.devId != null) { setView("rack"); setSel({ kind: "dev", id: o.devId }); }
+    else if (o.cableId != null) { setView("rack"); setSel({ kind: "cable", id: o.cableId }); }
   };
   /** Web, Clients screen: save the open rack (not saved yet) as a new shared rack in a site. */
   const saveCurrentTo = async (siteId: number) => {
@@ -543,7 +546,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       ] },
     ] },
     { label: "Clients", items: [
-      { label: "Clients…", run: () => { setClientsImport(false); setClientsOpen(true); } },
+      { label: "Clients…", run: () => setScreen({ kind: "home" }) },
       { label: "Client report…", run: () => setReportFor("") },
       { label: "Import Auvik into a client…", run: () => { setScreen({ kind: "home" }); setImportTick((n) => n + 1); } },
     ] },
@@ -556,7 +559,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
   ];
   const rackName = IS_WEB ? (cur?.name ?? "New rack") : (path ? path.split(/[\\/]/).pop()! : "New rack");
   useEffect(() => {
-    if (clientsOpen) return;
     let stop = false;
     (async () => {
       try {
@@ -574,7 +576,13 @@ export default function App({ web }: { web?: WebProps } = {}) {
       } catch { if (!stop) setLoc(null); }
     })();
     return () => { stop = true; };
-  }, [IS_WEB ? cur?.id : path, clientsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [IS_WEB ? cur?.id : path, clientRev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hasLoc = !!loc && loc !== "unassigned";
+  const barKey = screen.kind === "client" ? screen.key : screen.kind === "editor" && hasLoc ? (loc as RackLocation).clientKey : null;
+  const barTab: ClientTab = screen.kind === "client" ? screen.tab : "racks";
+  const barSite = screen.kind === "client" ? screen.site : undefined;
+  const showEditor = screen.kind === "editor" || (screen.kind === "client" && screen.tab === "racks" && hasLoc && (loc as RackLocation).clientKey === screen.key);
+  const toClient = (key: string, tab: ClientTab, site?: number) => setScreen({ kind: "client", key, tab, site });
   const sepBar = <span style={{ width: 1, alignSelf: "stretch", background: v("border"), margin: "2px 10px" }} />;
   const seg = (opts: [string, string][], curId: string, pick: (id: string) => void, title: (l: string) => string) => opts.map(([id, label], i) => (
     <button key={id} onClick={() => pick(id)} title={title(label)}
@@ -627,10 +635,11 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <MenuBar menus={menus} />
         {sepBar}
         <Breadcrumb loc={loc} rackName={rackName} dirty={dirty}
-          onClient={(k) => { setClientsTarget({ client: k }); setClientsImport(false); setClientsOpen(true); }}
-          onSite={(k, id) => { setClientsTarget({ client: k, site: id }); setClientsImport(false); setClientsOpen(true); }} />
+          onClient={(k) => setScreen({ kind: "client", key: k, tab: "sites" })}
+          onSite={(k, id) => setScreen({ kind: "client", key: k, tab: "racks", site: id })} />
         {msg && <span style={{ opacity: 0.7, fontSize: 12, marginLeft: 8, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{msg}</span>}
         {sepBar}
+        {showEditor && <>
         {wide
           ? <span style={{ display: "inline-flex", marginRight: 8 }}>{seg(VIEWS, view, (id) => setView(id as ViewId), (l) => `${l} view`)}</span>
           : <span style={{ marginRight: 8 }}><DropButton label={`${VIEWS.find(([id]) => id === view)?.[1]} ▾`} title="Change view" items={VIEWS.map(([id, label]): MenuItem => ({ label, checked: view === id, run: () => setView(id) }))} /></span>}
@@ -638,6 +647,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         <button style={{ ...btn, padding: "5px 9px" }} onClick={doUndo} disabled={!undo.length} title={`Undo (${SHORTCUTS.undo})`}>{"↶"}</button>
         <button style={{ ...btn, padding: "5px 9px" }} onClick={doRedo} disabled={!redo.length} title={`Redo (${SHORTCUTS.redo})`}>{"↷"}</button>
         <button style={{ ...btn, background: panelOpen ? v("accent-soft") : v("control") }} onClick={() => setPanelOpen((o) => !o)} title="Show or hide the details panel" aria-pressed={panelOpen}>Details</button>
+        </>}
         <button style={{ ...btn, background: v("accent"), color: v("on-accent"), borderColor: v("accent") }} onClick={() => doSave()} title={`Save (${SHORTCUTS.save})`}>Save</button>
         {!IS_WEB && <button style={{ ...btn, padding: "5px 9px", marginLeft: 6, marginRight: 0 }} title="Settings" aria-label="Settings" onClick={() => setSettingsTab("profile")}>{"⚙"}</button>}
         {IS_WEB && webGuarded && <UserBar web={webGuarded} openSettings={setSettingsTab} />}
@@ -645,8 +655,15 @@ export default function App({ web }: { web?: WebProps } = {}) {
       {!IS_WEB && deskUpd.offer && <UpdateBanner kind="desktop" text={`Rackwright ${deskUpd.offer.version} is available.`} primary="Download" secondary="Skip this version" onPrimary={deskUpd.download} onSecondary={deskUpd.skip} onClose={deskUpd.hide} />}
       {IS_WEB && webUpd.reload && <UpdateBanner kind="reload" text={`Rackwright was updated to ${webUpd.reload}. Reload to use the new version.`} primary="Reload" onPrimary={() => location.reload()} />}
       {IS_WEB && !webUpd.reload && webUpd.admin && <UpdateBanner kind="admin" text={`Rackwright ${webUpd.admin} is available for this server.`} primary="Update now" secondary="Later" onPrimary={() => setSettingsTab("update")} onSecondary={webUpd.later} />}
-      {screen.kind === "home" && <Dashboard importTick={importTick} onOpen={(key, o) => { setClientsTarget({ client: key, site: o?.site }); setClientsImport(false); setClientsOpen(true); }} />}
-      <div style={{ flex: 1, minHeight: 0, display: screen.kind === "home" ? "none" : "flex", position: "relative" }}>
+      {barKey && <ClientBar clientKey={barKey} tab={barTab} site={barSite} rev={clientRev}
+        onClient={(k) => toClient(k, barTab)} onSite={(id) => toClient(barKey, barTab, id)} onTab={(t) => toClient(barKey, t, barSite)} onReport={() => setReportFor(barKey)} />}
+      {screen.kind === "home" && <Dashboard importTick={importTick} onOpen={(key, o) => setScreen({ kind: "client", key, tab: o?.tab ?? "sites", site: o?.site })} />}
+      {screen.kind === "client" && !showEditor && <ClientPage key={screen.key} clientKey={screen.key} tab={screen.tab} site={screen.site} rev={clientRev}
+        onChanged={() => setClientRev((n) => n + 1)} onTab={(t) => toClient(screen.key, t, screen.site)} onGone={() => setScreen({ kind: "home" })}
+        onOpenRack={(r, o) => openFromClient(screen.key, r, o)}
+        current={{ label: cur?.name ?? (path ? path.split(/[\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
+        saveCurrentTo={IS_WEB && !cur && doc.racks.length > 0 ? saveCurrentTo : undefined} />}
+      <div style={{ flex: 1, minHeight: 0, display: showEditor ? "flex" : "none", position: "relative" }}>
         <div style={{ display: view === "rack" ? "flex" : "none" }}>
           <EquipmentSidebar list={CATALOG} fitsOnly={fitsOnly} onFits={setFitsOnly} onDragStart={startPdrag} onAdd={addFromCatalog}
             statusOf={(c) => rackForTags ? tplRackStatus(doc, rackForTags, c) : c.plate?.off ? "off" : "none"}
@@ -765,7 +782,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
           {sel && !selDev && <button style={{ ...btn, color: v("danger"), marginRight: 0 }} onClick={del}>Delete</button>}
         </div>}
       </div>
-      {routes.hints.length > 0 && (
+      {showEditor && routes.hints.length > 0 && (
         <div style={{ maxHeight: 70, overflow: "auto", background: v("panel"), fontSize: 12, padding: 6, borderTop: `1px solid ${v("border-subtle")}` }}>
           {routes.hints.map((h, i) => <div key={i}>! {h.msg}</div>)}
         </div>
@@ -792,11 +809,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
         </div>
       )}
       {settingsTab && <SettingsScreen tab={settingsTab} setTab={setSettingsTab} web={webGuarded} onClose={() => setSettingsTab(null)} />}
-      {clientsOpen && (
-        <ClientsPanel startImport={clientsImport} openClient={clientsTarget.client} focusSite={clientsTarget.site} onClose={() => { setClientsOpen(false); setClientsTarget({}); }} onOpenRack={openFromClient}
-          current={{ label: cur?.name ?? (path ? path.split(/[\\/]/).pop()! : "unsaved rack"), id: cur?.id ?? null, path }}
-          saveCurrentTo={IS_WEB && !cur && doc.racks.length > 0 ? saveCurrentTo : undefined} />
-      )}
       {reportFor != null && <Suspense fallback={null}><ReportDialog clientKey={reportFor || undefined} onClose={() => setReportFor(null)} /></Suspense>}
       {IS_WEB && showRacks && <RackList currentId={cur?.id ?? null} onClose={() => setShowRacks(false)} onOpen={(m) => loadShared(m.id)} />}
       {IS_WEB && nameAsk && <NamePrompt title={nameAsk.title} initial={nameAsk.initial} onOk={nameAsk.cb} onCancel={() => setNameAsk(null)} />}
