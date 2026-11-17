@@ -89,7 +89,7 @@ export function deviceAlerts(doc: Doc, dev: Device, today: string, others: IpEnt
     if (f && f.ratedW && f.loadW > 0) {
       const ratio = f.loadW / f.ratedW;
       if (ratio > 0.8) {
-        const msg = `${f.unknown > 0 ? "At least " : ""}Load ${Math.round(f.loadW).toLocaleString("en-US")} W is ${Math.round(ratio * 100)}% of ${f.ratedW.toLocaleString("en-US")} W`;
+        const msg = `Load ${f.unknown > 0 ? "at least " : ""}${Math.round(f.loadW).toLocaleString("en-US")} W is ${Math.round(ratio * 100)}% of ${f.ratedW.toLocaleString("en-US")} W`;
         out.push({ ...base, level: ratio > 1 ? "critical" : "warning", kind: "load", msg });
       }
     }

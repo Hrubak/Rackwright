@@ -52,7 +52,7 @@ function loadDoc(w: number, extra: Partial<Device> = {}) {
 }
 { const { doc, ups } = loadDoc(900); eq("load warn", deviceAlerts(doc, ups, TODAY).map((a) => [a.level, a.msg]), [["warning", "Load 900 W is 90% of 1,000 W"]]); }
 { const { doc, ups } = loadDoc(1100); eq("load crit", deviceAlerts(doc, ups, TODAY).map((a) => [a.level, a.msg]), [["critical", "Load 1,100 W is 110% of 1,000 W"]]); }
-{ const { doc, ups } = loadDoc(900, { name: "x" }); eq("load unknown", deviceAlerts(doc, ups, TODAY)[0].msg.startsWith("At least "), true); }
+{ const { doc, ups } = loadDoc(900, { name: "x" }); eq("load unknown", deviceAlerts(doc, ups, TODAY).map((a) => [a.level, a.msg]), [["warning", "Load at least 900 W is 90% of 1,000 W"]]); }
 { const { doc, ups } = loadDoc(500); eq("load fine", deviceAlerts(doc, ups, TODAY), []); }
 
 // stale racks
@@ -60,6 +60,8 @@ const st = (rack: Partial<Doc["racks"][0]>, devs = [mk(1, "NAS-01", "NAS")]) => 
 eq("never", st({ last_verified: undefined }), [["info", "stale", "Never checked on site", "k", 1, "Rack A"]]);
 eq("old", st({ last_verified: "2026-07-01" }), [["info", "stale", "Not checked on site since 2026-07-01", "k", 1, "Rack A"]]);
 eq("recent", st({ last_verified: "2026-10-01" }), []);
+eq("90 days", st({ last_verified: "2026-08-19" }), []);
+eq("91 days", st({ last_verified: "2026-08-18" }).length, 1);
 eq("empty rack", st({ last_verified: undefined }, []), []);
 
 // ips
