@@ -4,7 +4,8 @@ import { v } from "../theme";
 import type { Doc } from "../types";
 import type { Units } from "../settings/types";
 import { ClientItem, RackItem, clientStore } from "../clients/store";
-import { FloorPlan, type FloorSel } from "./FloorPlan";
+import { FloorPlan, rackWatts, type FloorSel } from "./FloorPlan";
+import { btu } from "../power/model";
 import { OBJ_TYPES, ensureRooms, findFreeTile, footprint, nextId, resizeRoom, spotId } from "./model";
 import type { RackSource, Room, RoomObject } from "./types";
 
@@ -81,6 +82,13 @@ export default function FloorTab({ client, siteId, docs, units, onOpenRack, onSa
 
   const room = rooms.find((r) => r.id === roomId) ?? rooms[0];
   useEffect(() => { if (room) setSize({ w: String(room.w), d: String(room.d) }); }, [room?.id, room?.w, room?.d]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  let roomPower = "";
+  if (room) {
+    let w = 0, unk = 0;
+    for (const sp of room.racks) { const p = rackWatts(docs, sp); w += p.w; unk += p.unknown; }
+    roomPower = w > 0 ? `Room: ${unk > 0 ? "at least " : ""}${Math.round(w).toLocaleString("en-US")} W · ${btu(w).toLocaleString("en-US")} BTU/hr` : "Power unknown";
+  }
 
   if (!client.sites.length) return <div style={{ opacity: 0.8 }}>Add a site on the Sites tab to start a floor plan.</div>;
   if (!site) return null;
@@ -175,6 +183,7 @@ export default function FloorTab({ client, siteId, docs, units, onOpenRack, onSa
           </>}
           <button style={btn} onClick={exportPdf}>Export PDF</button>
         </>}
+        {!all && <span style={{ fontSize: 12, opacity: 0.85 }}>{roomPower}</span>}
         {saved && <span style={{ opacity: 0.7 }}>Saved</span>}
       </div>
       {msg && <div style={{ fontSize: 12, color: v("error-text"), marginBottom: 6 }}>{msg}</div>}

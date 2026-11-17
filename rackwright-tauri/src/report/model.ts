@@ -4,6 +4,9 @@ import type { ClientItem } from "../clients/store";
 import type { ReportOptions } from "./types";
 import { addStats, docStats, inventoryRows, typeTotals, zero } from "../clients/util";
 import type { InvRow } from "../clients/util";
+import { clientAlerts } from "../attention/model";
+import type { Alert } from "../attention/model";
+import { powerBudget } from "../power/model";
 import { switchPorts, switchesOf } from "../views/switchPorts";
 
 export interface SwitchMap { name: string; ports: { name: string; used: boolean; to: string; type: string; ip: string }[] }
@@ -17,6 +20,8 @@ export interface ReportModel {
   title: string; date: string; preparedFor: string; preparedBy: string; level: ReportOptions["level"];
   summary: string; recommendations: string;
   totals: { sites: number; racks: number; usedU: number; totalU: number; devices: number; byType: [string, number][] };
+  attention: Alert[];
+  power: { site: string; rack: string; w: number; unknown: number; circuit: string; amps: number }[];
   sites: SiteSection[]; links: LinkRow[]; inventory: InvRow[];
   /** Chosen sites only, and the links touching them; for the links diagram. */
   client: ClientItem; docs: Record<string, Doc | string>;
@@ -64,11 +69,20 @@ export function buildReportModel(input: { client: ClientItem; docs: Record<strin
       to: l.site_b == null ? "Internet" : nameOf.get(l.site_b) ?? "Unknown site",
       provider: l.provider, circuit: l.circuit, bandwidth: l.bandwidth,
     }));
+  const today = options.date || new Date().toLocaleDateString("en-CA");
+  const attention = clientAlerts({ ...client, sites: chosen }, docs, today);
+  const power: ReportModel["power"] = [];
+  for (const sec of sites) for (const r of sec.racks) {
+    if (!r.doc) continue;
+    for (const p of powerBudget(r.doc).racks) {
+      power.push({ site: sec.name, rack: r.doc.racks.find((x) => x.id === p.rackId)?.name || r.name, w: p.w, unknown: p.unknown, circuit: p.circuit, amps: p.amps });
+    }
+  }
   return {
     title: `Network review — ${client.name}`, date: options.date, preparedFor: options.prepared_for, preparedBy: company,
     level: options.level, summary: options.summary, recommendations: options.recommendations,
     totals: { sites: sites.length, racks: st.racks, usedU: st.usedU, totalU: st.totalU, devices: st.devices, byType: typeTotals(inventory) },
-    sites, links, inventory,
+    attention, power, sites, links, inventory,
     client: { ...client, sites: chosen, links: touching }, docs: usedDocs,
   };
 }

@@ -1,4 +1,6 @@
 // Client report PDF: lays a ReportModel out page by page with jsPDF; diagrams are drawn offscreen and placed with svg2pdf.js.
+import { groupInfo } from "../attention/model";
+import { fmtW } from "../power/model";
 import type { ReportModel, SiteSection } from "./model";
 import type { Doc } from "../types";
 import { LIGHT } from "../theme";
@@ -217,6 +219,16 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
     ], 260);
     if (t.byType.length) table([{ head: "Devices by type", w: 2 }, { head: "Count", w: 1 }], t.byType.map(([k, n]) => [k || "Other", String(n)]), 260);
 
+    h1("Needs attention");
+    {
+      const { shown, staleRacks } = groupInfo(model.attention);
+      const LV = { critical: "Critical", warning: "Warning", info: "Info" } as const;
+      const rows = shown.map((a) => [LV[a.level], a.devName ? `${a.rackName ?? ""} › ${a.devName}` : a.rackName ?? "", a.msg]);
+      if (staleRacks) rows.push([LV.info, "", `${staleRacks} ${staleRacks === 1 ? "rack" : "racks"} not checked on site in 90 days`]);
+      if (rows.length) table([{ head: "Level", w: 1 }, { head: "Where", w: 2.4 }, { head: "Issue", w: 4 }], rows);
+      else paragraph("Nothing needs attention.");
+    }
+
     if (model.links.length) {
       h1("Site links");
       try {
@@ -291,6 +303,11 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
       if (s.devices.length) {
         h2(`Devices at ${s.name}`, 60);
         table([{ head: "Name", w: 2.2 }, { head: "Type", w: 1.4 }, { head: "Model", w: 2.2 }, { head: "IP", w: 1.5 }, { head: "Where", w: 1.6 }], s.devices.map((d) => [d.name, d.type, d.model, d.ip, d.where]));
+      }
+      const pw = model.power.filter((p) => p.site === s.name);
+      if (pw.length) {
+        h2(`Power at ${s.name}`, 60);
+        table([{ head: "Rack", w: 2 }, { head: "Power", w: 2.6 }, { head: "Circuit", w: 1.6 }, { head: "Amps", w: 1 }], pw.map((p) => [p.rack, fmtW(p.w, p.unknown), p.circuit, p.w > 0 ? String(p.amps) : ""]));
       }
     }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Doc } from "../types";
 import type { Units } from "../settings/types";
 import { v } from "../theme";
+import { powerBudget } from "../power/model";
 import { footprint, OBJ_TYPES, spotId, tileFree } from "./model";
 import { floorLinks } from "./floorLinks";
 import type { RackSpot, Room, RoomObject, Rot } from "./types";
@@ -24,12 +25,24 @@ export interface FloorPlanProps {
   readOnly?: boolean;
 }
 
+const budgets = new WeakMap<Doc, ReturnType<typeof powerBudget>>();
+export function rackWatts(docs: Record<string, Doc | string>, s: RackSpot): { w: number; unknown: number } {
+  const d = docs[s.key];
+  if (!d || typeof d === "string") return { w: 0, unknown: 0 };
+  let b = budgets.get(d);
+  if (!b) { b = powerBudget(d); budgets.set(d, b); }
+  const p = b.racks.find((x) => x.rackId === s.rack);
+  return { w: p?.w ?? 0, unknown: p?.unknown ?? 0 };
+}
+
 function rackInfo(docs: Record<string, Doc | string>, s: RackSpot) {
   const d = docs[s.key];
-  if (!d || typeof d === "string") return { name: "Rack", used: 0, total: 0 };
+  if (!d || typeof d === "string") return { name: "Rack", used: 0, total: 0, power: "" };
   const r = d.racks.find((x) => x.id === s.rack);
   const used = d.devices.filter((x) => x.rack === s.rack).reduce((n, x) => n + (x.u_size || 0), 0);
-  return { name: r?.name || "Rack", used, total: r?.u ?? 0 };
+  const p = rackWatts(docs, s);
+  const power = p.w > 0 ? `${p.unknown > 0 ? "≥ " : ""}${Math.round(p.w).toLocaleString("en-US")} W` : "";
+  return { name: r?.name || "Rack", used, total: r?.u ?? 0, power };
 }
 
 export function FloorPlan({ room, docs, units, onChange, onOpenRack, onSelect, selected, readOnly }: FloorPlanProps) {
@@ -175,6 +188,7 @@ export function FloorPlan({ room, docs, units, onChange, onOpenRack, onSelect, s
         <g transform={turn} pointerEvents="none">
           <text x={cx} y={cy - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill={v("text")}>{name}</text>
           <text x={cx} y={cy + 8} textAnchor="middle" fontSize={10} fill={v("text-muted")}>{info.used}/{info.total}U</text>
+          {info.power && <text x={cx} y={cy + 21} textAnchor="middle" fontSize={10} fill={v("text-muted")}>{info.power}</text>}
         </g>
         {s.n > 1 && <text x={L + 3} y={T + 11} fontSize={9} fill={v("text-muted")} pointerEvents="none">{s.i + 1}/{s.n}</text>}
         <title>{info.name} - double-click to open</title>

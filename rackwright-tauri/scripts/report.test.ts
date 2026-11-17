@@ -42,5 +42,18 @@ const sw = m.sites[0].switches;
 eq("switch maps exist", sw.length > 0 && sw.every((s) => s.ports.length > 0), true);
 eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), true);
 
+// attention and power in the report
+{
+  const base = JSON.parse(JSON.stringify(doc)) as Doc;
+  const rk = base.racks[0];
+  const dv = { ...base.devices.find((d) => d.rack === rk.id)!, id: 9001, name: "Example Box", rack: rk.id, power_w: 400, warranty_exp: "2020-01-01", status: "active" } as any;
+  const d2: Doc = { ...base, devices: [dv] };
+  const c2: ClientItem = { ...client, sites: [{ id: 1, name: "Head Office", address: "", notes: "", racks: [{ key: "p1", name: "P" }] }], links: [] };
+  const m2 = buildReportModel({ client: c2, docs: { p1: d2 }, options: opts, company: "x" });
+  eq("attention critical first", m2.attention[0]?.level, "critical");
+  eq("power watts", m2.power[0]?.w, 400);
+  eq("power site", m2.power[0]?.site, "Head Office");
+}
+
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);
