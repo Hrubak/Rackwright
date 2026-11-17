@@ -103,3 +103,4 @@ const localStore: SettingsStore = {
 };
 
 export function settingsStore(): SettingsStore { return IS_WEB ? webStore : localStore; }
+export { startScreen } from "./startScreen";

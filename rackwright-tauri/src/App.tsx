@@ -34,6 +34,7 @@ import { resizeDevice, swapModel } from "./swapModel";
 import { CableOpts, loadOpts, saveOpts, visibleCables } from "./cableView";
 import ClientPage from "./clients/ClientPage";
 import ClientBar from "./clients/ClientBar";
+import { startScreen } from "./settings/startScreen";
 import { Breadcrumb } from "./Breadcrumb";
 import Dashboard, { type ClientTab } from "./home/Dashboard";
 import { findRackLocation, sameFile, type RackLocation } from "./location";
@@ -222,7 +223,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   };
   const webUpd = useWebUpdates(IS_WEB && !!web, !!web?.user.is_admin);
 
-  const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setDoc(upgradeDoc(d)); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
+  const reset = (d: Doc, p: string | null, c: Cur | null = null) => { setScreen({ kind: "editor" }); setLoc(null); setClientRev((n) => n + 1); setDoc(upgradeDoc(d)); setPath(p); setCur(c); setUndo([]); setRedo([]); setSel(null); setPending(null); setDirty(false); setFitTick((n) => n + 1); };
   const doNew = () => { if (!dirty || confirm("Discard unsaved changes?")) setPicker("new"); };
   const onPick = (r: PickResult) => {
     const mode = picker; setPicker(null);
@@ -577,6 +578,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
     })();
     return () => { stop = true; };
   }, [IS_WEB ? cur?.id : path, clientRev]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A rack that belongs to a client opens inside that client's Racks tab.
+  useEffect(() => { if (screen.kind === "editor" && loc && loc !== "unassigned") setScreen({ kind: "client", key: loc.clientKey, tab: "racks" }); }, [loc]); // eslint-disable-line react-hooks/exhaustive-deps
   const hasLoc = !!loc && loc !== "unassigned";
   const barKey = screen.kind === "client" ? screen.key : screen.kind === "editor" && hasLoc ? (loc as RackLocation).clientKey : null;
   const barTab: ClientTab = screen.kind === "client" ? screen.tab : "racks";
@@ -595,7 +598,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   useEffect(() => {
     if (!settings.loaded || startDone.current) return;
     startDone.current = true;
-    const start = settings.prefs.start ?? "new";
+    const start = startScreen(settings.prefs);
     if (start !== "clients") setScreen({ kind: "editor" });
     const last = settings.prefs.last_rack;
     if (start === "last" && last) {

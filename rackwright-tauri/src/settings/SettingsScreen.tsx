@@ -7,6 +7,7 @@ import { RACK_MODELS, GENERIC_MAX_U, GENERIC_MIN_U, kindLabel } from "../racks";
 import { UpdateBody, UsersBody, WebProps, errStyle, msgOf } from "../web";
 import { useSettings } from "./context";
 import { settingsStore } from "./store";
+import { startScreen } from "./startScreen";
 import type { AssetName, StartScreen, ThemePref, Units } from "./types";
 
 export type SettingsTab = "profile" | "company" | "racks" | "users" | "update";
@@ -50,7 +51,7 @@ function Profile({ web }: { web?: WebProps }) {
     if (await pw.run(() => A.changePassword(cur, nw))) { setCur(""); setNw(""); setRep(""); }
   };
   const units: Units = prefs.units ?? "mm";
-  const start: StartScreen = prefs.start ?? "new";
+  const start: StartScreen = startScreen(prefs);
   return (
     <>
       {web && (
@@ -82,9 +83,9 @@ function Profile({ web }: { web?: WebProps }) {
       </label>
       <label style={lbl}>Start screen<br />
         <select style={inp} value={start} onChange={(e) => pref.run(() => savePrefs({ start: e.target.value as StartScreen }))}>
+          <option value="clients">Clients dashboard</option>
+          <option value="last">Last rack</option>
           <option value="new">New rack</option>
-          <option value="last">Last rack I had open</option>
-          <option value="clients">Clients</option>
           {IS_WEB && <option value="racks">Rack list</option>}
         </select>
       </label>

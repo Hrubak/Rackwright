@@ -1,5 +1,6 @@
 // npx tsx scripts/settings.test.ts — units formatting and accent colour helpers
 import { fmtDims, fmtLen } from "../src/units";
+import { startScreen } from "../src/settings/startScreen";
 import { isHex6, mixHex } from "../src/theme";
 
 let fail = 0;
@@ -18,5 +19,8 @@ eq("hex ok", isHex6("#336699"), true);
 eq("hex bad", isHex6("blue"), false);
 eq("mix", mixHex("#000000", "#ffffff", 0.5), "#808080");
 
+eq("start default", startScreen({}), "clients");
+eq("start last", startScreen({ start: "last" }), "last");
+eq("start new", startScreen({ start: "new" }), "new");
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);
