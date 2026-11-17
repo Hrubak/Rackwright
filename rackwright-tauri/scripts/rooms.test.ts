@@ -58,5 +58,14 @@ const f = resizeRoom(packed, 2, 2, false);
 eq("failed when packed", f.failed > 0, true);
 eq("failed ids kept", f.room.racks.length, 8);
 
+import { floorLinks } from "../src/rooms/floorLinks";
+const mk = (id: number, rack: number, pids: number[]) => ({ id, name: "d" + id, type: "switch", u_size: 1, rack, u: 1, side: 0, half: false, rows: 1, fx: 0, fy: 0, face: "front", ports: pids.map((p) => ({ id: p, name: "p", type: "RJ45", label: "" })) });
+const fdoc: any = { v: 1, nid: 99, racks: [], devices: [mk(1, 1, [10, 11, 12, 13, 14, 15]), mk(2, 2, [20, 21, 22, 23, 24]), mk(3, 1, [30])], cables: [
+  { id: 1, a: 10, b: 20, color: "#000", type: "Cat6" }, { id: 2, a: 11, b: 21, color: "#000", type: "Cat6" }, { id: 3, a: 12, b: 22, color: "#000", type: "OM3" },
+  { id: 4, a: 13, b: 23, color: "#000", type: "Power C13" }, { id: 5, a: 14, b: 30, color: "#000", type: "Cat6" }] };
+const froom: Room = { id: 1, name: "R", w: 14, d: 9, objects: [], racks: [{ key: "k", rack: 1, x: 0, y: 0, rot: 0 }, { key: "k", rack: 2, x: 3, y: 0, rot: 0 }] };
+eq("floor links", floorLinks(froom, { k: fdoc }), [{ a: "k#1", b: "k#2", data: 3, power: 1 }]);
+eq("floor links unloaded", floorLinks(froom, { k: "loading" }), []);
+
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);
