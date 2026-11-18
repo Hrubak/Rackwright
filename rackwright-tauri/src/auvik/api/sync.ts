@@ -98,7 +98,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   const itemOf = (d: Device) => p.items.find((i) => i.dev.apiId && (d as X).auvik_id === "api:" + i.dev.apiId);
   for (const d of doc.devices) {
     const it = itemOf(d);
-    if (it?.specs && (!before.has(d.id) || wanted(it.key))) fillSpecs(d, it.specs);
+    if (it?.specs && it.mode !== "skip" && (!before.has(d.id) || wanted(it.key))) fillSpecs(d, it.specs);
     if (before.has(d.id) || d.rack != null) continue;   // only devices made by this run, and never one that sits in a rack
     setOffColumn(doc, d, it && specKinds.has(it.kind) ? 0 : 1);
   }
