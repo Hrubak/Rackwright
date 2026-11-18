@@ -5,6 +5,7 @@ import { IS_WEB } from "../backend";
 import type { Doc } from "../types";
 import { clone } from "../edit";
 import { readImport } from "./read";
+import { DIAGRAM_ACCEPT, fmtSize, isDiagramKind, kindOf, pathOf, readDiagramFiles } from "./files";
 import { sideChoice, sidePatch, switchKind } from "./layout";
 import type { SideChoice } from "./layout";
 import type { ReadMode } from "./read";
@@ -15,7 +16,7 @@ import type { ImportSpec } from "./spec";
 
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "5px 12px", marginRight: 5, cursor: "pointer" } as const;
 const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "3px 5px" } as const;
-const FORMATS: [ReadMode, string][] = [["auto", "Automatic"], ["layout", "Rack layout list (top of rack first)"], ["rackmap", "RackMap text format"], ["csv", "CSV or spreadsheet"]];
+const FORMATS: [ReadMode, string][] = [["auto", "Automatic"], ["layout", "Rack layout list (top of rack first)"], ["rackmap", "RackMap text format"], ["csv", "CSV or spreadsheet"], ["diagram", "Diagram files (Visio, SVG, PDF, picture)"]];
 const MAX_BYTES = 5 * 1024 * 1024;
 const CHIP: Record<Action, { label: string; bg: Token; fg: Token }> = {
   add: { label: "Add", bg: "ok-bg", fg: "ok-text" },
@@ -39,6 +40,10 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   const [drag, setDrag] = useState(false);
   const [showWarn, setShowWarn] = useState(false);
   const [showLeft, setShowLeft] = useState(false);
+  const [picked, setPicked] = useState<File[]>([]); // several files or a folder: read together by readDiagramFiles
+  const [endUsers, setEndUsers] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
 
   const newUn = Math.max(1, parseInt(newU) || 42);
   const opts: ImportOpts = useMemo(() => ({ rackId: rackSel === "new" ? null : +rackSel, newRackName: "Imported rack", newRackU: newUn, growRack: grow }), [rackSel, newUn, grow]);
@@ -49,14 +54,32 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   const dry = useMemo(() => (plan ? applyImport(clone(doc), plan, opts) : null), [plan, doc, opts]);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const dirRef = useRef<HTMLInputElement>(null);
   const loadFile = async (f: File | undefined) => {
-    if (fileRef.current) fileRef.current.value = ""; // so the same file can be picked again
     if (!f) return;
     if (f.size > MAX_BYTES) { setErr("That file is over 5 MB."); return; }
-    try { setErr(""); setText(await f.text()); }
+    try { setErr(""); setPicked([]); setText(await f.text()); }
     catch { setErr("That file couldn't be read."); }
   };
-  const preview = () => {
+  /** One text file fills the box as before; anything else becomes a list read together. */
+  const addFiles = (list: File[]) => {
+    if (fileRef.current) fileRef.current.value = ""; // so the same file can be picked again
+    if (dirRef.current) dirRef.current.value = "";
+    if (!list.length) return;
+    if (list.length === 1 && kindOf(list[0].name) === "Text" && !list[0].webkitRelativePath) { loadFile(list[0]); return; }
+    setErr(""); setPicked(list);
+  };
+  const hasDiagram = picked.some((f) => isDiagramKind(kindOf(f.name)));
+  const preview = async () => {
+    if (picked.length) {
+      setBusy(true); setErr(""); setStatus("");
+      try {
+        const sp = await readDiagramFiles(picked, { endUsers, say: setStatus, web: IS_WEB, mode });
+        setSpec(sp); setOvr({}); setGrow(true);
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+      finally { setBusy(false); setStatus(""); }
+      return;
+    }
     if (text.length > MAX_BYTES) { setErr("That text is over 5 MB."); return; }
     try { setErr(""); setSpec(readImport(text, mode)); setOvr({}); setGrow(true); }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -108,12 +131,29 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
 
         {!plan && <div style={{ overflow: "auto" }}>
           <div {...(IS_WEB ? { onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDrag(true); }, onDragLeave: () => setDrag(false),
-              onDrop: (e: React.DragEvent) => { e.preventDefault(); setDrag(false); loadFile(e.dataTransfer.files[0]); } } : {})}
+              onDrop: (e: React.DragEvent) => { e.preventDefault(); setDrag(false); dropped(e.dataTransfer).then(addFiles); } } : {})}
             style={{ border: `1px dashed ${drag ? v("focus") : v("border")}`, borderRadius: 4, padding: 8, marginBottom: 8 }}>
-            {IS_WEB ? "Drop a file here, or choose one: " : "Choose a file: "}<input ref={fileRef} type="file" accept=".txt,.csv,.tsv,.md" onChange={(e) => loadFile(e.target.files?.[0])} />
-            <div style={{ opacity: 0.7, marginTop: 4 }}>The file stays on this computer. Or paste the text below.</div>
+            {IS_WEB ? "Drop files or a folder here, or choose some: " : "Choose files: "}<input ref={fileRef} type="file" multiple accept={DIAGRAM_ACCEPT} onChange={(e) => addFiles(Array.from(e.target.files ?? []))} />
+            {" "}<button style={btn} onClick={() => dirRef.current?.click()}>Choose a folder…</button>
+            <input ref={dirRef} type="file" style={{ display: "none" }} onChange={(e) => addFiles(Array.from(e.target.files ?? []))}
+              {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} />
+            <div style={{ opacity: 0.7, marginTop: 4 }}>The files stay on this computer. Or paste the text below.</div>
           </div>
-          <textarea style={{ ...inp, width: "100%", height: 240, boxSizing: "border-box" }} value={text} onChange={(e) => setText(e.target.value)} />
+          {picked.length > 0 ? <div style={{ border: `1px solid ${v("border-subtle")}`, borderRadius: 4, maxHeight: 240, overflow: "auto" }}>
+            <div style={{ padding: "4px 6px", display: "flex" }}><span style={{ flex: 1 }}>{picked.length} {picked.length === 1 ? "file" : "files"} chosen</span>
+              <a style={{ cursor: "pointer", color: v("link") }} onClick={() => setPicked([])}>Clear</a></div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
+              {picked.map((f, i) => <tr key={i} style={{ borderTop: `1px solid ${v("border-subtle")}` }}>
+                <td style={{ padding: "2px 6px", width: 90 }}>{kindOf(f.name) ?? "—"}</td>
+                <td style={{ padding: "2px 6px", wordBreak: "break-all" }}>{pathOf(f)}</td>
+                <td style={{ padding: "2px 6px", textAlign: "right", whiteSpace: "nowrap" }}>{fmtSize(f.size)}</td>
+              </tr>)}
+            </tbody></table>
+          </div>
+          : <textarea style={{ ...inp, width: "100%", height: 240, boxSizing: "border-box" }} value={text} onChange={(e) => setText(e.target.value)} />}
+          {hasDiagram && <label style={{ display: "block", marginTop: 8 }}>
+            <input type="checkbox" checked={endUsers} onChange={(e) => setEndUsers(e.target.checked)} /> Include end-user devices (PCs, laptops, printers, phones)
+          </label>}
           <div style={{ margin: "8px 0" }}>
             {FORMATS.map(([k, l]) => <label key={k} style={{ marginRight: 14 }}><input type="radio" name="fmt" checked={mode === k} onChange={() => setMode(k)} /> {l}</label>)}
           </div>
@@ -125,10 +165,11 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
               </select></label>
             {rackSel === "new" && <label>Rack height <input type="number" style={{ ...inp, width: 56 }} value={newU} onChange={(e) => setNewU(e.target.value)} /></label>}
           </div>}
+          {status && <div style={{ opacity: 0.8, marginBottom: 8 }}>{status}</div>}
           {err && <div style={{ color: v("danger"), marginBottom: 8 }}>{err}</div>}
           <div style={{ textAlign: "right" }}>
             <button style={btn} onClick={onClose}>Cancel</button>
-            <button style={{ ...btn, marginRight: 0 }} disabled={!text.trim()} onClick={preview}>Preview</button>
+            <button style={{ ...btn, marginRight: 0 }} disabled={busy || (!picked.length && !text.trim())} onClick={preview}>Preview</button>
           </div>
         </div>}
 
@@ -209,4 +250,28 @@ function HeightInput({ value, onCommit }: { value: number; onCommit: (h: number)
   };
   return <input type="number" min={1} style={{ ...inp, width: 44 }} value={draft ?? String(value)}
     onChange={(e) => setDraft(e.target.value)} onBlur={done} onKeyDown={(e) => e.key === "Enter" && done()} />;
+}
+
+const MAX_DEPTH = 4;
+type Entry = { isFile: boolean; isDirectory: boolean; name: string; file?: (ok: (f: File) => void, no: (e: unknown) => void) => void; createReader?: () => { readEntries(ok: (e: Entry[]) => void, no: (e: unknown) => void): void } };
+/** Files from a drop. Folders are walked up to 4 levels deep; each file remembers its path inside the folder. */
+async function dropped(dt: DataTransfer): Promise<File[]> {
+  const entries: Entry[] = Array.from(dt.items ?? []).map((i) => (i as unknown as { webkitGetAsEntry?: () => Entry | null }).webkitGetAsEntry?.() ?? null).filter((e): e is Entry => !!e);
+  if (!entries.some((e) => e.isDirectory)) return Array.from(dt.files);
+  const out: File[] = [];
+  const walk = async (e: Entry, path: string, depth: number): Promise<void> => {
+    if (e.isFile && e.file) {
+      const f = await new Promise<File | null>((ok) => e.file!(ok, () => ok(null)));
+      if (f) { Object.defineProperty(f, "webkitRelativePath", { value: path + e.name }); out.push(f); }
+    } else if (e.isDirectory && e.createReader && depth < MAX_DEPTH) {
+      const rd = e.createReader();
+      for (;;) { // readEntries returns a batch at a time until it is empty
+        const batch = await new Promise<Entry[]>((ok) => rd.readEntries(ok, () => ok([])));
+        if (!batch.length) break;
+        for (const c of batch) await walk(c, path + e.name + "/", depth + 1);
+      }
+    }
+  };
+  for (const e of entries) await walk(e, "", 0);
+  return out;
 }

@@ -4,7 +4,7 @@ import { parseRackmapText } from "./rackmap";
 import { csvToSpec, looksDelimited } from "./csv";
 import { parseLayout } from "./layout";
 
-export type ReadMode = "auto" | "layout" | "rackmap" | "csv";
+export type ReadMode = "auto" | "layout" | "rackmap" | "csv" | "diagram";
 
 const foundNothing = (s: ImportSpec) => s.links.length === 0 && !s.devices.some((d) => (d.kind || "device") === "device");
 
