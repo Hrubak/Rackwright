@@ -30,22 +30,32 @@ export interface VsdxLimits { part: number; total: number; pages: number }
 export const VSDX_LIMITS: VsdxLimits = { part: 50 * 1024 * 1024, total: 200 * 1024 * 1024, pages: 200 };
 const TOO_BIG = "the drawing is too big";
 
-export async function parseVsdx(data: ArrayBuffer | Uint8Array, fileName: string, limits: VsdxLimits = VSDX_LIMITS): Promise<DiagramModel[]> {
+export async function parseVsdx(data: ArrayBuffer | Uint8Array | JSZip, fileName: string, limits: VsdxLimits = VSDX_LIMITS): Promise<DiagramModel[]> {
   let zip: JSZip;
-  try { zip = await JSZip.loadAsync(data); } catch { throw new Error("not a .vsdx file"); }
+  try { zip = data instanceof JSZip ? data : await JSZip.loadAsync(data); } catch { throw new Error("not a .vsdx file"); }
   let total = 0;
-  const read = async (p: string) => {
+  const read = async (p: string): Promise<string | null> => {
     const f = zip.file(p); if (!f) return null;
-    const size = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
-    if (typeof size === "number") { // the zip says how big it will be: refuse before inflating
-      if (size > limits.part || total + size > limits.total) throw new Error(TOO_BIG);
-      total += size;
-      return f.async("string");
-    }
-    const s = await f.async("string"); // size unknown: count what came out
-    if (s.length > limits.part || total + s.length > limits.total) throw new Error(TOO_BIG);
-    total += s.length;
-    return s;
+    const declared = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+    if (typeof declared === "number" && (declared > limits.part || total + declared > limits.total)) throw new Error(TOO_BIG); // early exit; the file's own claim is not trusted below
+    return new Promise<string>((res, rej) => { // count what actually comes out and stop as soon as it is over a limit
+      const chunks: Uint8Array[] = []; let n = 0; const before = total;
+      const st = (f as unknown as { internalStream(t: "uint8array"): { on(e: string, cb: (...a: any[]) => void): any; pause(): void; resume(): void } }).internalStream("uint8array");
+      let done = false;
+      st.on("data", (c: Uint8Array) => {
+        if (done) return;
+        n += c.length;
+        if (n > limits.part || before + n > limits.total) { done = true; st.pause(); rej(new Error(TOO_BIG)); return; }
+        chunks.push(c);
+      });
+      st.on("error", (e: unknown) => { if (!done) { done = true; rej(e); } });
+      st.on("end", () => {
+        if (done) return; done = true; total = before + n;
+        const all = new Uint8Array(n); let o = 0; chunks.forEach((c) => { all.set(c, o); o += c.length; });
+        res(new TextDecoder().decode(all));
+      });
+      st.resume();
+    });
   };
   const masters = new Map<string, string>(), pageNames = new Map<number, string>();
   const mx = await read("visio/masters/masters.xml");

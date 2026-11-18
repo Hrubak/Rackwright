@@ -70,6 +70,13 @@ t("export cables are not links (known limit)", logical.links.length === 0);
   t("big part refused", await msg(await zipOf(1, " ".repeat(5000))) === "the drawing is too big");
   t("total over limit refused", await msg(await zipOf(3, " ".repeat(400))) === "the drawing is too big");
   t("too many pages refused", await msg(await zipOf(4)) === "the drawing is too big");
+  { // the zip header claims a small size, the data is large
+    const big = await JSZip.loadAsync(await zipOf(1, " ".repeat(5000)));
+    const ent = big.file("visio/pages/page1.xml") as unknown as { _data: { uncompressedSize: number } };
+    ent._data.uncompressedSize = 10;
+    let m2 = "ok"; try { await parseVsdx(big, "x.vsdx", lim); } catch (e) { m2 = (e as Error).message; }
+    t("lying size header still refused", m2 === "the drawing is too big", m2);
+  }
   t("small drawing within limits", await msg(await zipOf(2)) === "ok");
 }
 console.log(fails ? `${fails} FAILED` : "all passed");

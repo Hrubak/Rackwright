@@ -7,9 +7,15 @@ const VNS = "http://schemas.microsoft.com/visio/2003/SVGExtensions/";
 const hrefOk = (v: string) => v.replace(/[\u0000-\u0020]/g, "").startsWith("#");
 
 // CSS that can fetch something or hide what it fetches (escapes, url(), @import, image functions)
-const BAD_CSS = /\\|url\(|@import|image-set\(|image\(|src\(/i;
+const BAD_STYLE = /\\|@import|image-set\(|image\(|src\(/i;
 /** True when every url( in the value points at a local #id (quoted or not). */
 const urlsOk = (v: string) => !/url\(/i.test(v) || (v.match(/url\([^)]*\)?/gi) || []).every((u) => /^url\(\s*(["']?)#[^)]*\1\s*\)$/i.test(u.trim()));
+
+/** Style text is fine when it has no escapes, imports or image functions and every url( is local. */
+const styleOk = (v: string) => !BAD_STYLE.test(v) && !/expression\(/i.test(v) && urlsOk(v);
+
+/** Any attribute but style: no backslash (CSS escapes) and only local url(#…). Style is judged by styleOk. */
+const attrOk = (name: string, v: string) => /^style$/i.test(name) || (!/\\/.test(v) && urlsOk(v));
 
 /** String-level clean-up that works without a DOM. Pre-filter only; the DOM pass is the real one. */
 export function sanitizeSvgText(svg: string): string {
@@ -20,11 +26,11 @@ export function sanitizeSvgText(svg: string): string {
     .replace(/<foreignObject\b[^>]*>/gi, "")
     .replace(/<iframe\b[\s\S]*?<\/iframe\s*>/gi, "")
     .replace(/<iframe\b[^>]*>/gi, "")
-    .replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, (m, css) => (BAD_CSS.test(css) ? "" : m))
-    .replace(/\sstyle\s*=\s*"([^"]*)"/gi, (m, v) => (BAD_CSS.test(v) ? "" : m))
-    .replace(/\sstyle\s*=\s*'([^']*)'/gi, (m, v) => (BAD_CSS.test(v) ? "" : m))
-    .replace(/\s[\w:.-]+\s*=\s*"([^"]*)"/g, (m, v) => (urlsOk(v) ? m : ""))
-    .replace(/\s[\w:.-]+\s*=\s*'([^']*)'/g, (m, v) => (urlsOk(v) ? m : ""))
+    .replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, (m, css) => (styleOk(css) ? m : ""))
+    .replace(/\sstyle\s*=\s*"([^"]*)"/gi, (m, v) => (styleOk(v) ? m : ""))
+    .replace(/\sstyle\s*=\s*'([^']*)'/gi, (m, v) => (styleOk(v) ? m : ""))
+    .replace(/\s([\w:.-]+)\s*=\s*"([^"]*)"/g, (m, n, v) => (attrOk(n, v) ? m : ""))
+    .replace(/\s([\w:.-]+)\s*=\s*'([^']*)'/g, (m, n, v) => (attrOk(n, v) ? m : ""))
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
     .replace(/\s(?:xlink:)?href\s*=\s*"([^"]*)"/gi, (m, v) => (hrefOk(v) ? m : ""))
@@ -40,13 +46,12 @@ function sanitizeSvgDom(root: Element): void {
   [root, ...Array.from(root.querySelectorAll("*"))].forEach((e) => {
     const ln = e.localName.toLowerCase();
     if (e !== root && BAD_ELEMENTS.has(ln)) { e.remove(); return; }
-    if (ln === "style" && BAD_CSS.test(e.textContent || "")) { e.remove(); return; }
+    if (ln === "style" && !styleOk(e.textContent || "")) { e.remove(); return; }
     Array.from(e.attributes).forEach((a) => {
       const n = a.name.toLowerCase(), local = (a.localName || n).toLowerCase();
       if (/^on/.test(local) || /^on/.test(n)) e.removeAttribute(a.name);
       else if (local === "href" && !hrefOk(a.value)) e.removeAttribute(a.name);
-      else if (local === "style" && (BAD_CSS.test(a.value) || /expression\(/i.test(a.value))) e.removeAttribute(a.name);
-      else if (!urlsOk(a.value)) e.removeAttribute(a.name);
+      else if (local === "style" ? !styleOk(a.value) : !attrOk(local, a.value)) e.removeAttribute(a.name);
     });
   });
 }

@@ -32,4 +32,8 @@ t("image-set removed", !/evil/.test(sanitizeSvgText('<rect style="background:ima
 t("local url kept", sanitizeSvgText('<rect fill="url(#grad)"/>').includes('fill="url(#grad)"'));
 t("quoted local url kept", sanitizeSvgText('<rect fill="url(\'#grad\')"/>').includes("url('#grad')"));
 t("plain style kept", sanitizeSvgText('<rect style="fill:red"/>').includes('style="fill:red"'));
+t("escaped url in plain attribute removed", !/evil/.test(sanitizeSvgText('<rect fill="\\75rl(https://evil.example/a)"/>')));
+t("local url in style block survives", sanitizeSvgText('<svg><style>.a{fill:url(#g);font-size:12px}</style></svg>').includes("font-size:12px"));
+t("external url in style block dropped", !/evil/.test(sanitizeSvgText('<svg><style>.a{fill:url(https://evil.example/x)}</style></svg>')));
+t("local url in style attr survives", sanitizeSvgText('<rect style="fill:url(#g)"/>').includes("style="));
 if (fails) process.exit(1);
