@@ -1,6 +1,12 @@
 // npx tsx scripts/docx.test.ts — Word report export (synthetic data only)
 import { longDate, markerValues, replaceMarkers, scanMarkers, xmlText, type MarkerValues } from "../src/report/docxMarkers";
 import type { ReportModel } from "../src/report/model";
+import { buildReportModel } from "../src/report/model";
+import { buildBodyXml, pageBox, picKey, styleIds, type BodyPic } from "../src/report/docxBody";
+import type { ClientItem } from "../src/clients/store";
+import type { Doc } from "../src/types";
+import { readFileSync } from "node:fs";
+import { XMLValidator } from "fast-xml-parser";
 
 let fail = 0;
 const eq = (name: string, a: unknown, b: unknown) => {
@@ -114,6 +120,54 @@ eq("longDate", [longDate("2026-11-18"), longDate("2026-01-05"), longDate("soon")
 {
   const m = { title: "T", date: "2026-11-18", preparedFor: "F", preparedBy: "B", summary: "S", recommendations: "R", client: { name: "Example Client" }, sites: [{ name: "Head Office" }, { name: "Warehouse" }] } as unknown as ReportModel;
   eq("markerValues", markerValues(m), { CLIENT: "Example Client", SITE: "Head Office, Warehouse", DATE: "November 18, 2026", REPORT_TITLE: "T", PREPARED_FOR: "F", PREPARED_BY: "B", SUMMARY: "S", RECOMMENDATIONS: "R" });
+}
+
+// ---- body ----
+eq("styleIds", styleIds(`<w:styles><w:style w:type="paragraph" w:styleId="Kop1"><w:name w:val="heading 1"/></w:style><w:style w:type="paragraph" w:styleId="Kop2"><w:name w:val="Heading 2"/></w:style><w:style w:type="paragraph" w:styleId="Titel"><w:name w:val="Title"/></w:style><w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/></w:style></w:styles>`), { h1: "Kop1", h2: "Kop2", title: "Titel", table: "TableGrid" });
+eq("styleIds undefined", styleIds(undefined), {});
+const sect = (w: number, h: number, m: number) => `<w:sectPr><w:pgSz w:w="${w}" w:h="${h}"/><w:pgMar w:top="${m}" w:right="${m}" w:bottom="${m}" w:left="${m}"/></w:sectPr>`;
+eq("pageBox letter", pageBox(`<w:document><w:body><w:p/>${sect(12240, 15840, 1440)}</w:body></w:document>`), { textWidthEmu: 5943600, textHeightEmu: 8229600 });
+eq("pageBox a4", pageBox(`<w:document><w:body>${sect(11906, 16838, 1134)}</w:body></w:document>`), { textWidthEmu: (11906 - 2268) * 635, textHeightEmu: (16838 - 2268) * 635 });
+eq("pageBox uses body sectPr", pageBox(`<w:document><w:body><w:p><w:pPr>${sect(12240, 15840, 720)}</w:pPr></w:p>${sect(12240, 15840, 1440)}</w:body></w:document>`), { textWidthEmu: 5943600, textHeightEmu: 8229600 });
+eq("pageBox fallback", pageBox("<w:document><w:body/></w:document>"), { textWidthEmu: 5943600, textHeightEmu: 8229600 });
+{
+  const hl: Doc = JSON.parse(readFileSync("../Homelab.rack.json", "utf8"));
+  const client: ClientItem = {
+    key: "c1", name: "Example Client", notes: "",
+    sites: [
+      { id: 1, name: "Head Office", address: "1 Example St", notes: "", racks: [{ key: "r1", name: "MDF" }, { key: "r2", name: "Broken" }] },
+      { id: 2, name: "Warehouse", address: "", notes: "", racks: [] },
+    ],
+    links: [{ id: 1, site_a: 1, site_b: 2, kind: "VPN", provider: "Example IT", circuit: "C1", bandwidth: "100 Mbps", notes: "", a_end: null, b_end: null }],
+  };
+  const mk = (level: "overview" | "detailed", c = client, recommendations = "R") =>
+    buildReportModel({ client: c, docs: { r1: hl, r2: "Could not open file" }, options: { level, sites: "all", summary: "S", recommendations, date: "2026-11-17", prepared_for: "Example Client" }, company: "Example IT" });
+  const pics = new Map<string, BodyPic>();
+  let n = 1;
+  for (const k of [picKey.links, picKey.infra("r1"), picKey.face("r1", "front"), picKey.face("r1", "rear")]) pics.set(k, { relId: `rIdP${n}`, docPrId: n++, wEmu: 5000000, hEmu: 3000000, name: k });
+  const st = { h1: "Kop1", h2: "Kop2", table: "TableGrid" };
+  const base = { skipSummary: false, skipRecommendations: false };
+  const wrap = (b: string) => `<w:document xmlns:w="w" xmlns:wp="wp" xmlns:a="a" xmlns:pic="pic" xmlns:r="r"><w:body>${b}</w:body></w:document>`;
+  const ov = buildBodyXml(mk("overview"), pics, { styles: st, ...base });
+  const tx = texts(ov);
+  ok("overview text", ["Executive summary", "Totals", "Needs attention", "Head Office", "Warehouse", "Site links"].every((s) => tx.includes(s)), tx.slice(0, 200));
+  ok("overview no detail", !tx.includes("rear view") && !tx.includes("Full inventory"));
+  ok("overview ends with p", ov.endsWith("</w:p>") || ov.endsWith("<w:p/>"));
+  eq("overview valid xml", XMLValidator.validate(wrap(ov)), true);
+  ok("overview picture", ov.includes('r:embed="rIdP3"') && ov.includes('<wp:extent cx="5000000" cy="3000000"/>') && ov.includes('<wp:docPr id="3"'));
+  const de = buildBodyXml(mk("detailed"), pics, { styles: st, ...base });
+  const dt = texts(de);
+  ok("detailed text", ["rear view", "Full inventory", "Switch ", "ports used", "Could not load Broken."].every((s) => dt.includes(s)));
+  eq("detailed valid xml", XMLValidator.validate(wrap(de)), true);
+  ok("skipSummary", !texts(buildBodyXml(mk("overview"), pics, { styles: st, ...base, skipSummary: true })).includes("Executive summary"));
+  ok("skipRecommendations", !texts(buildBodyXml(mk("overview"), pics, { styles: st, ...base, skipRecommendations: true })).includes("Recommendations"));
+  ok("empty recommendations", !texts(buildBodyXml(mk("overview", client, ""), pics, { styles: st, ...base })).includes("Recommendations"));
+  ok("missing picture", texts(buildBodyXml(mk("overview"), new Map(), { styles: st, ...base })).includes("This diagram could not be drawn."));
+  const fb = buildBodyXml(mk("overview"), pics, { styles: {}, ...base });
+  ok("heading fallback", fb.includes("<w:b/>") && fb.includes('<w:sz w:val="32"/>') && !fb.includes("pStyle"));
+  const esc = buildBodyXml(mk("overview", { ...client, sites: [{ ...client.sites[0], name: "A & B <x>" }] }), pics, { styles: st, ...base });
+  ok("escaped", esc.includes("A &amp; B &lt;x&gt;"));
+  eq("escaped valid xml", XMLValidator.validate(wrap(esc)), true);
 }
 
 process.exit(fail ? 1 : 0);
