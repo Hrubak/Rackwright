@@ -45,6 +45,11 @@ export interface Readers {
 /** `web` picks the wording of the reader-download warnings; `mode` is how PDF and text files are read. */
 export interface DiagramOpts { endUsers: boolean; say: (s: string) => void; web?: boolean; mode?: ReadMode; readers?: Readers }
 
+const MAX_SKIP_WARNINGS = 10;
+
+/** An error that also carries the per-file warnings collected so far, so the dialog can list them. */
+export class ImportFilesError extends Error { constructor(message: string, public warnings: string[]) { super(message); } }
+
 export const MAX_TEXT_BYTES = 5 * 1024 * 1024;
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -53,7 +58,7 @@ let pictureReady = false, pdfReady = false; // the first use of each reader down
 function mergeDevice(ex: ImportDevice, d: ImportDevice) {
   for (const [k, v] of Object.entries(d.fields)) if (v && !(ex.fields as Record<string, unknown>)[k]) (ex.fields as Record<string, unknown>)[k] = v;
   for (const [k, v] of Object.entries(d.specs)) if (!ex.specs[k]) ex.specs[k] = v;
-  if (ex.rack === undefined && d.rack !== undefined) { ex.rack = d.rack; ex.u = d.u; ex.height = d.height; }
+  if (ex.rack === undefined && d.rack !== undefined) { ex.rack = d.rack; ex.u = d.u; ex.height = d.height; ex.offRackIfNew = false; }
   if ((!ex.type || ex.type === "Other") && d.type && d.type !== "Other") ex.type = d.type;
   if (!ex.ports && d.ports) ex.ports = d.ports;
 }
@@ -82,7 +87,7 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
   const warnings: string[] = [];
   const models: DiagramModel[] = [];
   const textSpecs: ImportSpec[] = [];
-  let readable = 0;
+  let readable = 0, unknown = 0;
   const readerWarn = (name: string, what: string) =>
     `${name}: the ${what} couldn't load. ${opts.web ? "Try again." : "Check the internet connection and try again."}`;
 
@@ -90,25 +95,27 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
     const name = pathOf(f);
     const kind = kindOf(f.name);
     try {
-      if (!kind) { warnings.push(`${name}: this kind of file can't be read — skipped.`); continue; }
+      if (!kind) { if (++unknown <= MAX_SKIP_WARNINGS) warnings.push(`${name}: this kind of file can't be read — skipped.`); continue; }
       if (kind === "Visio (old)") { warnings.push(`${name}: old Visio file — open it in Visio and save it as .vsdx first.`); continue; }
       if (f.size > MAX_FILE_BYTES) { warnings.push(`${name}: the file is over 50 MB — skipped.`); continue; }
       if (kind === "Text" && f.size > MAX_TEXT_BYTES) { warnings.push(`${name}: the file is over 5 MB — skipped.`); continue; }
-      readable++;
+
       say(`Reading ${name}…`);
       if (kind === "Visio") {
         const ms = (await parseVsdx(await f.arrayBuffer(), name)).filter((m) => m.nodes.length);
         if (!ms.length) warnings.push(`${name}: no shapes found.`);
-        models.push(...ms);
+        models.push(...ms); readable++;
       } else if (kind === "SVG") {
         const m = await svgRead(await f.text(), name);
         if (!m.nodes.length) warnings.push(`${name}: no shapes found.`); else models.push(m);
+        readable++;
       } else if (kind === "Picture") {
         if (!pictureReady) say("Loading the picture reader (first time only, about 10 MB)…");
         const m = await pictureRead(f as unknown as Blob, name);
         pictureReady = true;
         if (!m.nodes.length) warnings.push(m.words === 0 ? `${name}: no readable text was found.` : `${name}: no shapes found.`);
         else models.push(m);
+        readable++;
       } else {
         let text: string;
         if (kind === "PDF") {
@@ -116,10 +123,10 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
           text = await pdfRead(await f.arrayBuffer());
           pdfReady = true;
         } else text = await f.text();
-        if (!text.trim()) { warnings.push(`${name}: no readable text was found.`); continue; }
+        if (!text.trim()) { warnings.push(`${name}: no readable text was found.`); readable++; continue; }
         const s = readImport(text, mode);
         s.warnings = s.warnings.map((w) => `${name}: ${w}`);
-        textSpecs.push(s);
+        textSpecs.push(s); readable++;
       }
     } catch (e) {
       if (isReaderError(e)) warnings.push(readerWarn(name, kind === "PDF" ? "PDF reader" : "picture reader"));
@@ -127,7 +134,8 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
     }
   }
 
-  if (!readable) throw new Error("None of these files can be read — add a .vsdx, .svg, .pdf or picture file.");
+  if (unknown > MAX_SKIP_WARNINGS) warnings.push(`${unknown - MAX_SKIP_WARNINGS} other ${unknown - MAX_SKIP_WARNINGS === 1 ? "file was" : "files were"} skipped.`);
+  if (!readable) throw new ImportFilesError("None of these files can be read — add a .vsdx, .svg, .pdf or picture file.", warnings);
 
   const specs: ImportSpec[] = [];
   if (models.length) specs.push(diagramToSpec(models, { endUsers: opts.endUsers }));
@@ -142,6 +150,6 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
   if (models.length) out.kind = "diagram";
   out.warnings = [...warnings, ...out.warnings];
   const nothing = out.links.length === 0 && !out.devices.some((d) => (d.kind || "device") === "device");
-  if (nothing && files.some((f) => isDiagramKind(kindOf(f.name)))) throw new Error("No equipment was found in these files.");
+  if (nothing && files.some((f) => isDiagramKind(kindOf(f.name)))) throw new ImportFilesError("No equipment was found in these files.", out.warnings);
   return out;
 }

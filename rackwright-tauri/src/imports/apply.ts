@@ -109,7 +109,7 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
       jobs.push({ row, d: m, r, u: x.u ?? (same ? m.u : null), fresh: false });
       continue;
     }
-    const offRack = plan.kind === "diagram" && x.rack === undefined && x.u == null; // drawn outside any rack: off-rack, not the target rack
+    const offRack = !!x.offRackIfNew && x.rack === undefined && x.u == null; // drawn outside any rack: off-rack, not the target rack
     jobs.push({ row, d: makeDevice(row), r: offRack ? null : rackOf(x.rack), u: x.u, fresh: true });
   }
 

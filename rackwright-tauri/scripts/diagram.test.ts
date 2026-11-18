@@ -62,6 +62,10 @@ const sw = node("a", "Switch", "EX-SW01", 0, 0, 5, 5), srv = node("b", "Server",
   eq("link with ports", sp.links, [{ a: "EX-SW01", ap: "Gi1/0/1", b: "EX-SRV01", bp: "eth0" }]);
 }
 
+{
+  const sp = diagramToSpec([model([RACK, inRack, outside])], E);
+  eq("flag set for outside device", sp.devices.filter((d) => d.offRackIfNew).length > 0 && sp.devices.filter((d) => d.rack !== undefined).every((d) => !d.offRackIfNew), true);
+}
 const adoc = (): Doc => ({ v: 1, nid: 100, racks: [{ id: 1, name: "EX-R1", u: 42, x: 0, y: 0 }], cables: [], devices: [] }) as unknown as Doc;
 const opts = { rackId: 1, newRackName: "New", newRackU: 42, growRack: false };
 {

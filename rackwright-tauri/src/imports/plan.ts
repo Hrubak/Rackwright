@@ -161,7 +161,7 @@ function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
     }
     if (!hit) {
       const row: Row = { id, dev: d, match: null, action: "add", diffs: [], on: true };
-      if (spec.kind === "diagram" && d.rack === undefined && d.u == null) row.offRack = true;
+      if (d.offRackIfNew && d.rack === undefined && d.u == null) row.offRack = true;
       rows.push(row);
       pending.push(row);
       return;

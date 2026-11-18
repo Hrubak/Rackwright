@@ -85,6 +85,27 @@ async function makeVsdx(): Promise<Uint8Array> {
   const big = await readDiagramFiles([fake("a.vsdx", vs), fake("big.png", "", 51 * 1024 * 1024)], o);
   t("50 MB cap", big.warnings.includes("big.png: the file is over 50 MB — skipped."));
 
+
+  // per-device off-rack flag in a mixed set; warnings travel with the errors; skipped-file grouping
+  {
+    const mk = (n: string, t: string, l: string, x: number) => ({ id: n, title: t, label: l, data: {}, x, y: 0, w: 5, h: 5 });
+    const svgOk = { svg: async (_t: string, n: string) => ({ source: n, nodes: [mk("a", "Switch", "EX-SW09", 100), mk("b", "Server", "EX-SRV09", 120)], links: [], yUp: false }) };
+    const mx = await readDiagramFiles([fake("a.svg", "<svg/>"), fake("b.txt", "42U\nEX-TXT01\n")], { ...o, readers: svgOk });
+    const dv = mx.devices.find((d) => d.name === "EX-SW09")!, tx = mx.devices.find((d) => d.name === "EX-TXT01")!;
+    t("diagram device offRackIfNew, text device not", dv?.offRackIfNew === true && !!tx && !tx.offRackIfNew, JSON.stringify([dv?.offRackIfNew, tx?.offRackIfNew]));
+  }
+  {
+    let er: unknown = null;
+    try { await readDiagramFiles([fake("a.png", "x")], { ...o, readers: bad }); } catch (e) { er = e; }
+    const w = (er as { warnings?: string[] })?.warnings ?? [];
+    t("error carries reader warning", w.includes("a.png: the picture reader couldn't load. Check the internet connection and try again."), w.join("|"));
+    er = null;
+    try { await readDiagramFiles([fake("a.vsd", "x")], o); } catch (e) { er = e; }
+    t("lone .vsd error carries old-Visio warning", ((er as { warnings?: string[] })?.warnings ?? []).some((x) => /old Visio file/.test(x)));
+    const junk = Array.from({ length: 13 }, (_, i) => fake(`j${i}.dat`, "x"));
+    const g = await readDiagramFiles([fake("a.vsdx", vs), ...junk], o);
+    t("skipped warnings grouped", g.warnings.filter((x) => /can't be read — skipped/.test(x)).length === 10 && g.warnings.includes("3 other files were skipped."), g.warnings.length + "");
+  }
   console.log(fails ? `${fails} failed` : "0 failed");
   if (fails) process.exit(1);
 })();

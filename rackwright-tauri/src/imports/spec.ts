@@ -10,6 +10,7 @@ export interface ImportDevice {
   u: number | null; // lowest U, null = unknown
   height: number | null;
   heightGuessed?: boolean;
+  offRackIfNew?: boolean; // drawn outside any rack shape: a new device goes off-rack, not into the target rack
   modelGuessed?: boolean; // the model came from a catalog guess: it may fill a blank model but never replaces a real one
   cols?: number;
   side?: number;

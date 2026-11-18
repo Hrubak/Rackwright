@@ -74,14 +74,14 @@ export function diagramToSpec(input: DiagramModel[], opts: { endUsers: boolean }
         d.rack = rk.name;
         d.u = Math.max(1, Math.min(rk.units, Math.round(fromBottom / us) + 1));
         d.height = Math.max(1, Math.min(rk.units, Math.round(n.h / us)));
-      }
+      } else d.offRackIfNew = true;
       const key = nk(d.name);
       idToName.set(n.id, d.name);
       const ex = byKey.get(key);
       if (ex) {
         for (const [k, v] of Object.entries(d.fields)) if (v && !(ex.fields as Record<string, unknown>)[k]) (ex.fields as Record<string, unknown>)[k] = v;
         for (const [k, v] of Object.entries(d.specs)) if (!ex.specs[k]) ex.specs[k] = v;
-        if (ex.rack === undefined && d.rack) { ex.rack = d.rack; ex.u = d.u; ex.height = d.height; }
+        if (ex.rack === undefined && d.rack) { ex.rack = d.rack; ex.u = d.u; ex.height = d.height; ex.offRackIfNew = false; }
         if ((!ex.type || ex.type === "Other") && d.type && d.type !== "Other") ex.type = d.type;
       } else { byKey.set(key, d); devices.push(d); }
     });

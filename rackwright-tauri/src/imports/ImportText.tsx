@@ -5,7 +5,7 @@ import { IS_WEB } from "../backend";
 import type { Doc } from "../types";
 import { clone } from "../edit";
 import { readImport } from "./read";
-import { DIAGRAM_ACCEPT, fmtSize, isDiagramKind, kindOf, pathOf, readDiagramFiles } from "./files";
+import { DIAGRAM_ACCEPT, ImportFilesError, fmtSize, isDiagramKind, kindOf, pathOf, readDiagramFiles } from "./files";
 import { sideChoice, sidePatch, switchKind } from "./layout";
 import type { SideChoice } from "./layout";
 import type { ReadMode } from "./read";
@@ -37,6 +37,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   const [grow, setGrow] = useState(true);
   const [ovr, setOvr] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState("");
+  const [errNotes, setErrNotes] = useState<string[]>([]); // per-file warnings that explain a read error
   const [drag, setDrag] = useState(false);
   const [showWarn, setShowWarn] = useState(false);
   const [showLeft, setShowLeft] = useState(false);
@@ -63,20 +64,21 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   };
   /** One text file fills the box as before; anything else becomes a list read together. */
   const addFiles = (list: File[]) => {
+    if (busy) return; // the list must not change under a running read
     if (fileRef.current) fileRef.current.value = ""; // so the same file can be picked again
     if (dirRef.current) dirRef.current.value = "";
     if (!list.length) return;
     if (list.length === 1 && kindOf(list[0].name) === "Text" && !list[0].webkitRelativePath) { loadFile(list[0]); return; }
-    setErr(""); setPicked(list);
+    setErr(""); setErrNotes([]); setPicked(list);
   };
   const hasDiagram = picked.some((f) => isDiagramKind(kindOf(f.name)));
   const preview = async () => {
     if (picked.length) {
-      setBusy(true); setErr(""); setStatus("");
+      setBusy(true); setErr(""); setErrNotes([]); setStatus("");
       try {
         const sp = await readDiagramFiles(picked, { endUsers, say: setStatus, web: IS_WEB, mode });
         setSpec(sp); setOvr({}); setGrow(true);
-      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); if (e instanceof ImportFilesError) setErrNotes(e.warnings); }
       finally { setBusy(false); setStatus(""); }
       return;
     }
@@ -114,7 +116,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
 
   const where = (r: Row) => {
     const d = r.dev;
-    const rk = d.rack === null ? "Off-rack" : d.rack ?? (rackSel === "new" ? "New rack" : rackName);
+    const rk = d.rack === null || r.offRack ? "Off-rack" : d.rack ?? (rackSel === "new" ? "New rack" : rackName);
     return d.u != null ? `${rk} U${d.u}${d.side ? " side" : ""}${d.face && d.face !== "front" ? " " + d.face : ""}` : rk;
   };
   const rowOf = (id: string) => rowById.get(id);
@@ -131,17 +133,17 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
 
         {!plan && <div style={{ overflow: "auto" }}>
           <div {...(IS_WEB ? { onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDrag(true); }, onDragLeave: () => setDrag(false),
-              onDrop: (e: React.DragEvent) => { e.preventDefault(); setDrag(false); dropped(e.dataTransfer).then(addFiles); } } : {})}
+              onDrop: (e: React.DragEvent) => { e.preventDefault(); setDrag(false); if (busy) return; dropped(e.dataTransfer).then(addFiles); } } : {})}
             style={{ border: `1px dashed ${drag ? v("focus") : v("border")}`, borderRadius: 4, padding: 8, marginBottom: 8 }}>
-            {IS_WEB ? "Drop files or a folder here, or choose some: " : "Choose files: "}<input ref={fileRef} type="file" multiple accept={DIAGRAM_ACCEPT} onChange={(e) => addFiles(Array.from(e.target.files ?? []))} />
-            {" "}<button style={btn} onClick={() => dirRef.current?.click()}>Choose a folder…</button>
+            {IS_WEB ? "Drop files or a folder here, or choose some: " : "Choose files: "}<input ref={fileRef} type="file" multiple disabled={busy} accept={DIAGRAM_ACCEPT} onChange={(e) => addFiles(Array.from(e.target.files ?? []))} />
+            {" "}<button style={btn} disabled={busy} onClick={() => dirRef.current?.click()}>Choose a folder…</button>
             <input ref={dirRef} type="file" style={{ display: "none" }} onChange={(e) => addFiles(Array.from(e.target.files ?? []))}
               {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} />
             <div style={{ opacity: 0.7, marginTop: 4 }}>The files stay on this computer. Or paste the text below.</div>
           </div>
           {picked.length > 0 ? <div style={{ border: `1px solid ${v("border-subtle")}`, borderRadius: 4, maxHeight: 240, overflow: "auto" }}>
             <div style={{ padding: "4px 6px", display: "flex" }}><span style={{ flex: 1 }}>{picked.length} {picked.length === 1 ? "file" : "files"} chosen</span>
-              <a style={{ cursor: "pointer", color: v("link") }} onClick={() => setPicked([])}>Clear</a></div>
+              <button style={{ ...btn, marginRight: 0, padding: "0 8px" }} disabled={busy} onClick={() => setPicked([])}>Clear</button></div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
               {picked.map((f, i) => <tr key={i} style={{ borderTop: `1px solid ${v("border-subtle")}` }}>
                 <td style={{ padding: "2px 6px", width: 90 }}>{kindOf(f.name) ?? "—"}</td>
@@ -167,6 +169,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
           </div>}
           {status && <div style={{ opacity: 0.8, marginBottom: 8 }}>{status}</div>}
           {err && <div style={{ color: v("danger"), marginBottom: 8 }}>{err}</div>}
+          {err && errNotes.map((w, i) => <div key={i} style={{ opacity: 0.7, marginBottom: 2 }}>Note: {w}</div>)}
           <div style={{ textAlign: "right" }}>
             <button style={btn} onClick={onClose}>Cancel</button>
             <button style={{ ...btn, marginRight: 0 }} disabled={busy || (!picked.length && !text.trim())} onClick={preview}>Preview</button>
