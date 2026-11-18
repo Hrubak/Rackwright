@@ -70,8 +70,8 @@ export function buildReportModel(input: { client: ClientItem; docs: Record<strin
       provider: l.provider, circuit: l.circuit, bandwidth: l.bandwidth,
     }));
   const today = options.date || todayIso();
-  // Run on the whole client so IP clashes with other sites still show, then keep the chosen sites; "not checked on site" waits for Site visit.
-  const attention = clientAlerts(client, docs, today).filter((a) => a.kind !== "stale" && a.rackKey != null && keep.has(a.rackKey));
+  // Run on the whole client so IP clashes with other sites still show, then keep the chosen sites. Includes racks not checked on site.
+  const attention = clientAlerts(client, docs, today).filter((a) => a.rackKey != null && keep.has(a.rackKey));
   const power: ReportModel["power"] = [];
   for (const sec of sites) for (const r of sec.racks) {
     if (!r.doc) continue;

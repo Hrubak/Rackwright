@@ -63,9 +63,19 @@ eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), tru
     { id: 1, name: "Site A", address: "", notes: "", racks: [{ key: "a", name: "A" }] },
     { id: 2, name: "Site B", address: "", notes: "", racks: [{ key: "b", name: "B" }] }] };
   const m3 = buildReportModel({ client: c3, docs: { a: mkDoc("NAS-A", "10.0.0.5"), b: mkDoc("NAS-B", "10.0.0.5") }, options: { ...opts, sites: [1] }, company: "x" });
-  eq("ip clash kept for site A", m3.attention.map((a) => [a.kind, a.rackKey]), [["ip", "a"]]);
-  eq("no stale in report", m3.attention.some((a) => a.kind === "stale"), false);
+  eq("ip clash kept for site A", m3.attention.map((a) => [a.kind, a.rackKey]), [["ip", "a"], ["stale", "a"]]);
   eq("power site id", m3.power.map((p) => p.siteId), [1]);
+}
+
+// racks not checked on site are listed in the report
+{
+  const mkRack = (lastVerified?: string): Doc => ({ v: 1, nid: 20, racks: [{ id: 1, name: "Rack Example", u: 12, x: 0, y: 0, ...(lastVerified ? { last_verified: lastVerified } : {}) }],
+    devices: [{ id: 1, name: "Example Switch", type: "Switch", u_size: 1, rack: 1, u: 1, side: 0, half: false, rows: 1, fx: 0, fy: 0, face: "front", model: "", ports: [], ip: "" } as any], cables: [] });
+  const c4: ClientItem = { ...client, links: [], sites: [{ id: 1, name: "Site C", address: "", notes: "", racks: [{ key: "u", name: "U" }] }] };
+  const unchecked = buildReportModel({ client: c4, docs: { u: mkRack() }, options: opts, company: "x" });
+  eq("report counts unchecked racks", unchecked.attention.map((a) => [a.kind, a.level, a.rackKey]), [["stale", "info", "u"]]);
+  const checked = buildReportModel({ client: c4, docs: { u: mkRack("2026-11-17") }, options: opts, company: "x" });
+  eq("checked rack not listed", checked.attention, []);
 }
 
 console.log(fail ? `${fail} failed` : "all passed");
