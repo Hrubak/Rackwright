@@ -20,6 +20,9 @@ const NS: [string, string][] = [
 ];
 const RELS_HEAD = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
 
+/** Write a part without adding folder entries (Word does not need them). */
+const put = (z: JSZip, name: string, data: string | Uint8Array) => z.file(name, data, { createFolders: false, compression: "DEFLATE" });
+
 async function open(bytes: Uint8Array): Promise<JSZip | null> {
   try { return await JSZip.loadAsync(bytes); } catch { return null; }
 }
@@ -36,12 +39,12 @@ export async function checkDocxTemplate(bytes: Uint8Array): Promise<string | nul
 export async function blankTemplate(): Promise<Uint8Array> {
   const W = NS[0][1];
   const z = new JSZip();
-  z.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
-  z.file("_rels/.rels", `${RELS_HEAD}<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
-  z.file("word/_rels/document.xml.rels", `${RELS_HEAD}<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  put(z, "[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+  put(z, "_rels/.rels", `${RELS_HEAD}<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  put(z, "word/_rels/document.xml.rels", `${RELS_HEAD}<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
   const style = (type: string, id: string, name: string, extra = "", def = "") =>
     `<w:style w:type="${type}"${def} w:styleId="${id}"><w:name w:val="${name}"/>${extra}</w:style>`;
-  z.file("word/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="${W}">` +
+  put(z, "word/styles.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="${W}">` +
     style("paragraph", "Normal", "Normal", "<w:qFormat/>", ' w:default="1"') +
     style("paragraph", "Title", "Title", `<w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="52"/></w:rPr>`) +
     style("paragraph", "Heading1", "heading 1", `<w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="360" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/></w:rPr>`) +
@@ -49,7 +52,7 @@ export async function blankTemplate(): Promise<Uint8Array> {
     style("table", "TableGrid", "Table Grid", `<w:basedOn w:val="TableNormal"/><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr>`) +
     `</w:styles>`);
   const p = (t: string, style = "") => `<w:p>${style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ""}<w:r><w:t xml:space="preserve">${t}</w:t></w:r></w:p>`;
-  z.file("word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>` +
+  put(z, "word/document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>` +
     p("{{REPORT_TITLE}}", "Title") + p("Prepared for {{PREPARED_FOR}}") + p("Prepared by {{PREPARED_BY}}") + p("{{DATE}}") +
     `<w:p><w:r><w:br w:type="page"/></w:r></w:p>` + p("{{RACKWRIGHT}}") +
     `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`);
@@ -109,7 +112,7 @@ export async function buildDocx(input: { template: Uint8Array; model: ReportMode
     while (usedRel.has(`rIdRw${id}`)) id++;
     const relId = `rIdRw${id}`;
     usedRel.add(relId);
-    zip.file(name, pic.png, { compression: "DEFLATE" });
+    put(zip, name, pic.png);
     relXml.push(`<Relationship Id="${relId}" Type="${REL_IMAGE}" Target="${name.slice(5)}"/>`);
     let w = (pic.wPx / pic.dpi) * EMU_IN, h = (pic.hPx / pic.dpi) * EMU_IN;
     const k = Math.min(1, box.textWidthEmu / w, box.textHeightEmu / h);
@@ -119,10 +122,10 @@ export async function buildDocx(input: { template: Uint8Array; model: ReportMode
   if (relXml.length) {
     const add = relXml.join("");
     rels = hadRels ? rels!.replace(/<\/Relationships>\s*$/, `${add}</Relationships>`) : `${RELS_HEAD}${add}</Relationships>`;
-    zip.file(relsPath, rels);
+    put(zip, relsPath, rels!);
     const ct = await zip.file("[Content_Types].xml")?.async("string");
     if (ct !== undefined && !/<Default\b[^>]*\bExtension="png"/i.test(ct)) {
-      zip.file("[Content_Types].xml", ct.replace(/<\/Types>\s*$/, `<Default Extension="png" ContentType="image/png"/></Types>`));
+      put(zip, "[Content_Types].xml", ct.replace(/<\/Types>\s*$/, `<Default Extension="png" ContentType="image/png"/></Types>`));
     }
   }
 
@@ -131,13 +134,13 @@ export async function buildDocx(input: { template: Uint8Array; model: ReportMode
   const res = replaceMarkers(docXml, values, body);
   if (res.rackwright === "shared") notes.push(NOTE_SHARED);
   else if (res.rackwright === "missing") notes.push(NOTE_MISSING);
-  zip.file("word/document.xml", addNamespaces(res.xml));
+  put(zip, "word/document.xml", addNamespaces(res.xml));
 
   for (const name of Object.keys(zip.files)) {
     if (!/^word\/(header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(name)) continue;
     const xml = await zip.file(name)!.async("string");
     const out = replaceMarkers(xml, values).xml;
-    if (out !== xml) zip.file(name, out);
+    if (out !== xml) put(zip, name, out);
   }
 
   const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
