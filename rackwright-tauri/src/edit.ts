@@ -365,19 +365,20 @@ function catalogLookup(name: string, u: number | null): Tpl | null {
       const key = "r" + m[1] + (m[2] || "");
       pick = cands.filter((t) => (t.short || "").toLowerCase() === "pe-" + key).sort((x, y) => x.plate.bays - y.plate.bays)[0];
     }
-    return sized(pick || byShort(u === 1 ? "PE-R650" : "PE-R750"));
+    return sized(pick || (u == null ? undefined : byShort(u === 1 ? "PE-R650" : "PE-R750")));
   }
   if (/dream\s*router|\budr7?\b/.test(n)) return sized(byShort(n.includes("7") ? "UDR7" : "UDR"));
   if (/unifi|usw|ubiquiti/.test(n)) {
     const cands = pool.filter((t) => t.plate.k === "unifi");
-    return sized(cands.find((t) => t.model === (n.includes("48") ? "UniFi Switch Pro 48" : "UniFi Switch Pro 24")) || cands[0]);
+    if (u == null && !/\b(24|48)\b/.test(n)) return null;
+    return sized(cands.find((t) => t.model === (n.includes("48") ? "UniFi Switch Pro 48" : "UniFi Switch Pro 24")) || (u == null ? undefined : cands[0]));
   }
   if (/synology|\bds\d{3}|\brs\d{3,4}/.test(n)) {
     const rack = /\brs\d{3,4}/.test(n);
     const cands = pool.filter((t) => t.plate.k === (rack ? "syn_rack" : "syn_desk"));
     m = /\b(ds|rs)(\d{3,4})(rp)?(\+)?/.exec(n);
     const pick = m ? byShort("NAS-" + (m[1] + m[2] + (m[3] || "") + (m[4] || "")).toUpperCase()) : undefined;
-    return sized(pick || cands.find((t) => t.u_size === u) || cands[0]);
+    return sized(pick || (u == null ? undefined : cands.find((t) => t.u_size === u) || cands[0]));
   }
   // Other vendors (Cisco, Meraki, Fortinet, SonicWall, APC...): longest short/model name found in the text
   const key = n.replace(/[^a-z0-9+]/g, "");

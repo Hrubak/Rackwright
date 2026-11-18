@@ -1,5 +1,7 @@
 // npx tsx scripts/imports.test.ts — RackMap text and CSV readers (synthetic data only)
 import { parseRackmapText } from "../src/imports/rackmap";
+import { buildFromText } from "../src/edit";
+import type { Doc } from "../src/types";
 import { parseLayout, placeLayout, guessHeight } from "../src/imports/layout";
 import { csvToSpec, looksDelimited, parseDelimited } from "../src/imports/csv";
 
@@ -73,5 +75,20 @@ const old = parseLayout("Rack1\n- Panel A - (2U)\n- Open - (12U)\n");
 placeLayout(old, 14);
 eq("old list syntax", [old.racks[0].name, old.devices.map((d) => [d.kind, d.name, d.u, d.height])], ["Rack1", [["device", "Panel A", 13, 2], ["empty", "Empty", 1, 12]]]);
 
+const nm1 = (s: string) => { const d = parseLayout(s).devices[0]; return [d.kind || "device", d.name, d.height]; };
+eq("height leading", nm1("1U Patch Panel"), ["device", "Patch Panel", 1]);
+eq("height paren mid", nm1("Switch (2U) uplink"), ["device", "Switch uplink", 2]);
+eq("height old", nm1("- Panel A - (2U)"), ["device", "Panel A", 2]);
+eq("height keeps host", nm1("Dell R740 2U esxi.example.com"), ["device", "Dell R740 esxi.example.com", 2]);
+eq("height paren first", nm1("(2U) Switch"), ["device", "Switch", 2]);
+const old2 = parseLayout("Rack1\n- Panel A - (2U)\n- Open - (12U)\nRack2\n- Switch B - (2U)\n- Open - (12U)\n");
+placeLayout(old2, 14);
+const bd: Doc = { v: 1, nid: 1, racks: [], devices: [], cables: [] };
+buildFromText(bd, "Rack1\n- Panel A - (2U)\n- Open - (12U)\nRack2\n- Switch B - (2U)\n- Open - (12U)\n");
+const want = bd.devices.map((d) => [d.name, bd.racks.find((r) => r.id === d.rack)!.name, d.u]);
+eq("old two racks", old2.devices.filter((d) => d.kind === "device").map((d) => [d.name, d.rack, d.u]), want);
+eq("empty strict", ["Spare UPS battery", "Open vSwitch host", "1U Switch (free ports on 5-8)", "Free space above is reserved for the new firewall."].map((s) => nm1(s)[0]), ["device", "device", "device", "note"]);
+eq("empty yes", ["1 U RACK EMPTY SPACE", "Empty (3U)", "Open"].map((s) => nm1(s).slice(0, 1).concat(parseLayout(s).devices[0].height as number)), [["empty", 1], ["empty", 3], ["empty", 1]]);
+eq("unknown synology guessed", [guessHeight("Synology RS9999").guessed], [true]);
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

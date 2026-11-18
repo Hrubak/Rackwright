@@ -5,7 +5,6 @@ import { guessType, type ImpFace, type ImportDevice, type ImportSpec } from "./s
 const BULLET = /^\s*(?:[-*•]|\d+\.)\s+/;
 const HEIGHT_PAREN = /\(\s*(\d+)\s*U\s*\)/i;
 const HEIGHT_TOKEN = /(?:^|\s)(\d+)\s*U(?=\s|$)/i;
-const EMPTY_WORD = /^(open|empty|free|spare|vacant|available)\b/i;
 
 /** Height from the catalog when the name matches a template, else a type default. */
 export function guessHeight(name: string): { height: number; guessed: boolean } {
@@ -20,30 +19,33 @@ export function guessHeight(name: string): { height: number; guessed: boolean } 
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
+const EMPTY_KEY = new Set(["empty", "open", "free", "spare", "vacant"]);
+const EMPTY_FILL = new Set(["rack", "u", "unit", "units", "space", "blank"]);
+/** An empty slot is the keyword alone (with an optional height), or "N U ... EMPTY SPACE" with only filler words. */
 function emptyHeight(s: string): number | null {
-  let m = /^(\d+)\s*U\b.*\b(empty|open|free|spare|blank space|vacant)/i.exec(s);
-  if (m) return +m[1];
-  if (!EMPTY_WORD.test(s)) return null;
-  m = HEIGHT_PAREN.exec(s) || HEIGHT_TOKEN.exec(s);
-  return m ? +m[1] : 1;
+  let m = /^(open|empty|free|spare|vacant|available)(?:\s*[-–]?\s*(?:\(\s*(\d+)\s*U\s*\)|(\d+)\s*U))?$/i.exec(s);
+  if (m) return +(m[2] || m[3] || 1);
+  m = /^(\d+)\s*U\b(.*)$/i.exec(s);
+  if (!m) return null;
+  const rest = m[2].toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  const keyed = rest.some((w) => EMPTY_KEY.has(w)) || (rest.includes("blank") && rest.includes("space"));
+  return keyed && rest.every((w) => EMPTY_KEY.has(w) || EMPTY_FILL.has(w)) ? +m[1] : null;
 }
 
-function deviceFrom(raw: string, line: number, face: ImpFace, group: string | undefined): ImportDevice {
+function deviceFrom(raw: string, line: number, face: ImpFace, group: string | undefined, rack?: string): ImportDevice {
   let text = raw.trim();
   let height: number | null = null;
   const hm = HEIGHT_PAREN.exec(text) || HEIGHT_TOKEN.exec(text);
-  let tail = "";
   if (hm) {
     height = +hm[1];
-    tail = text.slice(hm.index + hm[0].length);
-    text = text.slice(0, hm.index);
+    text = (text.slice(0, hm.index) + " " + text.slice(hm.index + hm[0].length)).replace(/\s+/g, " ").trim();
   }
   let notes = "";
   const nm = /\s*\(([^)]*)\)\s*$/.exec(text);
   if (nm) { notes = nm[1].trim(); text = text.slice(0, nm.index); }
   const name = text.replace(/^[-–—:\s]+|[-–—:\s]+$/g, "");
   let f = face;
-  const tl = (tail + " " + name).toLowerCase();
+  const tl = name.toLowerCase();
   if (/\b(rear|back)\b/.test(tl)) f = "rear"; else if (tl.includes("full depth")) f = "both";
   let guessed = false;
   if (height == null) { const g = guessHeight(name); height = g.height; guessed = g.guessed; }
@@ -51,7 +53,7 @@ function deviceFrom(raw: string, line: number, face: ImpFace, group: string | un
   const found = catalogFind(name);
   const type = tpl.type !== "Other" ? tpl.type : guessType(name) ?? "Other";
   const d: ImportDevice = {
-    kind: "device", line, name, type, rack: undefined, u: null, height, face: f, fields: {}, ports: null, specs: {}, services: [],
+    kind: "device", line, name, type, rack, u: null, height, face: f, fields: {}, ports: null, specs: {}, services: [],
   };
   if (guessed) d.heightGuessed = true;
   if (group) d.group = group;
@@ -66,6 +68,7 @@ export function parseLayout(text: string): ImportSpec {
   const meaningful = lines.map((l, i) => ({ s: l.trim(), i: i + 1 })).filter((x) => x.s && !x.s.startsWith("#") && !x.s.startsWith("//"));
   let face: ImpFace = "front";
   let group: string | undefined;
+  let rack: string | undefined;
   meaningful.forEach(({ s, i }, idx) => {
     const bulleted = BULLET.test(s);
     const t = s.replace(BULLET, "").trim();
@@ -81,13 +84,14 @@ export function parseLayout(text: string): ImportSpec {
     const eh = emptyHeight(t);
     if (eh != null) {
       group = undefined;
-      spec.devices.push({ kind: "empty", line: i, name: "Empty", type: null, rack: undefined, u: null, height: eh, face, fields: {}, ports: null, specs: {}, services: [] });
+      spec.devices.push({ kind: "empty", line: i, name: "Empty", type: null, rack, u: null, height: eh, face, fields: {}, ports: null, specs: {}, services: [] });
       return;
     }
     // Old syntax: an unbulleted line with no height, followed by a bulleted "(nU)" line, names a rack.
     const next = meaningful[idx + 1]?.s;
     if (!bulleted && !HEIGHT_PAREN.test(t) && next && BULLET.test(next) && HEIGHT_PAREN.test(next)) {
-      spec.racks.push({ name: t.replace(/^[-:* ]+|[-:* ]+$/g, ""), u: null });
+      rack = t.replace(/^[-:* ]+|[-:* ]+$/g, "");
+      spec.racks.push({ name: rack, u: null });
       return;
     }
     const wc = words(t);
@@ -98,7 +102,7 @@ export function parseLayout(text: string): ImportSpec {
     }
     const halves = t.split(/\s+\|\s+/).map((h) => h.trim()).filter(Boolean).slice(0, 2);
     halves.forEach((h, k) => {
-      const d = deviceFrom(h, i, face, group);
+      const d = deviceFrom(h, i, face, group, rack);
       if (halves.length === 2) { d.cols = 2; d.side = k; }
       spec.devices.push(d);
     });
@@ -108,17 +112,23 @@ export function parseLayout(text: string): ImportSpec {
 
 /** Fills each device's and empty slot's lowest U, top line at the top of a rackU rack. Returns the U the list needs. */
 export function placeLayout(spec: ImportSpec, rackU: number): number {
-  const byLine = new Map<number, ImportDevice[]>();
+  const racks = new Map<string | undefined, Map<number, ImportDevice[]>>();
   for (const d of spec.devices) {
     if (d.kind === "note") continue;
-    byLine.set(d.line, [...(byLine.get(d.line) || []), d]);
+    const rows = racks.get(d.rack as string | undefined) || new Map<number, ImportDevice[]>();
+    rows.set(d.line, [...(rows.get(d.line) || []), d]);
+    racks.set(d.rack as string | undefined, rows);
   }
-  let top = rackU, used = 0;
-  for (const line of [...byLine.keys()].sort((a, b) => a - b)) {
-    const row = byLine.get(line)!;
-    const h = Math.max(...row.map((d) => d.height ?? 1));
-    for (const d of row) d.u = top - h + 1;
-    top -= h; used += h;
+  let most = 0;
+  for (const byLine of racks.values()) {
+    let top = rackU, used = 0;
+    for (const line of [...byLine.keys()].sort((a, b) => a - b)) {
+      const row = byLine.get(line)!;
+      const h = Math.max(...row.map((d) => d.height ?? 1));
+      for (const d of row) d.u = top - h + 1;
+      top -= h; used += h;
+    }
+    most = Math.max(most, used);
   }
-  return used;
+  return most;
 }
