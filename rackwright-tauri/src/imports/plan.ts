@@ -30,7 +30,8 @@ const brandWords = (...s: (string | undefined)[]) =>
 
 interface Target { id: number | null; name: string; u: number; rack?: Rack }
 
-export function planImport(doc: Doc, spec: ImportSpec, opts: ImportOpts): ImportPlan {
+export function planImport(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
+  const spec: ImportSpec = { ...input, devices: input.devices.map((d) => ({ ...d })) }; // placed on a copy; the input stays untouched
   const docTarget = opts.rackId != null ? doc.racks.find((r) => r.id === opts.rackId) : undefined;
   const target: Target = docTarget ? { id: docTarget.id, name: docTarget.name, u: docTarget.u, rack: docTarget } : { id: null, name: opts.newRackName, u: opts.newRackU };
   const named = new Map<string, Target>();
@@ -52,11 +53,11 @@ export function planImport(doc: Doc, spec: ImportSpec, opts: ImportOpts): Import
   }
 
   const rows: Row[] = [];
-  const claimed = new Set<number>();
+  const claimed = new Map<number, number>(); // device id -> line of the row that took it
   const devs = doc.devices;
   const groupSeen = new Map<string, number>();
 
-  const findMatch = (d: ImportDevice): { hit: Device | null; conflict: Device[] } => {
+  const findMatch = (d: ImportDevice, ord: number): { hit: Device | null; conflict: Device[] } => {
     const stages: ((x: Device) => boolean)[] = [];
     const f = d.fields;
     if (f.serial) stages.push((x) => !!x.serial && low(x.serial) === low(f.serial));
@@ -70,11 +71,9 @@ export function planImport(doc: Doc, spec: ImportSpec, opts: ImportOpts): Import
       if (hits.length > 1) return { hit: null, conflict: hits };
     }
     if (d.group) {
-      const n = groupSeen.get(d.group) ?? 0;
-      groupSeen.set(d.group, n + 1);
       const stem = stackStem(d.group);
       const members = devs.filter((x) => stem && memberNo(x.name) != null && stackStem(x.name) === stem).sort((a, b) => memberNo(a.name)! - memberNo(b.name)!);
-      if (members[n]) return { hit: members[n], conflict: [] };
+      if (members[ord] && !claimed.has(members[ord].id)) return { hit: members[ord], conflict: [] };
     }
     return { hit: null, conflict: [] };
   };
@@ -120,7 +119,10 @@ export function planImport(doc: Doc, spec: ImportSpec, opts: ImportOpts): Import
       rows.push({ id, dev: d, match: null, action: same ? "same" : "add", diffs: [], on: !same });
       return;
     }
-    const { hit, conflict } = findMatch(d);
+    const gk = d.group ? low(d.rack === undefined ? "" : String(d.rack)) + "|" + d.group : "";
+    const ord = d.group ? groupSeen.get(gk) ?? 0 : 0;
+    if (d.group) groupSeen.set(gk, ord + 1);
+    const { hit, conflict } = findMatch(d, ord);
     if (conflict.length) {
       rows.push({ id, dev: d, match: null, action: "add", diffs: [], on: false, reason: "Matches more than one device: " + conflict.map((x) => x.name).join(", ") });
       return;
@@ -131,7 +133,11 @@ export function planImport(doc: Doc, spec: ImportSpec, opts: ImportOpts): Import
       pending.push(row);
       return;
     }
-    claimed.add(hit.id);
+    if (claimed.has(hit.id)) {
+      rows.push({ id, dev: d, match: null, action: "add", diffs: [], on: false, reason: "Same device as line " + claimed.get(hit.id) });
+      return;
+    }
+    claimed.set(hit.id, d.line);
     rows.push(finish({ id, dev: d, match: hit, action: "same", diffs: [], on: false }));
   });
 
@@ -144,7 +150,7 @@ export function planImport(doc: Doc, spec: ImportSpec, opts: ImportOpts): Import
     const c = cands[0];
     const a = brandWords(d.name, d.fields.model, d.fields.manufacturer), b = brandWords(c.name, c.model, c.manufacturer, c.auvik_model);
     if (![...a].some((w) => b.has(w))) continue;
-    claimed.add(c.id);
+    claimed.set(c.id, d.line);
     row.match = c;
     finish(row);
     row.on = false;

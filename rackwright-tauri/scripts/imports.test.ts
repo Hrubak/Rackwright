@@ -118,5 +118,16 @@ const ld = pdoc(); ld.devices[0].locked = ["ip"]; ld.devices[0].ip = "10.0.0.5";
 const lk = planImport(ld, csvToSpec("Name,Rack,U,IP\nEX-NAS01,EX-R1,10,10.0.0.9\n"), popts);
 eq("locked kept", [lk.rows[0].diffs, lk.rows[0].action], [[{ field: "ip", from: "10.0.0.5", to: "10.0.0.9", kept: true }], "same"]);
 
+const gdoc = pdoc(); gdoc.devices.push(mk(9, "EX-MDF-STK01 Member 3", { type: "Switch", u: 32 }));
+const gp = planImport(gdoc, parseLayout("(EX-MDF-STACK)\nEX-MDF-STK01 Member 1\nStack B\nStack C\n"), popts);
+eq("group index counts named rows", gp.rows.map((r) => r.match?.name), ["EX-MDF-STK01 Member 1", "EX-MDF-STK01 Member 2", "EX-MDF-STK01 Member 3"]);
+const dd = planImport(pdoc(), parseLayout("EX-NAS01\nEX-NAS01 (spare)\n"), popts);
+eq("same device twice", [dd.rows[0].on, dd.rows[1].match, dd.rows[1].on, dd.rows[1].reason], [true, null, false, "Same device as line 1"]);
+for (const grow of [false, true]) {
+  const sp = parseLayout("EX-NAS01\nSwitch\nEmpty (4U)\n");
+  const before = JSON.stringify(sp);
+  planImport(pdoc(), sp, { ...popts, newRackU: 2, rackId: null, growRack: grow });
+  eq("planImport leaves spec alone " + grow, JSON.stringify(sp), before);
+}
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);
