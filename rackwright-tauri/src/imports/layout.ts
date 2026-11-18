@@ -41,6 +41,8 @@ function deviceFrom(raw: string, line: number, face: ImpFace, group: string | un
     text = (text.slice(0, hm.index) + " " + text.slice(hm.index + hm[0].length)).replace(/\s+/g, " ").trim();
   }
   let notes = "";
+  const unpunct = text.replace(/[.,;:!]+$/, "");
+  if (unpunct.endsWith(")")) text = unpunct; // "Name (note)." -> "Name (note)"
   const nm = /\s*\(([^)]*)\)\s*$/.exec(text);
   if (nm) { notes = nm[1].trim(); text = text.slice(0, nm.index); }
   const name = text.replace(/^[-–—:\s]+|[-–—:\s]+$/g, "");
@@ -57,7 +59,7 @@ function deviceFrom(raw: string, line: number, face: ImpFace, group: string | un
   };
   if (guessed) d.heightGuessed = true;
   if (group) d.group = group;
-  if (found?.model) d.fields.model = found.model;
+  if (found?.model) { d.fields.model = found.model; d.modelGuessed = true; }
   if (notes) d.fields.notes = notes;
   return d;
 }
@@ -100,10 +102,12 @@ export function parseLayout(text: string): ImportSpec {
       spec.devices.push({ kind: "note", line: i, name: t, type: null, rack: undefined, u: null, height: 0, face, fields: {}, ports: null, specs: {}, services: [] });
       return;
     }
-    const halves = t.split(/\s+\|\s+/).map((h) => h.trim()).filter(Boolean).slice(0, 2);
+    const all = t.split("|").map((h) => h.trim()).filter(Boolean);
+    if (all.length > 3) spec.warnings.push(`Line ${i}: only the first 3 items on a line are used.`);
+    const halves = all.slice(0, 3);
     halves.forEach((h, k) => {
       const d = deviceFrom(h, i, face, group, rack);
-      if (halves.length === 2) { d.cols = 2; d.side = k; }
+      if (halves.length > 1) { d.cols = halves.length; d.side = k; }
       spec.devices.push(d);
     });
   });
@@ -142,4 +146,19 @@ export function switchKind(d: ImportDevice, kind: "device" | "empty" | "note"): 
   if (kind === "empty") return { ...d, kind, height };
   const name = was === "note" ? d.name : !d.name || d.name === "Empty" ? "New device" : d.name;
   return { ...d, kind, name: name || "New device", height };
+}
+
+export type SideChoice = "full" | "left" | "middle" | "right";
+/** The side selector's value for a device: derived from its cols and side. */
+export function sideChoice(d: Pick<ImportDevice, "cols" | "side">): SideChoice {
+  if (!d.cols || d.cols < 2) return "full";
+  if (d.cols >= 3 && d.side === 1) return "middle";
+  return (d.side ?? 0) === 0 ? "left" : "right";
+}
+/** What choosing a side does to a device: Full width = no columns, Left / Right = two columns. */
+export function sidePatch(c: SideChoice): { cols: number | undefined; side: number } {
+  if (c === "left") return { cols: 2, side: 0 };
+  if (c === "right") return { cols: 2, side: 1 };
+  if (c === "middle") return { cols: 3, side: 1 };
+  return { cols: undefined, side: 0 };
 }

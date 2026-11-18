@@ -2,7 +2,7 @@
 import { parseRackmapText } from "../src/imports/rackmap";
 import { buildFromText } from "../src/edit";
 import type { Doc } from "../src/types";
-import { parseLayout, placeLayout, guessHeight, switchKind } from "../src/imports/layout";
+import { parseLayout, placeLayout, guessHeight, switchKind, sideChoice, sidePatch } from "../src/imports/layout";
 import { readImport } from "../src/imports/read";
 import { csvToSpec, looksDelimited, parseDelimited } from "../src/imports/csv";
 
@@ -222,7 +222,7 @@ APC Battery Pack
 const o = { rackId: 1, newRackName: "N", newRackU: 42, growRack: false };
 const before = JSON.stringify(rdoc);
 const sp = parseLayout(rtext);
-eq("pipe line is two devices, not a note", sp.devices.filter((d) => d.line === sp.devices.find((x) => x.name === "SonicWall 370")!.line).map((d) => [d.kind, d.name, d.side]), [["device", "SonicWall 370", 0], ["device", "Phone Switch (should be decommissioned).", 1]]);
+eq("pipe line is two devices, not a note", sp.devices.filter((d) => d.line === sp.devices.find((x) => x.name === "SonicWall 370")!.line).map((d) => [d.kind, d.name, d.side]), [["device", "SonicWall 370", 0], ["device", "Phone Switch", 1]]);
 const rp = planImport(rdoc, sp, o);
 eq("matched row takes the device's size", [rp.rows[0].dev.height, rp.rows[0].dev.u, rp.rows[1].dev.u], [1, 42, 39]);
 const dry = applyImport(JSON.parse(JSON.stringify(rdoc)), rp, o);
@@ -235,6 +235,89 @@ eq("no warnings when a slot is freed by a move", dry.warnings, []);
   eq("note to device keeps text", [switchKind(e[1], "device").name, switchKind(e[1], "device").height], [e[1].name, 1]);
   eq("device to empty keeps height", [switchKind(e[2], "empty").height, switchKind(e[2], "empty").kind], [2, "empty"]);
   eq("device to note", [switchKind(e[2], "note").height, switchKind(e[2], "note").kind], [0, "note"]);
+}
+{
+  // ---- final fix wave
+  // 1: a cabling CSV between existing devices applies its cable, and a re-import adds none
+  const d = adoc(); d.devices.push(mk(70, "EX-SW01", { u: 10 }), mk(71, "EX-HV01", { u: 20 }));
+  const sp = csvToSpec("From,From Port,To,To Port\nEX-SW01,1,EX-HV01,NIC1\n");
+  const l1 = applyImport(d, planImport(d, sp, aopts), aopts);
+  eq("cabling csv applies one cable", [l1.cables, d.cables.length], [1, 1]);
+  const l2 = applyImport(d, planImport(d, sp, aopts), aopts);
+  eq("cabling csv re-import adds none", [l2.cables, d.cables.length], [0, 1]);
+}
+{
+  // 2: rows with no rack and no U never move a matched device
+  const d: Doc = { v: 1, nid: 100, racks: [{ id: 1, name: "EX-R1", u: 42, x: 0, y: 0 }, { id: 2, name: "EX-R2", u: 42, x: 200, y: 0 }], cables: [], devices: [] };
+  d.devices.push(mk(80, "EX-A", { rack: 2, u: 5 }), mk(81, "EX-B", { rack: null }));
+  const pl = planImport(d, csvToSpec("Name,Serial,Warranty\nEX-A,SA1,2030-01-01\nEX-B,SB1,2030-01-01\nEX-C,SC1,2030-01-01\n"), aopts);
+  eq("fields-only csv does not move", pl.rows.map((r) => r.action), ["change", "change", "add"]);
+  applyImport(d, pl, aopts);
+  eq("fields-only csv keeps places", [d.devices[0].rack, d.devices[0].u, d.devices[1].rack, d.devices[0].serial, d.devices.find((x) => x.name === "EX-C")!.rack], [2, 5, null, "SA1", 1]);
+}
+{
+  // 3: repeated names take the devices in rack order
+  const d = adoc(), txt = "APC Battery Pack\nEX-NAS01\nAPC Battery Pack\n";
+  applyImport(d, planImport(d, parseLayout(txt), aopts), aopts);
+  const p2 = planImport(d, parseLayout(txt), aopts);
+  eq("repeated names all same", p2.rows.map((r) => r.action), ["same", "same", "same"]);
+  eq("repeated names distinct devices", new Set(p2.rows.map((r) => r.match?.id)).size, 3);
+  const c = planImport(pdoc(), parseLayout("EX-DUP thing\n"), popts);
+  eq("conflict stays unticked for name-inside-line", [c.rows[0].on, c.rows[0].action], [false, "add"]);
+}
+{
+  // 4: name-inside-line is for layouts only
+  const d = adoc(); d.devices.push(mk(90, "EX-SW01", { u: 10 }));
+  const pl = planImport(d, csvToSpec("Name,Rack,U\nEX-SW01-NEW,EX-R1,12\n"), aopts);
+  eq("csv does not match inside the name", [pl.rows[0].match, pl.rows[0].action], [null, "add"]);
+}
+{
+  // 5: a catalog-guessed model never replaces a real one
+  const d = adoc(); d.devices.push(mk(91, "EX-HV01", { model: "PowerEdge R740xd", u: 10 }));
+  const pl = planImport(d, parseLayout("Dell PowerEdge R740 EX-HV01"), aopts);
+  eq("guessed model keeps real model", [pl.rows[0].match?.id, pl.rows[0].diffs.filter((x) => x.field === "model")], [91, []]);
+  const d2 = adoc(); d2.devices.push(mk(92, "EX-HV01", { u: 10 }));
+  const p2 = planImport(d2, parseLayout("Dell PowerEdge R740 EX-HV01"), aopts);
+  eq("guessed model fills a blank", p2.rows[0].diffs.some((x) => x.field === "model"), true);
+  const p3 = planImport(d, csvToSpec("Name,Model\nEX-HV01,R760\n"), aopts);
+  eq("explicit model still diffs", p3.rows[0].diffs.map((x) => x.to), ["R760"]);
+}
+{
+  // 6: side selector mapping
+  eq("side patches", [sidePatch("full"), sidePatch("left"), sidePatch("right")], [{ cols: undefined, side: 0 }, { cols: 2, side: 0 }, { cols: 2, side: 1 }]);
+  eq("side choice derived", [sideChoice({}), sideChoice({ cols: 2, side: 0 }), sideChoice({ cols: 2, side: 1 })], ["full", "left", "right"]);
+}
+{
+  // 7: off-rack only into a document with no racks keeps fx finite
+  const d: Doc = { v: 1, nid: 100, racks: [], cables: [], devices: [] };
+  const o = { rackId: null, newRackName: "New", newRackU: 42, growRack: false };
+  applyImport(d, planImport(d, csvToSpec("Name,Rack\nEX-A,unracked\nEX-B,unracked\n"), o), o);
+  eq("no racks gives finite fx", [d.devices.length, d.devices.every((x) => Number.isFinite(x.fx) && Number.isFinite(x.fy))], [2, true]);
+}
+{
+  // 8: status words
+  const sd = csvToSpec("Name,Status\nEX-A,Online\nEX-B,Decommissioned\nEX-C,In Use\nEX-D,Standby\nEX-E,Future\nEX-F,Weird\n");
+  eq("status normalised", sd.devices.map((x) => [x.fields.status ?? null, x.specs.status ?? null]), [["active", null], ["offline", null], ["active", null], ["spare", null], ["planned", null], [null, "Weird"]]);
+}
+{
+  // 9: notes are appended, not replaced
+  const d = adoc(); d.devices.push(mk(93, "EX-HV01", { notes: "Old note", u: 10 }));
+  const o = parseLayout("EX-HV01 (new note)");
+  applyImport(d, planImport(d, o, aopts), aopts);
+  eq("notes appended", d.devices[0].notes, "Old note\nnew note");
+  eq("notes not repeated", planImport(d, o, aopts).rows[0].action, "same");
+}
+{
+  // 10: trailing punctuation after a parenthetical
+  const x = parseLayout("Phone Switch (should be decommissioned).").devices[0];
+  eq("paren then dot", [x.name, x.fields.notes], ["Phone Switch", "should be decommissioned"]);
+}
+{
+  // 11: up to three items per line
+  const t = parseLayout("EX-A|EX-B\nEX-C | EX-D | EX-E\nEX-F | EX-G | EX-H | EX-I\n");
+  eq("pipes without spaces", t.devices.slice(0, 2).map((x) => [x.name, x.cols, x.side]), [["EX-A", 2, 0], ["EX-B", 2, 1]]);
+  eq("three items", t.devices.slice(2, 5).map((x) => [x.cols, x.side]), [[3, 0], [3, 1], [3, 2]]);
+  eq("fourth item warns", [t.devices.length, t.warnings], [8, ["Line 3: only the first 3 items on a line are used."]]);
 }
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

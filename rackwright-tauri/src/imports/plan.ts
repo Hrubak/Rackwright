@@ -28,6 +28,9 @@ const GENERIC = new Set(["ups", "pdu", "smart", "rack", "mount", "power", "batte
 const brandWords = (...s: (string | undefined)[]) =>
   new Set(s.join(" ").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !GENERIC.has(w)));
 
+const rackOrder = (a: Device, b: Device) =>
+  (a.rack == null ? 1 : 0) - (b.rack == null ? 1 : 0) || (a.rack ?? 0) - (b.rack ?? 0) || (b.u + b.u_size) - (a.u + a.u_size) || (a.side ?? 0) - (b.side ?? 0) || a.id - b.id;
+
 interface Target { id: number | null; name: string; u: number; rack?: Rack }
 
 export function planImport(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
@@ -73,16 +76,24 @@ function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
 
   const findMatch = (d: ImportDevice, ord: number): { hit: Device | null; conflict: Device[] } => {
     const stages: ((x: Device) => boolean)[] = [];
+    let nameStage = -1;
     const f = d.fields;
     if (f.serial) stages.push((x) => !!x.serial && low(x.serial) === low(f.serial));
     if (f.mac && normMac(f.mac)) stages.push((x) => (!!x.mac && normMac(x.mac) === normMac(f.mac!)) || !!x.auvik_macs?.some((m) => normMac(m) === normMac(f.mac!)));
     if (f.hostname || d.name) stages.push((x) => !!x.hostname && (low(x.hostname) === low(f.hostname) || low(x.hostname) === low(d.name)));
-    if (d.name) stages.push((x) => low(x.name) === low(d.name));
-    stages.push((x) => (x.name.length >= 4 && hasToken(d.name, x.name)) || (!!x.hostname && x.hostname.length >= 4 && hasToken(d.name, x.hostname)));
-    for (const st of stages) {
-      const hits = devs.filter(st);
+    if (d.name) { nameStage = stages.length; stages.push((x) => low(x.name) === low(d.name)); }
+    if (spec.kind === "layout") stages.push((x) => (x.name.length >= 4 && hasToken(d.name, x.name)) || (!!x.hostname && x.hostname.length >= 4 && hasToken(d.name, x.hostname)));
+    for (let si = 0; si < stages.length; si++) {
+      const hits = devs.filter(stages[si]);
       if (hits.length === 1) return { hit: hits[0], conflict: [] };
-      if (hits.length > 1) return { hit: null, conflict: hits };
+      if (hits.length > 1) {
+        // Repeated names: the rows with that name take the devices in rack order, top of the rack first, off-rack last.
+        if (si === nameStage && hits.every((x) => low(x.name) === low(hits[0].name))) {
+          const free = hits.filter((x) => !claimed.has(x.id)).sort(rackOrder);
+          if (free.length) return { hit: free[0], conflict: [] };
+        }
+        return { hit: null, conflict: hits };
+      }
     }
     if (d.group) {
       const stem = stackStem(d.group);
@@ -97,9 +108,15 @@ function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
     for (const [k, v] of Object.entries(d.fields)) {
       const to = String(v ?? "").trim();
       if (!to) continue;
+      if (k === "model" && d.modelGuessed && m.model) continue; // a catalog guess never replaces a real model
       const raw = (m as unknown as Record<string, unknown>)[k];
       const from = raw == null ? "" : String(raw).trim();
       if (k === "mac" ? normMac(from) === normMac(to) : from === to) continue;
+      if (k === "notes" && from) { // notes are added to, not replaced
+        if (from.includes(to)) continue;
+        out.push({ field: k, from, to: from + "\n" + to, kept: !!m.locked?.includes(k) });
+        continue;
+      }
       out.push({ field: k, from, to, kept: !!m.locked?.includes(k) });
     }
     return out;
@@ -107,6 +124,7 @@ function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
 
   // A row moves when its rack, U, side or face differs; anything the row leaves unspecified is ignored.
   const moved = (d: ImportDevice, m: Device): boolean => {
+    if (spec.kind !== "layout" && d.rack === undefined && d.u == null) return false; // no position given: fields only, never a move
     const r = rackFor(d.rack);
     if (r === null) return m.rack !== null;
     if (r.id === null || m.rack !== r.id) return true;

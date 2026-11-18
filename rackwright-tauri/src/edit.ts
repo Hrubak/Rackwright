@@ -269,7 +269,7 @@ export function resizeRack(doc: Doc, r: Rack, u: number): string {
 export function setOffRack(doc: Doc, d: Device) {
   const offs = doc.devices.filter((x) => x.rack == null && x.id !== d.id);
   d.rack = null;
-  d.fx = Math.min(...doc.racks.map((x) => x.x)) - RW - 160;
+  d.fx = doc.racks.length ? Math.min(...doc.racks.map((x) => x.x)) - RW - 160 : 0;
   d.fy = offs.reduce((s, x) => s + devDims({ ...x, rack: null }).h + 20, 0);
 }
 

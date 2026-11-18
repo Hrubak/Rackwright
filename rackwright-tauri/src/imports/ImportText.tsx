@@ -5,7 +5,8 @@ import { IS_WEB } from "../backend";
 import type { Doc } from "../types";
 import { clone } from "../edit";
 import { readImport } from "./read";
-import { switchKind } from "./layout";
+import { sideChoice, sidePatch, switchKind } from "./layout";
+import type { SideChoice } from "./layout";
 import type { ReadMode } from "./read";
 import { planImport } from "./plan";
 import type { Action, ImportOpts, ImportPlan, Row } from "./plan";
@@ -69,8 +70,9 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
     setOvr((o) => { const c = { ...o }; delete c["r" + i]; return c; });
   };
 
-  const n = plan ? plan.rows.filter((r) => r.on && r.action !== "same").length : 0;
-  const count = (a: Action) => (plan ? plan.rows.filter((r) => r.action === a).length : 0);
+  const cables = dry?.cables ?? 0;
+  const n = (plan ? plan.rows.filter((r) => r.on && r.action !== "same").length : 0) + cables;
+  const count = (a: Action) => (plan ? plan.rows.filter((r) => r.action === a && (a === "same" || r.on)).length : 0); // unticked rows are not counted as work
   const sel = doc.racks.find((r) => r.id === +rackSel);
   const baseU = rackSel === "new" ? newUn : sel?.u ?? 0;
   const rackName = rackSel === "new" ? "the new rack" : sel?.name ?? "";
@@ -82,7 +84,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
     if (!plan) return;
     const ok = onApply((d) => {
       const log = applyImport(d, plan, opts);
-      return `Imported: ${log.added} added, ${log.moved} moved, ${log.changed} changed`;
+      return `Imported: ${log.added} added, ${log.moved} moved, ${log.changed} changed${log.cables ? `, ${log.cables} cables` : ""}`;
     });
     if (ok) onClose();
   };
@@ -132,7 +134,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
 
         {plan && spec && <>
           <div style={{ marginBottom: 6 }}>
-            {count("add")} to add · {count("move")} to move · {count("change")} to change · {count("same")} unchanged
+            {count("add")} to add · {count("move")} to move · {count("change")} to change · {count("same")} unchanged{cables > 0 && ` · ${cables} ${cables === 1 ? "cable" : "cables"}`}
           </div>
           {spec.warnings.map((w, i) => <div key={i} style={{ opacity: 0.7 }}>Note: {w}</div>)}
           {tooShort && <label style={{ display: "block", background: v("warn-bg"), border: `1px solid ${v("warn")}`, borderRadius: 4, padding: "4px 8px", margin: "4px 0" }}>
@@ -161,8 +163,8 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
                         </select>{" "}
                         {d.kind !== "note" && <>
                           <HeightInput value={shown.height ?? 1} onCommit={(h) => editDev(i, { height: h, heightGuessed: false })} /> U{" "}
-                          {d.kind !== "empty" && <select style={inp} value={d.side ?? 0} onChange={(e) => editDev(i, { side: +e.target.value })}>
-                            <option value={0}>Full width</option><option value={1}>Left</option><option value={2}>Right</option>
+                          {d.kind !== "empty" && <select style={inp} value={sideChoice(d)} onChange={(e) => editDev(i, sidePatch(e.target.value as SideChoice))}>
+                            <option value="full">Full width</option><option value="left">Left</option>{sideChoice(d) === "middle" && <option value="middle">Middle</option>}<option value="right">Right</option>
                           </select>}
                         </>}
                       </div>}

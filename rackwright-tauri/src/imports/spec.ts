@@ -10,6 +10,7 @@ export interface ImportDevice {
   u: number | null; // lowest U, null = unknown
   height: number | null;
   heightGuessed?: boolean;
+  modelGuessed?: boolean; // the model came from a catalog guess: it may fill a blank model but never replaces a real one
   cols?: number;
   side?: number;
   face?: ImpFace;
@@ -28,6 +29,16 @@ export const TYPE_MAP: Record<string, string> = {
   server: "Server", switch: "Switch", firewall: "Firewall", router: "Router", patchpanel: "Patch panel", ups: "UPS", pdu: "PDU",
   storage: "Storage", kvm: "KVM", shelf: "Shelf", cablemgmt: "Cable manager", blank: "Blank", other: "Other",
 };
+
+/** Loose status words onto Device.status values; null when the word is not one of them. */
+export function normStatus(s: string): "active" | "spare" | "offline" | "planned" | null {
+  const t = s.trim().toLowerCase().replace(/[\s_-]+/g, " ");
+  if (/^(active|online|up|in use|production|prod|live)$/.test(t)) return "active";
+  if (/^(offline|down|off|decommissioned|retired)$/.test(t)) return "offline";
+  if (/^(spare|standby|stand by)$/.test(t)) return "spare";
+  if (/^(planned|future|proposed)$/.test(t)) return "planned";
+  return null;
+}
 
 export const nk = (s: unknown): string => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -150,6 +161,7 @@ export function devFrom(pairs: [string, string][], base: Partial<ImportDevice>):
     else if (f === "services") d.services.push(...parseServices(v));
     else if (f === "contract") d.specs.contract = v;
     else if (f === "ips") d.specs.ips = v;
+    else if (f === "status") { const st = normStatus(v); if (st) d.fields.status = st; else d.specs.status = v; }
     else if (f === "power_w") { const n = parseFloat(v); if (Number.isFinite(n)) d.fields.power_w = n; else extra.push([k, v]); }
     else if (f) (d.fields as Record<string, string>)[f] = v;
     else extra.push([k, v]);
