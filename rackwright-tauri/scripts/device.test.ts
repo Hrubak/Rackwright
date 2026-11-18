@@ -54,7 +54,7 @@ const txt = copyAsText(doc, 1);
 eq("text name", txt.includes("Example server — Server"), true);
 eq("text U", txt.includes("U12"), true);
 eq("text link", txt.includes("SW-1"), true);
-eq("spec ups", SPEC_FIELDS.length, 13);
+eq("spec ups", SPEC_FIELDS.length, 14);
 eq("spec order", SPEC_FIELDS.slice(0, 3).map((f) => f.label), ["Manufacturer", "Model", "Serial"]);
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }

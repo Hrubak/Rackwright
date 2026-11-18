@@ -15,6 +15,7 @@ export const SPEC_FIELDS: SpecField[] = [
   { key: "mac", label: "MAC", kind: "text" }, { key: "os", label: "OS", kind: "text" },
   { key: "role", label: "Role", kind: "text" }, { key: "owner", label: "Owner", kind: "text" },
   { key: "purchase_date", label: "Purchase date", kind: "date" }, { key: "warranty_exp", label: "Warranty ends", kind: "date" },
+  { key: "last_verified", label: "Last checked on site", kind: "date" },
   { key: "power_w", label: "Power (W)", kind: "number" },
 ];
 export const UPS_FIELDS: SpecField[] = [

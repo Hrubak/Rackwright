@@ -41,7 +41,7 @@ import { findRackLocation, sameFile, type RackLocation } from "./location";
 import { RackItem, clientStore } from "./clients/store";
 import { powerBudget, fmtW } from "./power/model";
 import RackPowerInfo from "./power/RackPowerInfo";
-import { ipClashes, ipEntries } from "./attention/model";
+import { ipClashes, ipEntries, todayIso } from "./attention/model";
 import { useClientIps } from "./attention/useClientIps";
 import { UpdateBanner } from "./version/UpdateBanner";
 import { useDesktopUpdates } from "./version/useDesktopUpdates";
@@ -49,6 +49,7 @@ import { useWebUpdates } from "./version/useWebUpdates";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
 const ImportText = lazy(() => import("./imports/ImportText"));
+const SiteVisit = lazy(() => import("./visit/SiteVisit"));
 const ReportDialog = lazy(() => import("./report/ReportDialog"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
@@ -113,6 +114,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [fitTick, setFitTick] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [visitOpen, setVisitOpen] = useState(false);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [reportFor, setReportFor] = useState<string | null>(null); // "" = no client preselected
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -730,6 +732,8 @@ export default function App({ web }: { web?: WebProps } = {}) {
               </select></label>
             {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {fmtDims(selRack.width_mm, selRack.depth_mm, settings.prefs.units ?? "mm")}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>{selRack.last_verified ? `Checked on site ${selRack.last_verified}` : "Never checked on site"}</div>
+            <button style={{ ...btn, margin: "4px 0" }} onClick={() => setVisitOpen(true)}>Site visit</button>
             {field("Circuit", selRack.circuit ?? "", (val) => edit((d) => { const r = d.racks.find((x) => x.id === selRack.id)!; if (val) r.circuit = val; else delete r.circuit; }, `rc${selRack.id}`))}
             <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Voltage<br />
               <select style={{ ...inp, width: "100%" }} value={selRack.volts === 208 ? 208 : 120} onChange={(e) => edit((d) => {
@@ -828,6 +832,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         defaults={{ model: typeof settings.system.rack_default_model === "string" ? settings.system.rack_default_model : undefined, u: typeof settings.system.rack_default_u === "number" ? settings.system.rack_default_u : undefined }} onPick={onPick} onCancel={() => setPicker(null)} />}
       {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
       {unplacedOpen && <UnplacedDialog items={doc.auvik?.unplaced ?? []} onClose={() => setUnplacedOpen(false)} />}
+      {visitOpen && selRack && <Suspense fallback={null}><SiteVisit doc={doc} rackId={selRack.id} edit={edit} today={todayIso()} onClose={() => setVisitOpen(false)} /></Suspense>}
       {importOpen && <Suspense fallback={null}><ImportText doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setImportOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
     </div>
   );
