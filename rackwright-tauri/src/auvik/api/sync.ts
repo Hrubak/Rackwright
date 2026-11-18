@@ -3,7 +3,7 @@
 import * as A from "../../api";
 import type { AuvikInventory, AuvikTenant } from "../../api";
 import type { ClientItem } from "../../clients/store";
-import { addRack, clone, setOffColumn } from "../../edit";
+import { addRack, clone, fromTpl, setOffColumn } from "../../edit";
 import { modelById, specOf } from "../../racks";
 import { setSource } from "../../source";
 import type { Device, Doc } from "../../types";
@@ -13,7 +13,7 @@ import type { ImportSpec } from "../../imports/spec";
 import { applyInPlace } from "../apply";
 import { Diff, computeDiff, defaultSelection, deviceFields, orderUnits, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
-import { hostCtxOf, resolvePlan, type ImportPlan } from "../plan";
+import { epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type ImportPlan } from "../plan";
 import { TO_PLACE_KINDS, apiItems, type ApiPlanItem } from "./map";
 
 export interface SiteDocs { siteId: number; racks: { id: number; name: string; version: number; doc: Doc }[] }
@@ -80,6 +80,33 @@ function fillSpecs(d: Device, specs: Record<string, string>) {
   }
 }
 
+const EP_WORD: Record<EpKind, string> = { pc: "PCs", phone: "Phones", iot: "IoT devices", printer: "Printers", vm: "VMs", other: "Other endpoints" };
+
+/** The API has no neighbours, so endpoints cannot hang off a switch. They go in one unattached box per kind in the Inventory column. */
+function fillEndpointBoxes(doc: Doc, items: SitePlan["items"]) {
+  const byKind = new Map<EpKind, SitePlan["items"]>();
+  for (const it of items) if (isEndpointMode(it.mode)) { const k = epKindOf(it); byKind.set(k, [...(byKind.get(k) ?? []), it]); }
+  for (const [kind, list] of byKind) {
+    let d = doc.devices.find((x) => (x as any).auvik_epbox === kind) as X | undefined;
+    if (!d) {
+      const g = groupTemplate(0);
+      d = fromTpl(doc, { ...g, name: EP_WORD[kind], ports: [] }) as X;
+      (d as any).auvik_epbox = kind; d.face = "front"; d.color = g.color; d.type = "Endpoints";
+      doc.devices.push(d);
+      setOffColumn(doc, d, 1);
+    }
+    const eps = d.endpoints ?? (d.endpoints = []);
+    for (const it of list) {
+      const a = it.dev, key = "api:" + (a.apiId ?? it.key);
+      const have = eps.find((e) => e.key === key);
+      if (have) { have.status = a.status; continue; }
+      eps.push({ name: a.name, type: it.type, model: a.model, ip: a.ips[0] || "", mac: a.macs[0] || "", port: "", status: a.status, kind, key });
+    }
+    d.name = EP_WORD[kind]; d.model = summarize(eps.map((e) => e.kind ?? "other")); d.u_size = 1; d.rows = 0; d.half = false;
+    d.notes = "Auvik endpoints that are not attached to a switch";
+  }
+}
+
 function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: { rackId: number; doc: Doc }[]; rows: Row[] } {
   const mine = p.target.docId != null ? p.siteDocs.racks.find((r) => r.id === p.target.docId) : undefined;
   let doc: Doc;
@@ -104,6 +131,8 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
     setOffColumn(doc, d, it && specKinds.has(it.kind) ? 0 : 1);
   }
 
+  fillEndpointBoxes(doc, p.items);
+
   let rows: Row[] = [];
   if (p.layout) {
     const opts = { rackId, newRackName: "Rack 1", newRackU: p.defaults.u, growRack: false };
@@ -111,7 +140,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
     rows = ip.rows.filter((r) => r.match && r.action === "move");   // place devices that exist; never add the list's own rows
     if (rows.length) applyImport(doc, { ...ip, rows: rows.map((r) => ({ ...r, on: true })) }, opts);
   }
-  doc.auvik = { ...doc.auvik, tenant: p.tenant.id, source: "api", site: p.tenant.name, imported: new Date().toISOString().slice(0, 10) } as Doc["auvik"];
+  doc.auvik = { ...doc.auvik, tenant: p.tenant.id, source: "api", unplaced: [], site: p.tenant.name, imported: new Date().toISOString().slice(0, 10) } as Doc["auvik"];
 
   const others: { rackId: number; doc: Doc }[] = [];
   for (const r of p.siteDocs.racks) {

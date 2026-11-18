@@ -15,14 +15,15 @@ export interface SiteState {
   fill: "empty" | "overwrite";
   layout: ImportSpec | null;
   hosts: Record<string, string>;         // VM key -> chosen host key
-  ticks: Set<string> | null;             // ticked change ids; null = the defaults
+  over: Record<string, boolean>;         // the person's own tick choices by change id; the rest follow defaultOn
   view: "devices" | "changes";
 }
-export const newSiteState = (): SiteState => ({ excluded: new Set(), fill: "empty", layout: null, hosts: {}, ticks: null, view: "devices" });
+export const newSiteState = (): SiteState => ({ excluded: new Set(), fill: "empty", layout: null, hosts: {}, over: {}, view: "devices" });
 
-/** Default ticks, keyed exactly as the ids appear in the diffs (other racks carry a "<rackId>:" prefix). */
-export const defaultTicks = (p: SitePlan): Set<string> =>
-  new Set([...(p.diff?.changes ?? []), ...p.other.flatMap((o) => o.diff.changes)].filter((c) => c.defaultOn).map((c) => c.id));
+/** The ticked change ids, keyed exactly as they appear in the diffs (other racks carry a "<rackId>:" prefix).
+ *  The person's choices win; a change that is new after a re-plan follows its default. */
+export const ticksOf = (p: SitePlan, over: Record<string, boolean>): Set<string> =>
+  new Set([...(p.diff?.changes ?? []), ...p.other.flatMap((o) => o.diff.changes)].filter((c) => over[c.id] ?? c.defaultOn).map((c) => c.id));
 
 export default function SitePreview({ view, eff, st, setSt, targetName, isNew }: {
   view: SitePlan;          // every device, for the table
@@ -33,12 +34,11 @@ export default function SitePreview({ view, eff, st, setSt, targetName, isNew }:
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
-  const ticks = st.ticks ?? defaultTicks(eff);
-  // Anything that changes the plan starts the ticks again from the defaults.
-  const edit = (f: (s: SiteState) => SiteState) => setSt((s) => ({ ...f(s), ticks: null }));
+  const ticks = ticksOf(eff, st.over);
+  const edit = (f: (s: SiteState) => SiteState) => setSt(f);   // the plan is redone; the person's tick choices stay
   const changes = [...(eff.diff?.changes ?? []), ...eff.other.flatMap((o) => o.diff.changes)];
   const isOn = (c: { id: string }) => ticks.has(c.id);
-  const setOn = (ids: string[], on: boolean) => setSt((s) => { const n = new Set(s.ticks ?? ticks); for (const id of ids) { if (on) n.add(id); else n.delete(id); } return { ...s, ticks: n }; });
+  const setOn = (ids: string[], on: boolean) => setSt((s) => { const o = { ...s.over }; for (const id of ids) o[id] = on; return { ...s, over: o }; });
   const hosts = hostsOf(view.items);
   const hostName = (k: string) => view.items.find((i) => i.key === k)?.dev.name ?? k;
   const heightOf = (key: string) => { const us = view.plan.units.filter((u) => u.itemKey === key); return us.length ? String(us.reduce((a, u) => a + u.tpl.u_size, 0)) : ""; };
@@ -98,7 +98,7 @@ export default function SitePreview({ view, eff, st, setSt, targetName, isNew }:
               const off = st.excluded.has(id);
               return (
                 <tr key={i.key} style={{ borderTop: `1px solid ${v("border-faint")}`, opacity: off ? 0.45 : 1 }}>
-                  <td style={{ padding: "2px 4px" }}><input type="checkbox" checked={!off} onChange={(e) => edit((s) => { const n = new Set(s.excluded); if (e.target.checked) n.delete(id); else n.add(id); return { ...s, excluded: n }; })} /></td>
+                  <td style={{ padding: "2px 4px" }}><input type="checkbox" aria-label={`Import ${i.dev.name}`} checked={!off} onChange={(e) => edit((s) => { const n = new Set(s.excluded); if (e.target.checked) n.delete(id); else n.add(id); return { ...s, excluded: n }; })} /></td>
                   <td>{i.dev.name}{i.units.length > 1 && <span style={{ opacity: 0.6 }}> (stack of {i.units.length})</span>}</td>
                   <td>{i.type}</td><td>{i.dev.model}</td>
                   <td style={{ opacity: i.generic ? 0.6 : 1 }}>{["rack", "off"].includes(i.mode) ? i.tplName : ""}</td>

@@ -228,6 +228,11 @@ async function main() {
     t("re-import: empty serial filled, set ip kept", sw2.serial === "EXSN0001" && sw2.ip === "10.0.0.1", `${sw2.serial} ${sw2.ip}`);
     t("re-import: existing spec never overwritten", sw2.specs?.["CPU"] === "mine");
     t("re-import: no duplicate devices", r2.auvikDoc.devices.filter((d) => d.name === "EX-SW01").length === 1 && r2.auvikDoc.devices.length === doc2.devices.length);
+    // endpoints: unattached per-kind boxes in column 1, nothing unplaced
+    const prn = (d: Doc) => d.devices.filter((x) => x.endpoints?.some((e) => e.name === "EX-PRN01"));
+    const pb = prn(doc1);
+    t("endpoints: printer is a member of one printers box in column 1, unplaced empty", pb.length === 1 && pb[0].type === "Endpoints" && /printer/i.test(pb[0].name) && pb[0].fx === byName(doc1, "EX-AP01").fx && pb[0].rack === null && (doc1.auvik?.unplaced ?? []).length === 0, JSON.stringify(pb.map((x) => [x.name, x.fx])));
+    t("endpoints: re-import adds no second box or member", prn(r2.auvikDoc).length === 1 && r2.auvikDoc.devices.filter((x) => x.type === "Endpoints").length === doc2.devices.filter((x) => x.type === "Endpoints").length && prn(r2.auvikDoc)[0].endpoints!.filter((e) => e.name === "EX-PRN01").length === 1 && (r2.auvikDoc.auvik?.unplaced ?? []).length === 0);
 
     // overwrite ticks set values but not manual ones
     const doc3 = copy(doc1);

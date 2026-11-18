@@ -7,7 +7,7 @@ import { ClientItem, clientStore } from "../../clients/store";
 import { RACK_MODELS, modelById } from "../../racks";
 import { useSettings } from "../../settings/context";
 import type { Doc } from "../../types";
-import SitePreview, { SiteState, defaultTicks, newSiteState } from "./SitePreview";
+import SitePreview, { SiteState, ticksOf, newSiteState } from "./SitePreview";
 import { Defaults, SiteDocs, SitePlan, mapTenantToSite, planSite, saveSite } from "./sync";
 import { btn, inp } from "./ui";
 
@@ -34,6 +34,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   const [lines, setLines] = useState<string[]>([]);
   const abort = useRef<AbortController | null>(null);
   const stopped = useRef(false);
+  const chooseSeq = useRef(0);   // a slow answer for an earlier client must not replace the later one
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; abort.current?.abort(); }, []);
 
@@ -72,6 +73,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   };
 
   const choose = async (id: string) => {
+    const seq = ++chooseSeq.current;
     setParent(id); setErr(""); setDocs(null); setPicks({});
     if (!id) return;
     try {
@@ -79,15 +81,15 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
       const d = await loadDocs(fresh);
       const p = parents.find((x) => x.id === id)!;
       const list = p.type === "client" ? [p] : (tenants ?? []).filter((t) => t.type === "client" && t.parent === p.id);
-      if (!alive.current) return;
+      if (!alive.current || seq !== chooseSeq.current) return;
       setCl(fresh); setDocs(d); setPicks(mapping(fresh, d, list));
-    } catch (e) { if (alive.current) setErr("Could not read this client's racks. " + msg(e)); }
+    } catch (e) { if (alive.current && seq === chooseSeq.current) setErr("Could not read this client's racks. " + msg(e)); }
   };
 
   const testConn = async () => {
     setTest("Testing...");
-    try { const r = await A.auvikTest(); setTest(r.ok ? "Connection works." : `Connection failed. ${r.error ?? ""}`); }
-    catch (e) { setTest("Connection failed. " + msg(e)); }
+    try { const r = await A.auvikTest(); setTest(r.ok ? "Connection works." : r.error ? `Connection failed: ${r.error.replace(/[.\s]+$/, "")}.` : "Connection failed."); }
+    catch (e) { setTest(`Connection failed: ${msg(e).replace(/[.\s]+$/, "")}.`); }
   };
 
   const chosen = kids.filter((t) => picks[t.id]?.on);
@@ -106,9 +108,8 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
       const ac = new AbortController(); abort.current = ac;
       try {
         const inv = await A.auvikInventory(t.id, ac.signal);
-        if (stopped.current) break;
         if (inv.status !== "ok" || !inv.devices.length) out.push({ tenant: t, inv: null, note: inv.note || (inv.status === "denied" ? "Auvik did not allow access to this site." : "No devices in this site.") });
-        else out.push({ tenant: t, inv, note: "" });
+        else out.push({ tenant: t, inv, note: "" });   // a site that finished is kept even if Stop landed just after
       } catch (e) {
         if (stopped.current) break;
         out.push({ tenant: t, inv: null, note: msg(e) });
@@ -148,7 +149,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
       setProgress({ n: out.length + 1, of: reads.length, name: r.tenant.name });
       try {
         const p = planFor(r, false);
-        const sel = sites[r.tenant.id].ticks ?? defaultTicks(p);
+        const sel = ticksOf(p, sites[r.tenant.id].over);
         const res = await saveSite(p, sel, { clientKey: cl.key, siteId: picks[r.tenant.id].siteId, siteName: nameOf(r.tenant) });
         out.push(res.line);
         next[r.tenant.id] = { ...next[r.tenant.id], siteId: res.siteId };   // a re-run must not make a second site
@@ -201,7 +202,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
                   const set = (q: Partial<SitePick>) => setPicks((o) => ({ ...o, [t.id]: { ...p, ...q } }));
                   return (
                     <div key={t.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "2px 0" }}>
-                      <label style={{ width: 300 }}><input type="checkbox" checked={p.on} onChange={(e) => set({ on: e.target.checked })} /> {t.name}</label>
+                      <label style={{ width: 300 }}><input type="checkbox" aria-label={`Read ${t.name}`} checked={p.on} onChange={(e) => set({ on: e.target.checked })} /> {t.name}</label>
                       <select style={{ ...inp, minWidth: 220 }} value={p.siteId ?? ""} onChange={(e) => set({ siteId: e.target.value === "" ? null : +e.target.value })}>
                         <option value="">(new site)</option>
                         {cl.sites.map((s) => <option key={s.id} value={s.id}>Update {s.name}</option>)}
