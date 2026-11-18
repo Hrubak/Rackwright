@@ -3,7 +3,7 @@
 //   node scripts/version.mjs            print the version of every file
 //   node scripts/version.mjs --check    exit 1 if they differ (CI runs this)
 //   node scripts/version.mjs 3.1.0      set every file to 3.1.0
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +25,8 @@ const arg = process.argv[2];
 const found = [];
 const files = new Map();
 for (const [file, re] of spots) {
+  // A missing Cargo.lock is allowed: CI then builds one and keeps it as an artifact.
+  if (file.endsWith("Cargo.lock") && !files.has(file) && !existsSync(join(root, file))) continue;
   const text = files.get(file) ?? readFileSync(join(root, file), "utf8");
   const m = re.exec(text);
   if (!m) { console.error(`No version found in ${file}`); process.exit(1); }

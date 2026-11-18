@@ -2,6 +2,16 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.19.0 — 2026-11-18
+Web only; the desktop app is unchanged. Update the LXC as usual. The update adds an empty settings file for Auvik and builds the server with a new HTTPS client, so the first update takes a little longer.
+- **Import from Auvik.** A client page on the web has a new Import from Auvik button. It reads devices straight from Auvik, so you no longer need to export a spreadsheet. Pick the Auvik sites to read, check the preview for each one, and press Import. Nothing changes until you do.
+- **Connect Auvik first.** An admin puts the Auvik API username, API key and region in `/etc/rackwright/auvik.env` on the LXC and restarts the service. The README section "Connect Auvik (web)" has the steps. The key stays on the server: the browser never sees it, and it never appears in logs or error messages. Test connection in the dialog checks it. Until it is set, the button doesn't show.
+- **One "(Auvik)" rack per site.** New devices go into a rack document named after the site with "(Auvik)". Rack gear waits in the To place column and everything else goes to the Inventory column, with printers, phones and other end devices in Endpoints boxes. Paste a rack layout list in the preview to place devices straight into racks. A device you have already moved into a real rack stays there; Rackwright only updates its details.
+- **Your edits are kept.** Importing again only fills empty fields, unless you tick Overwrite existing values. Values you changed by hand are never overwritten. Every device field now remembers where it came from (Auvik, CSV or you), and devices that are no longer in Auvik are listed but never removed.
+- Cables from Auvik come in 3.20.0.
+- A site first imported from an Auvik spreadsheet may show its endpoints twice after its first API import: once in the old groups (shown as missing) and once in the new Endpoints boxes. Delete the old groups once.
+- The first LXC update after this release builds without a pinned dependency list. If the build fails on an old Rust version, run `rustup update stable` in the LXC and update again.
+
 ## 3.18.0 — 2026-11-18
 Web and desktop. Update the LXC as usual. The server now accepts one more upload, the Word master template; nothing else changes.
 - **Word report.** The Client report dialog has a new Export Word button next to Export PDF. It makes the same Overview or Detailed report as the PDF, with the same summary, recommendations, sites and date, as a Word document you can edit before you send it.

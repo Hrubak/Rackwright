@@ -9,6 +9,13 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
 - 3.3.0: site-to-site links diagram with provider, circuit ID, bandwidth and end devices. Done.
 - 3.4.0: Auvik import into a client, with an optional split into sites by network. Done.
 
+## Integrations
+
+- 3.19.0: Import from Auvik over the Auvik API (web): one "(Auvik)" rack per site, fill-empty re-imports, per-field source tracking. Done.
+- 3.20.0: cables from Auvik's interface and topology data.
+
+Design: `docs/superpowers/specs/2026-11-18-auvik-api-import-design.md`.
+
 ## Look and feel (planned after Clients and sites)
 
 - **Logo and icon.** A Rackwright logo and an app icon (desktop exe, browser tab, sign-in page).

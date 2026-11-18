@@ -62,8 +62,8 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx): { 
       const specs = src ? specsOf(src.components) : {};
       const out: ApiPlanItem = { ...i };
       if (i.mode === "vm" && i.host) out.hostGuessed = true;
-      if (i.kind === "controller" && i.mode === "skip" && !/virtual|vm/i.test(`${i.dev.name} ${i.dev.model}`)) { out.mode = "off"; out.virtual = false; }   // a real controller is inventory, never silently dropped
-      if (i.kind === "ipmi" && i.host === "new") { out.mode = "off"; out.host = null; }   // no host to attach to: off-rack only, a layout places devices
+      if (i.kind === "controller" && i.mode === "skip" && !/virtual|\bvm\b/i.test(`${i.dev.name} ${i.dev.model}`)) { out.mode = "off"; out.virtual = false; }   // a real controller is inventory, never silently dropped
+      if (i.kind === "ipmi" && i.host === "new") { out.mode = "off"; out.host = "off"; }   // no host to attach to: off-rack only, a layout places devices
       if (Object.keys(specs).length) out.specs = specs;
       return out;
     }),
