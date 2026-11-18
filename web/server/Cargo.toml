@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 axum = "0.7.9"
-tokio = { version = "1.41.1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tokio = { version = "1.41.1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
 tower-http = { version = "0.6.2", features = ["fs"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 argon2 = "0.5.3"
@@ -26,6 +26,7 @@ hex = "0.4.3"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.133", features = ["raw_value"] }
 time = { version = "0.3.36", features = ["formatting"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 tower = { version = "0.5.1", features = ["util"] }

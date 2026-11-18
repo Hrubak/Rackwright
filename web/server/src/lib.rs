@@ -9,6 +9,7 @@ pub mod geom;
 #[path = "../../../rackwright-tauri/src-tauri/src/router.rs"]
 pub mod router;
 
+pub mod auvik;
 mod clients;
 mod settings;
 mod update;
@@ -44,6 +45,7 @@ const BODY_LIMIT: usize = 20 * 1024 * 1024;
 pub struct AppState {
     db: Mutex<Connection>,
     update: update::UpdateCfg,
+    auvik: Option<auvik::Auvik>,
 }
 
 impl AppState {
@@ -682,6 +684,11 @@ CREATE TABLE IF NOT EXISTS racks (
 
 /// Open (creating if needed) the database in `data_dir` and build the full router.
 pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, String> {
+    build_app_with(data_dir, static_dir, auvik::AuvikCfg::from_env())
+}
+
+/// Like `build_app`, with the Auvik settings given (tests pass a mock server's URL).
+pub fn build_app_with(data_dir: &FsPath, static_dir: &FsPath, auvik_cfg: Option<auvik::AuvikCfg>) -> Result<Router, String> {
     std::fs::create_dir_all(data_dir).map_err(|e| format!("cannot create data dir {}: {e}", data_dir.display()))?;
     let conn = Connection::open(data_dir.join("rackwright.db")).map_err(|e| format!("cannot open database: {e}"))?;
     conn.execute_batch("PRAGMA journal_mode = WAL;").map_err(|e| format!("database setup failed: {e}"))?;
@@ -689,7 +696,11 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
     clients::migrate(&conn).map_err(|e| format!("database migration failed: {e}"))?;
     settings::migrate(&conn).map_err(|e| format!("database migration failed: {e}"))?;
 
-    let state: Shared = Arc::new(AppState { db: Mutex::new(conn), update: update::UpdateCfg::new(data_dir) });
+    let auvik = match auvik_cfg {
+        Some(cfg) => Some(auvik::Auvik::new(cfg)?),
+        None => None,
+    };
+    let state: Shared = Arc::new(AppState { db: Mutex::new(conn), update: update::UpdateCfg::new(data_dir), auvik });
     let spa = ServeDir::new(static_dir).fallback(ServeFile::new(static_dir.join("index.html")));
 
     let app = Router::new()
@@ -723,6 +734,8 @@ pub fn build_app(data_dir: &FsPath, static_dir: &FsPath) -> Result<Router, Strin
         .route("/api/sites/:id", axum::routing::patch(clients::patch_site).delete(clients::delete_site))
         .route("/api/clients/:id/links", post(clients::create_link))
         .route("/api/links/:id", axum::routing::patch(clients::patch_link).delete(clients::delete_link))
+        .route("/api/auvik", get(auvik::get_status))
+        .route("/api/auvik/test", post(auvik::post_test))
         .route("/api/route_cables", post(route_cables))
         .route("/api/port_positions", post(port_positions))
         .route("/api/admin/update", get(update::get_update).post(update::post_update))

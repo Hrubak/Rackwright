@@ -27,6 +27,12 @@ proxmox/install/rackwright-install.sh    runs inside the LXC
 | `RW_PORT`   | `8080`         | port                                     |
 | `RW_STATIC` | `./web/dist`   | front-end files; SPA fallback to index   |
 | `RW_APP_DIR`| `/opt/rackwright` | git checkout the admin Update server runs in |
+| `AUVIK_API_KEY` | (none) | Auvik API key. Server only; never sent to the browser |
+| `AUVIK_USERNAME` | (none) | Auvik API user name (Basic auth) |
+| `AUVIK_REGION` | (none) | Auvik region, matches `^[a-z]{2,3}[0-9]{1,2}$` (for example `us1`). Base URL is `https://auvikapi.<region>.my.auvik.com/v1` |
+| `AUVIK_BASE_URL` | (none) | **Test-only.** Replaces the base URL so tests can use a local mock. Do not set it in production |
+
+Auvik import is on only when key, user name and a valid region are all set.
 
 `GET /healthz` → `200 ok` (no auth).
 
@@ -110,6 +116,22 @@ It only works where the app is a git checkout in `RW_APP_DIR` (default `/opt/rac
 | `GET /api/admin/update`        | —    | `UpdateStatus` |
 | `POST /api/admin/update/check` | —    | fetches the branch, returns `{version, commit, latest_version, latest_commit, latest_date, latest_subject, update_available, changes}`. `changes` = CHANGELOG.md sections newer than `version`. 409 while an update runs, 502 when the repository can't be reached |
 | `POST /api/admin/update`       | —    | 202 `{}`; starts the update. 409 if one is already running |
+
+## Auvik (web only)
+
+Reads devices from the Auvik API. The server holds the key; the browser never sees it. All routes need a signed-in user (401 otherwise).
+When Auvik is not configured, every route except `GET /api/auvik` returns 404 `{"error":"Auvik is not set up on this server."}`.
+
+| Method & path | Result |
+|---|---|
+| `GET /api/auvik` | `{"configured": bool, "region": str, "username": str}`. Never the key. `region` and `username` are `""` when not configured. |
+| `POST /api/auvik/test` | Calls Auvik `GET /authentication/verify`. Returns `{"ok": true}` or `{"ok": false, "error": str}` (Auvik's error title, or a fixed message). Always 200. |
+| `GET /api/auvik/tenants` | `[{"id", "name", "type": "multiClient"\|"client", "parent": id\|null}]`, multi-client tenants first, by name. |
+| `GET /api/auvik/tenants/:id/inventory` | `{"status": "ok"\|"denied"\|"empty", "note": str, "devices": [AuvikApiDevice]}`. 200 for all three statuses. Other Auvik failures return 502 with a fixed message. |
+
+`AuvikApiDevice` = `{id, name, type, makeModel, vendor, serial, firmware, software, ips: [str], macs: [str], status, discovery: str, components: [{type, name, detail}]}`. Missing attributes are `""` or `[]`.
+
+Limits: 20 s per Auvik request, one Auvik request at a time, 429/503 retried up to 5 times, pages followed up to 50 per endpoint.
 
 ## Racks (shared: every signed-in user sees and edits all of them)
 
