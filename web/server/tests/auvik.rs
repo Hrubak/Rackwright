@@ -255,6 +255,8 @@ struct Mock {
     self_loop: bool,
     /// The device list answers 500 and echoes the Authorization header in the body.
     echo500: bool,
+    /// The tenant details answer 500.
+    detail_fails: bool,
     /// Requests to the device list.
     info_hits: AtomicUsize,
     /// Requests to all inventory routes (429 answers included).
@@ -270,6 +272,7 @@ impl Mock {
             rate_limits: AtomicUsize::new(0),
             self_loop: false,
             echo500: false,
+            detail_fails: false,
             info_hits: AtomicUsize::new(0),
             hits: AtomicUsize::new(0),
         }
@@ -296,8 +299,15 @@ async fn m_tenants() -> Response {
     answer(TENANTS.to_string())
 }
 
-async fn m_tenants_detail() -> Response {
-    answer(TENANTS_DETAIL.to_string())
+async fn m_tenants_detail(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>) -> Response {
+    if m.detail_fails {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "{}".to_string()).into_response();
+    }
+    if q.get("tenantDomainPrefix").map(|t| t.as_str()) == Some("example-it") {
+        answer(TENANTS_DETAIL.to_string())
+    } else {
+        answer(NO_DATA.to_string())
+    }
 }
 
 async fn m_info(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>, headers: HeaderMap) -> Response {
@@ -397,6 +407,17 @@ async fn tenants_listed() {
         {"id": "1002", "name": "EX Warehouse", "type": "client", "parent": "1000"},
     ]);
     assert_eq!(v, want);
+}
+
+#[tokio::test]
+async fn tenants_fall_back_to_prefix_when_details_fail() {
+    let (app, _d, _m) = inv_app(|m| m.detail_fails = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let names: Vec<String> = v.as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    assert_eq!(names, vec!["example-it", "ex-denied", "ex-empty", "ex-main", "ex-warehouse"]);
+    assert_eq!(v[0]["type"], "multiClient");
 }
 
 #[tokio::test]

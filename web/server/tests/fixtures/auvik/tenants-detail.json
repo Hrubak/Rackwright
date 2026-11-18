@@ -1,60 +1,80 @@
 {
   "data": [
     {
-      "type": "tenantDetail",
+      "type": "tenants",
       "id": "1000",
       "attributes": {
+        "domainPrefix": "example-it",
+        "displayName": "Example IT",
         "tenantType": "multiClient"
+      }
+    },
+    {
+      "type": "tenants",
+      "id": "1001",
+      "attributes": {
+        "domainPrefix": "ex-main",
+        "displayName": "EX Main Office",
+        "tenantType": "client"
       },
       "relationships": {
-        "clients": {
-          "data": [
-            {
-              "type": "tenant",
-              "id": "1001"
-            },
-            {
-              "type": "tenant",
-              "id": "1002"
-            },
-            {
-              "type": "tenant",
-              "id": "1003"
-            },
-            {
-              "type": "tenant",
-              "id": "1004"
-            }
-          ]
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
         }
       }
     },
     {
-      "type": "tenantDetail",
-      "id": "1001",
-      "attributes": {
-        "tenantType": "client"
-      }
-    },
-    {
-      "type": "tenantDetail",
+      "type": "tenants",
       "id": "1002",
       "attributes": {
+        "domainPrefix": "ex-warehouse",
+        "displayName": "EX Warehouse",
         "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     },
     {
-      "type": "tenantDetail",
+      "type": "tenants",
       "id": "1003",
       "attributes": {
+        "domainPrefix": "ex-denied",
+        "displayName": "EX Denied",
         "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     },
     {
-      "type": "tenantDetail",
+      "type": "tenants",
       "id": "1004",
       "attributes": {
+        "domainPrefix": "ex-empty",
+        "displayName": "EX Empty",
         "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     }
   ],

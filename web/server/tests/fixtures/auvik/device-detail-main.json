@@ -2,148 +2,312 @@
   "data": [
     {
       "type": "deviceDetail",
-      "id": "d-1001-01",
+      "id": "dd-1001-01",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.11"
-        ],
-        "macAddress": "00:00:5e:00:53:01",
-        "serialNumber": "EXSN0001",
-        "firmwareVersion": "4.2.1",
-        "softwareVersion": "1.0"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-0-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:01"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-02",
+      "id": "dd-1001-02",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.12"
-        ],
-        "macAddress": "00:00:5e:00:53:02",
-        "serialNumber": "EXSN0002",
-        "firmwareVersion": "4.2.1"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-1-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:02"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-03",
+      "id": "dd-1001-03",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.1"
-        ],
-        "macAddress": "00:00:5e:00:53:03",
-        "serialNumber": "EXSN0003",
-        "firmwareVersion": "7.0.9"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-2-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:03"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-04",
+      "id": "dd-1001-04",
       "attributes": {
-        "ipAddresses": [
-          "198.51.100.21"
-        ],
-        "macAddress": "00:00:5e:00:53:04",
-        "serialNumber": "EXSN0004",
-        "firmwareVersion": "6.1.0"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-3-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:04"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-05",
-      "attributes": {
-        "ipAddresses": [
-          "198.51.100.22"
-        ],
-        "macAddress": "00:00:5e:00:53:05",
-        "serialNumber": "EXSN0005",
-        "firmwareVersion": "6.1.0"
+      "id": "dd-1001-05",
+      "attributes": {},
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-4-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:05"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-06",
+      "id": "dd-1001-06",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.31",
-          "192.0.2.131"
-        ],
-        "macAddress": "00:00:5e:00:53:06",
-        "serialNumber": "EXSN0006",
-        "firmwareVersion": "2.9.0",
-        "softwareVersion": "Hypervisor 8.0"
+        "discoveryStatus": {
+          "snmp": "notSupported",
+          "login": "authorized",
+          "wmi": "notSupported",
+          "vmware": "authorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-5-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:06"
+              }
+            },
+            {
+              "type": "interface",
+              "id": "if-5-1",
+              "attributes": {
+                "interfaceName": "eth1",
+                "macAddress": "00:00:5e:00:53:a1"
+              }
+            },
+            {
+              "type": "interface",
+              "id": "if-5-2",
+              "attributes": {
+                "interfaceName": "eth2",
+                "macAddress": "00:00:5e:00:53:06"
+              }
+            },
+            {
+              "type": "interface",
+              "id": "if-5-3",
+              "attributes": {
+                "interfaceName": "eth3",
+                "macAddress": ""
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-07",
+      "id": "dd-1001-07",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.32"
-        ],
-        "macAddress": "00:00:5e:00:53:07",
-        "serialNumber": "EXSN0007",
-        "firmwareVersion": "2.9.0",
-        "softwareVersion": "Hypervisor 8.0"
+        "discoveryStatus": {
+          "snmp": "notSupported",
+          "login": "authorized",
+          "wmi": "notSupported",
+          "vmware": "authorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-6-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:07"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-08",
+      "id": "dd-1001-08",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.41"
-        ],
-        "macAddress": "00:00:5e:00:53:08",
-        "serialNumber": "EXSN0008",
-        "firmwareVersion": "5.3.2"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-7-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:08"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-09",
+      "id": "dd-1001-09",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.51"
-        ],
-        "macAddress": "00:00:5e:00:53:09"
+        "discoveryStatus": {
+          "snmp": "authorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-8-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:09"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-10",
+      "id": "dd-1001-10",
       "attributes": {
-        "ipAddresses": [
-          "198.51.100.61"
-        ],
-        "macAddress": "00:00:5e:00:53:0a",
-        "serialNumber": "EXSN0010",
-        "firmwareVersion": "3.1"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-9-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:0a"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-11",
+      "id": "dd-1001-11",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.2"
-        ],
-        "macAddress": "00:00:5e:00:53:0b",
-        "serialNumber": "EXSN0011",
-        "firmwareVersion": "9.1.4"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-10-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:0b"
+              }
+            }
+          ]
+        }
       }
     },
     {
       "type": "deviceDetail",
-      "id": "d-1001-12",
+      "id": "dd-1001-12",
       "attributes": {
-        "ipAddresses": [
-          "192.0.2.52"
-        ],
-        "macAddress": "00:00:5e:00:53:0c",
-        "serialNumber": "EXSN0012",
-        "firmwareVersion": "1.2"
+        "discoveryStatus": {
+          "snmp": "authorized",
+          "login": "notAuthorized"
+        }
+      },
+      "relationships": {
+        "interfaces": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "if-11-0",
+              "attributes": {
+                "interfaceName": "eth0",
+                "macAddress": "00:00:5e:00:53:0c"
+              }
+            }
+          ]
+        }
       }
     }
   ],

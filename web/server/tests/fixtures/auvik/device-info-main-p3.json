@@ -1,27 +1,63 @@
 {
   "data": [
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-11",
       "attributes": {
         "deviceName": "EX-RTR01",
         "deviceType": "router",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete",
         "makeModel": "Example R-1000",
-        "vendorName": "Example Networks"
+        "vendorName": "Example Networks",
+        "ipAddresses": [
+          "192.0.2.2"
+        ],
+        "onlineStatus": "online",
+        "serialNumber": "EXSN0011",
+        "firmwareVersion": "9.1.4"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-11"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-12",
       "attributes": {
         "deviceName": "EX-PDU01",
         "deviceType": "pdu",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete",
         "makeModel": "Example PDU-8",
-        "vendorName": "Example Power"
+        "vendorName": "Example Power",
+        "ipAddresses": [
+          "192.0.2.52"
+        ],
+        "onlineStatus": "online",
+        "serialNumber": "EXSN0012",
+        "firmwareVersion": "1.2"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-12"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     }
   ],

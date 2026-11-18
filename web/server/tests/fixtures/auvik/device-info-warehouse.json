@@ -1,39 +1,36 @@
 {
   "data": [
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1002-01",
       "attributes": {
         "deviceName": "EX-WSW01",
         "deviceType": "switch",
         "makeModel": "Example S24",
         "vendorName": "Example Networks",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete"
+        "onlineStatus": "online"
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1002-02",
       "attributes": {
         "deviceName": "EX-WAP01",
         "deviceType": "accessPoint",
         "makeModel": "Example AP-6",
         "vendorName": "Example Wireless",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete"
+        "onlineStatus": "online"
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1002-03",
       "attributes": {
         "deviceName": "EX-WSC01",
-        "deviceType": "scanner",
-        "makeModel": "Example SC-10",
-        "vendorName": "Example Print",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete"
+        "deviceType": "workstation",
+        "makeModel": "Example WS-10",
+        "vendorName": "Example Systems",
+        "onlineStatus": "online"
       }
     }
   ],

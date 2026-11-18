@@ -4,35 +4,72 @@
       "type": "tenant",
       "id": "1000",
       "attributes": {
-        "domainPrefix": "Example IT"
+        "domainPrefix": "example-it",
+        "tenantType": "multiClient"
       }
     },
     {
       "type": "tenant",
       "id": "1001",
       "attributes": {
-        "domainPrefix": "EX Main Office"
+        "domainPrefix": "ex-main",
+        "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     },
     {
       "type": "tenant",
       "id": "1002",
       "attributes": {
-        "domainPrefix": "EX Warehouse"
+        "domainPrefix": "ex-warehouse",
+        "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     },
     {
       "type": "tenant",
       "id": "1003",
       "attributes": {
-        "domainPrefix": "EX Denied"
+        "domainPrefix": "ex-denied",
+        "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     },
     {
       "type": "tenant",
       "id": "1004",
       "attributes": {
-        "domainPrefix": "EX Empty"
+        "domainPrefix": "ex-empty",
+        "tenantType": "client"
+      },
+      "relationships": {
+        "parent": {
+          "data": {
+            "type": "tenant",
+            "id": "1000"
+          }
+        }
       }
     }
   ],

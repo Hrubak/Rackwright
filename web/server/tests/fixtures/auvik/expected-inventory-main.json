@@ -18,17 +18,17 @@
         "00:00:5e:00:53:01"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": [
         {
-          "type": "module",
-          "name": "Slot 1 SFP+",
-          "detail": "10G SFP+ x4"
+          "type": "fan",
+          "name": "Fan 1",
+          "detail": "ok"
         },
         {
           "type": "powerSupply",
           "name": "PSU 1",
-          "detail": "Example PSU-500"
+          "detail": "ok"
         }
       ]
     },
@@ -48,7 +48,7 @@
         "00:00:5e:00:53:02"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": []
     },
     {
@@ -67,12 +67,12 @@
         "00:00:5e:00:53:03"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": [
         {
-          "type": "module",
-          "name": "Slot 0",
-          "detail": "EX-MOD-4G"
+          "type": "systemBoard",
+          "name": "Board",
+          "detail": "ok"
         }
       ]
     },
@@ -92,7 +92,7 @@
         "00:00:5e:00:53:04"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": []
     },
     {
@@ -111,7 +111,7 @@
         "00:00:5e:00:53:05"
       ],
       "status": "offline",
-      "discovery": "complete",
+      "discovery": "",
       "components": []
     },
     {
@@ -128,20 +128,21 @@
         "192.0.2.131"
       ],
       "macs": [
-        "00:00:5e:00:53:06"
+        "00:00:5e:00:53:06",
+        "00:00:5e:00:53:a1"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp notSupported, login authorized, wmi notSupported, vmware authorized",
       "components": [
         {
           "type": "disk",
           "name": "Disk 0",
-          "detail": "900 GB SAS"
+          "detail": "degraded"
         },
         {
           "type": "memory",
           "name": "DIMM A1",
-          "detail": "32 GB DDR4"
+          "detail": "ok"
         }
       ]
     },
@@ -161,7 +162,7 @@
         "00:00:5e:00:53:07"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp notSupported, login authorized, wmi notSupported, vmware authorized",
       "components": []
     },
     {
@@ -180,17 +181,17 @@
         "00:00:5e:00:53:08"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": [
         {
           "type": "disk",
           "name": "Disk 0",
-          "detail": "4 TB SATA"
+          "detail": "ok"
         },
         {
           "type": "disk",
           "name": "Disk 1",
-          "detail": "4 TB SATA"
+          "detail": "failed"
         }
       ]
     },
@@ -210,7 +211,7 @@
         "00:00:5e:00:53:09"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized",
       "components": []
     },
     {
@@ -229,7 +230,7 @@
         "00:00:5e:00:53:0a"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": []
     },
     {
@@ -248,7 +249,7 @@
         "00:00:5e:00:53:0b"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": []
     },
     {
@@ -267,7 +268,7 @@
         "00:00:5e:00:53:0c"
       ],
       "status": "online",
-      "discovery": "complete",
+      "discovery": "snmp authorized, login notAuthorized",
       "components": []
     }
   ]

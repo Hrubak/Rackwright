@@ -327,16 +327,6 @@ fn text(v: &Value, key: &str) -> String {
     }
 }
 
-/// A string attribute from the first of `parts` that has it non-empty.
-fn text_of(parts: &[&Value], key: &str) -> String {
-    for p in parts {
-        let t = text(p, key);
-        if !t.is_empty() {
-            return t;
-        }
-    }
-    String::new()
-}
 
 fn text_list(v: &Value, key: &str) -> Vec<String> {
     match v.pointer(&format!("/attributes/{key}")) {
@@ -351,15 +341,6 @@ fn text_list(v: &Value, key: &str) -> Vec<String> {
     }
 }
 
-fn list_of(parts: &[&Value], key: &str) -> Vec<String> {
-    for p in parts {
-        let l = text_list(p, key);
-        if !l.is_empty() {
-            return l;
-        }
-    }
-    Vec::new()
-}
 
 fn id_of(v: &Value) -> String {
     match v.get("id") {
@@ -390,6 +371,19 @@ fn api_err(e: AuvikErr, what: &str) -> ApiError {
     }
 }
 
+fn rel_id(v: &Value, rel: &str) -> String {
+    match v.pointer(&format!("/relationships/{rel}/data/id")) {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Number(n)) => n.to_string(),
+        _ => String::new(),
+    }
+}
+
+/// True when `s` is safe to put in a query string as it is.
+fn plain_token(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 64 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.')
+}
+
 pub async fn get_tenants(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
     auth(&st, &headers)?;
     let a = match st.auvik.as_ref() {
@@ -397,19 +391,35 @@ pub async fn get_tenants(State(st): State<Shared>, headers: HeaderMap) -> ApiRes
         None => return Err(not_set_up()),
     };
     let list = a.paged("/tenants?page[first]=1000").await.map_err(|e| api_err(e, "tenants"))?;
-    let detail = a.paged("/tenants/detail?page[first]=1000").await.map_err(|e| api_err(e, "tenant details"))?;
-    let mut kinds: HashMap<String, String> = HashMap::new();
-    let mut parents: HashMap<String, String> = HashMap::new();
-    for d in &detail {
-        let id = id_of(d);
-        kinds.insert(id.clone(), text(d, "tenantType"));
-        if let Some(kids) = d.pointer("/relationships/clients/data").and_then(|c| c.as_array()) {
-            for k in kids {
-                let kid = id_of(k);
-                if !kid.is_empty() {
-                    parents.insert(kid, id.clone());
+    // Display names exist only in the tenant details of a multi-client tenant. A failed detail call
+    // is not fatal: those tenants are shown by their domain prefix.
+    let mut names: HashMap<String, String> = HashMap::new();
+    for t in &list {
+        if text(t, "tenantType") != "multiClient" {
+            continue;
+        }
+        let prefix = text(t, "domainPrefix");
+        if !plain_token(&prefix) {
+            continue;
+        }
+        match a.paged(&format!("/tenants/detail?tenantDomainPrefix={prefix}&page[first]=1000")).await {
+            Ok(details) => {
+                for d in &details {
+                    let name = text(d, "displayName");
+                    let id = id_of(d);
+                    if name.is_empty() {
+                        continue;
+                    }
+                    let dp = text(d, "domainPrefix");
+                    if !dp.is_empty() {
+                        names.insert(format!("prefix:{dp}"), name.clone());
+                    }
+                    if !id.is_empty() {
+                        names.insert(id, name);
+                    }
                 }
             }
+            Err(_) => log("tenant details could not be read; using domain prefixes"),
         }
     }
     let mut rows: Vec<(bool, String, Value)> = Vec::new();
@@ -418,15 +428,20 @@ pub async fn get_tenants(State(st): State<Shared>, headers: HeaderMap) -> ApiRes
         if id.is_empty() {
             continue;
         }
-        let mut name = text(t, "domainPrefix");
+        let prefix = text(t, "domainPrefix");
+        let mut name = names.get(&id).cloned().unwrap_or_default();
+        if name.is_empty() {
+            name = names.get(&format!("prefix:{prefix}")).cloned().unwrap_or_default();
+        }
+        if name.is_empty() {
+            name = prefix;
+        }
         if name.is_empty() {
             name = id.clone();
         }
-        let multi = kinds.get(&id).map(|k| k.as_str() == "multiClient").unwrap_or(false);
-        let parent = match parents.get(&id) {
-            Some(p) => Value::String(p.clone()),
-            None => Value::Null,
-        };
+        let multi = text(t, "tenantType") == "multiClient";
+        let parent_id = rel_id(t, "parent");
+        let parent = if parent_id.is_empty() { Value::Null } else { Value::String(parent_id) };
         let kind = if multi { "multiClient" } else { "client" };
         rows.push((!multi, name.to_lowercase(), json!({ "id": id, "name": name, "type": kind, "parent": parent })));
     }
@@ -441,6 +456,33 @@ fn result(status: &str, note: &str, devices: Vec<Value>) -> Value {
 
 fn denied_result() -> Value {
     result("denied", "Rackwright's Auvik key can't read this site.", Vec::new())
+}
+
+/// "snmp authorized, wmi notSupported": the present keys of the discoveryStatus object, in a fixed order.
+fn discovery_text(detail: &Value) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for key in ["snmp", "login", "wmi", "vmware"] {
+        if let Some(Value::String(s)) = detail.pointer(&format!("/attributes/discoveryStatus/{key}")) {
+            if !s.trim().is_empty() {
+                parts.push(format!("{key} {}", s.trim()));
+            }
+        }
+    }
+    parts.join(", ")
+}
+
+/// MAC addresses of the device's interfaces, without empty values or repeats.
+fn macs_of(detail: &Value) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    if let Some(Value::Array(items)) = detail.pointer("/relationships/interfaces/data") {
+        for i in items {
+            let m = text(i, "macAddress");
+            if !m.is_empty() && !out.contains(&m) {
+                out.push(m);
+            }
+        }
+    }
+    out
 }
 
 async fn read_inventory(a: &Auvik, id: &str) -> Result<Value, AuvikErr> {
@@ -469,44 +511,39 @@ async fn read_inventory(a: &Auvik, id: &str) -> Result<Value, AuvikErr> {
     }
     let mut by_device: HashMap<String, Vec<Value>> = HashMap::new();
     for c in &comps {
-        let dev = match c.pointer("/relationships/device/data/id") {
-            Some(Value::String(s)) => s.clone(),
-            Some(Value::Number(n)) => n.to_string(),
-            _ => continue,
-        };
-        let mut detail_text = text(c, "description");
-        if detail_text.is_empty() {
-            detail_text = text(c, "modelNumber");
+        let dev = rel_id(c, "parentDevice");
+        if dev.is_empty() {
+            continue;
         }
         by_device.entry(dev).or_default().push(json!({
             "type": text(c, "componentType"),
             "name": text(c, "componentName"),
-            "detail": detail_text,
+            "detail": text(c, "currentStatus"),
         }));
     }
     let none = Value::Null;
     let mut devices: Vec<Value> = Vec::new();
     for d in &info {
         let did = id_of(d);
-        let det: &Value = match by_detail.get(&did) {
+        let detail_id = rel_id(d, "deviceDetail");
+        let det: &Value = match by_detail.get(&detail_id).or_else(|| by_detail.get(&did)) {
             Some(v) => *v,
             None => &none,
         };
-        let parts: [&Value; 2] = [d, det];
         let comps_for = by_device.remove(&did).unwrap_or_default();
         devices.push(json!({
             "id": did,
-            "name": text_of(&parts, "deviceName"),
-            "type": text_of(&parts, "deviceType"),
-            "makeModel": text_of(&parts, "makeModel"),
-            "vendor": text_of(&parts, "vendorName"),
-            "serial": text_of(&parts, "serialNumber"),
-            "firmware": text_of(&parts, "firmwareVersion"),
-            "software": text_of(&parts, "softwareVersion"),
-            "ips": list_of(&parts, "ipAddresses"),
-            "macs": list_of(&parts, "macAddress"),
-            "status": text_of(&parts, "onlineStatus"),
-            "discovery": text_of(&parts, "discoveryStatus"),
+            "name": text(d, "deviceName"),
+            "type": text(d, "deviceType"),
+            "makeModel": text(d, "makeModel"),
+            "vendor": text(d, "vendorName"),
+            "serial": text(d, "serialNumber"),
+            "firmware": text(d, "firmwareVersion"),
+            "software": text(d, "softwareVersion"),
+            "ips": text_list(d, "ipAddresses"),
+            "macs": macs_of(det),
+            "status": text(d, "onlineStatus"),
+            "discovery": discovery_text(det),
             "components": comps_for,
         }));
     }

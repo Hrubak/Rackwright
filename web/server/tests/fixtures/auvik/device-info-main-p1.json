@@ -1,63 +1,154 @@
 {
   "data": [
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-01",
       "attributes": {
         "deviceName": "EX-SW01",
         "deviceType": "switch",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete",
         "makeModel": "Example S48-PoE",
-        "vendorName": "Example Networks"
+        "vendorName": "Example Networks",
+        "ipAddresses": [
+          "192.0.2.11"
+        ],
+        "onlineStatus": "online",
+        "serialNumber": "EXSN0001",
+        "firmwareVersion": "4.2.1",
+        "softwareVersion": "1.0"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-01"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-02",
       "attributes": {
         "deviceName": "EX-SW02",
         "deviceType": "switch",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete",
         "makeModel": "Example S24",
-        "vendorName": "Example Networks"
+        "vendorName": "Example Networks",
+        "ipAddresses": [
+          "192.0.2.12"
+        ],
+        "onlineStatus": "online",
+        "serialNumber": "EXSN0002",
+        "firmwareVersion": "4.2.1"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-02"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-03",
       "attributes": {
         "deviceName": "EX-FW01",
         "deviceType": "firewall",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete",
         "makeModel": "Example FW-200",
-        "vendorName": "Example Security"
+        "vendorName": "Example Security",
+        "ipAddresses": [
+          "192.0.2.1"
+        ],
+        "onlineStatus": "online",
+        "serialNumber": "EXSN0003",
+        "firmwareVersion": "7.0.9"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-03"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-04",
       "attributes": {
         "deviceName": "EX-AP01",
         "deviceType": "accessPoint",
-        "onlineStatus": "online",
-        "discoveryStatus": "complete",
         "makeModel": "Example AP-6",
-        "vendorName": "Example Wireless"
+        "vendorName": "Example Wireless",
+        "ipAddresses": [
+          "198.51.100.21"
+        ],
+        "onlineStatus": "online",
+        "serialNumber": "EXSN0004",
+        "firmwareVersion": "6.1.0"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-04"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     },
     {
-      "type": "deviceInfo",
+      "type": "device",
       "id": "d-1001-05",
       "attributes": {
         "deviceName": "EX-AP02",
         "deviceType": "accessPoint",
-        "onlineStatus": "offline",
-        "discoveryStatus": "complete",
         "makeModel": "Example AP-6",
-        "vendorName": "Example Wireless"
+        "vendorName": "Example Wireless",
+        "ipAddresses": [
+          "198.51.100.22"
+        ],
+        "onlineStatus": "offline",
+        "serialNumber": "EXSN0005",
+        "firmwareVersion": "6.1.0"
+      },
+      "relationships": {
+        "deviceDetail": {
+          "data": {
+            "type": "deviceDetail",
+            "id": "dd-1001-05"
+          }
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
       }
     }
   ],
