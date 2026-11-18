@@ -636,6 +636,7 @@ export const identOf = (d: AuvikDevice, key = auvikKey(d)): Ident => ({
 /** Existing device -> same device in a new import: Auvik id, serial, MAC, IP + host name, then (Auvik-added devices only) Auvik name. */
 export function matchesDevice(d: Device & { auvik_id?: string; auvik_name?: string; auvik_macs?: string[] }, id: Ident): boolean {
   if (id.apiKey && d.auvik_id === id.apiKey) return true;
+  if (id.apiKey && d.auvik_id?.startsWith("api:")) return false;   // carries a different Auvik id: never the same device
   if (id.serial && (d.serial === id.serial || (!!d.auvik_id && d.auvik_id.split("#")[0] === id.serial))) return true;
   if (id.macs.length) {
     const mine = [...(d.auvik_macs || []), d.mac || ""].filter(Boolean).map(normMac);

@@ -56,9 +56,15 @@ export function orderUnits(plan: ImportPlan): PlanUnit[] {
 /** Which device in the document is each plan unit? Placeholders are always new; an OOBM host chosen from the document is that device. */
 export function matchUnits(doc: Doc, plan: ImportPlan): Map<string, Device> {
   const out = new Map<string, Device>(), used = new Set<number>();
-  for (const o of plan.oobms) if (o.unit.existingId != null) { const d = doc.devices.find((x) => x.id === o.unit.existingId); if (d) out.set(o.unit.key, d); }
+  for (const o of plan.oobms) if (o.unit.existingId != null) { const d = doc.devices.find((x) => x.id === o.unit.existingId); if (d) { out.set(o.unit.key, d); used.add(d.id); } }
+  // first pass: exact Auvik id, so a fallback never takes a device that belongs to another unit
   for (const u of orderUnits(plan)) {
-    if (u.placeholder) continue;
+    if (u.placeholder || out.has(u.key) || u.unit != null || !u.key.startsWith("api:")) continue;
+    const e = (doc.devices as X[]).find((d) => !used.has(d.id) && d.auvik_id === u.key);
+    if (e) { used.add(e.id); out.set(u.key, e); }
+  }
+  for (const u of orderUnits(plan)) {
+    if (u.placeholder || out.has(u.key)) continue;
     const id = identOf(u.item.dev, u.item.key);
     const found = (doc.devices as X[]).find((d) => !used.has(d.id) && !d.auvik_id?.startsWith("g:") && !d.auvik_id?.startsWith("vm:") && (u.unit != null
       ? d.auvik_id === u.key || (d.auvik_name || "").toLowerCase() === u.name.toLowerCase()

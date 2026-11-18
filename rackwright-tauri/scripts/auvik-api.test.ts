@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { setSource, isManual, markManual } from "../src/source";
 import { readXlsx } from "../src/auvik/xlsx";
 import { parseAuvik } from "../src/auvik/parse";
-import { buildItems, resolvePlan, hostCtxOf } from "../src/auvik/plan";
+import { buildItems, resolvePlan, hostCtxOf, matchesDevice, identOf } from "../src/auvik/plan";
 import { computeDiff, matchUnits } from "../src/auvik/diff";
 import { applyInPlace } from "../src/auvik/apply";
 import { makeXlsx, devices } from "./fixtures/auvikFixture";
@@ -93,6 +93,20 @@ async function main() {
       t("two units sharing a serial never match the same device", hits === 1, String(hits));
     }
     {
+      const dv = { serial: "S", auvik_id: "api:2" } as any;
+      t("matchesDevice: different api id never matches on serial", !matchesDevice(dv, identOf({ serial: "S", macs: [], ips: [], name: "n", apiId: "1" } as any)));
+    }
+    for (const order of [0, 1]) {
+      const { d, pl } = fresh(); const A = unitOf(pl, "EX-RTR"), B = unitOf(pl, "EX-AP1");
+      A.key = A.item.key = "api:1"; A.item.dev.apiId = "1"; B.key = B.item.key = "api:2"; B.item.dev.apiId = "2";
+      A.item.dev.serial = B.item.dev.serial = "SHARED";
+      const Y = d.devices.find((x) => x.name === "EX-AP1") as any, X = d.devices.find((x) => x.name === "EX-RTR") as any;
+      X.auvik_id = "api:1"; Y.auvik_id = "api:2"; X.serial = Y.serial = "SHARED";
+      if (order) d.devices = [X, ...d.devices.filter((x) => x !== X)]; else d.devices = [Y, ...d.devices.filter((x) => x !== Y)];
+      const m = matchUnits(d, pl);
+      t(`shared serial, distinct api ids, order ${order}: each unit keeps its own device`, m.get("api:1") === X && m.get("api:2") === Y);
+    }
+    {
       const { d, pl, it } = fresh(); const dev = d.devices.find((x) => x.name === "EX-SW-02") as any;
       dev.serial = ""; dev.model = "Mine"; dev.source = { model: "csv" };
       const u = unitOf(pl, "EX-SW-02"); u.item.dev.serial = "NEWSER"; u.item.dev.model = "Auvik Model";
@@ -108,7 +122,7 @@ async function main() {
       dev.locked = ["name"]; dev.name = "Hand name"; dev.auvik_name = "old-auvik-name";
       for (const fill of ["empty", "overwrite"] as const) {
         const n = computeDiff(d, pl, it, { fill }).changes.find((c) => c.id === `fld:${u.key}:name`);
-        t(`locked name stays off (${fill})`, !n || n.defaultOn === false, JSON.stringify(n));
+        t(`locked name stays off (${fill})`, !!n && n.defaultOn === false, JSON.stringify(n));
       }
     }
   }
