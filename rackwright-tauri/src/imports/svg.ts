@@ -4,26 +4,46 @@ import { nearestNode } from "./diagram";
 
 const VNS = "http://schemas.microsoft.com/visio/2003/SVGExtensions/";
 
-/** String-level clean-up that works without a DOM. */
+const hrefOk = (v: string) => v.replace(/[\u0000-\u0020]/g, "").startsWith("#");
+
+/** String-level clean-up that works without a DOM. Pre-filter only; the DOM pass is the real one. */
 export function sanitizeSvgText(svg: string): string {
-  return svg
+  const once = (x: string) => x
     .replace(/<script\b[\s\S]*?<\/script\s*>/gi, "")
-    .replace(/<script\b[^>]*\/>/gi, "")
+    .replace(/<script\b[^>]*>/gi, "")
     .replace(/<foreignObject\b[\s\S]*?<\/foreignObject\s*>/gi, "")
-    .replace(/<foreignObject\b[^>]*\/>/gi, "")
+    .replace(/<foreignObject\b[^>]*>/gi, "")
     .replace(/<iframe\b[\s\S]*?<\/iframe\s*>/gi, "")
     .replace(/<iframe\b[^>]*>/gi, "")
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
-    .replace(/\s(?:xlink:)?href\s*=\s*"\s*(?:javascript|https?):[^"]*"/gi, "")
-    .replace(/\s(?:xlink:)?href\s*=\s*'\s*(?:javascript|https?):[^']*'/gi, "");
+    .replace(/\s(?:xlink:)?href\s*=\s*"([^"]*)"/gi, (m, v) => (hrefOk(v) ? m : ""))
+    .replace(/\s(?:xlink:)?href\s*=\s*'([^']*)'/gi, (m, v) => (hrefOk(v) ? m : ""));
+  let cur = svg;
+  for (let i = 0; i < 10; i++) { const n = once(cur); if (n === cur) break; cur = n; }
+  return cur;
 }
 
+const BAD_ELEMENTS = new Set(["script", "foreignobject", "iframe", "object", "embed", "link", "animate", "animatemotion", "animatetransform", "set", "feimage"]);
+
 function sanitizeSvgDom(root: Element): void {
-  root.querySelectorAll("script,foreignObject,iframe").forEach((e) => e.remove());
-  root.querySelectorAll("*").forEach((e) => Array.from(e.attributes).forEach((a) => {
-    if (/^on/i.test(a.name) || (/href$/i.test(a.name) && /^\s*(javascript|https?):/i.test(a.value))) e.removeAttribute(a.name);
-  }));
+  Array.from(root.querySelectorAll("*")).forEach((e) => {
+    const ln = e.localName.toLowerCase();
+    if (BAD_ELEMENTS.has(ln)) { e.remove(); return; }
+    if (ln === "style" && /url\(|@import/i.test(e.textContent || "")) { e.remove(); return; }
+    Array.from(e.attributes).forEach((a) => {
+      const n = a.name.toLowerCase(), local = (a.localName || n).toLowerCase();
+      if (/^on/.test(local) || /^on/.test(n)) e.removeAttribute(a.name);
+      else if (local === "href" && !hrefOk(a.value)) e.removeAttribute(a.name);
+      else if (local === "style" && /url\(|@import|expression\(/i.test(a.value)) e.removeAttribute(a.name);
+    });
+  });
+  [root.localName.toLowerCase() === "svg" ? root : null].forEach((r) => {
+    if (r) Array.from(r.attributes).forEach((a) => {
+      const l = (a.localName || a.name).toLowerCase();
+      if (/^on/.test(l) || (l === "href" && !hrefOk(a.value)) || (l === "style" && /url\(|@import|expression\(/i.test(a.value))) r.removeAttribute(a.name);
+    });
+  });
 }
 
 export async function parseSvg(text: string, fileName: string): Promise<DiagramModel> {
@@ -129,7 +149,7 @@ function svgModel(svg: SVGSVGElement, source: string): DiagramModel {
     let i = 0;
     boxes.forEach((b) => {
       const label = b.lines.join("\n"); if (!label) return;
-      const title = b.el && b.el.localName === "image" ? (b.el.getAttribute("href") || b.el.getAttribute("xlink:href") || "").split("/").pop() || "" : "";
+      const title = b.el && b.el.localName === "image" ? "" : "";
       nodes.push({ id: "s" + i++, title, label, data: {}, ...b.r, el: b.el });
     });
     const inNode = (el: Element) => nodes.some((n) => n.el && n.el !== el && n.el.contains(el));
