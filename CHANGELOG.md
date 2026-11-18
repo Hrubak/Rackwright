@@ -2,6 +2,14 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.15.0 — 2026-11-17
+Web and desktop. Update the LXC as usual; nothing changes on the server.
+- **Import text or CSV.** File › Import text or CSV… replaces the old rack list import. Paste text or choose a .txt or .csv file (on the web you can also drop it in), then press Preview.
+- **Three formats.** A rack layout list (one device per line, top of the rack first, with lines like "1 U RACK EMPTY SPACE", "[Back of Rack]", "(GROUP)" and "A | B" for side-by-side gear), the RackMap text format (`U40 switch SW-01 key=value`), or a CSV or spreadsheet export with a Name, Device or Hostname column. Automatic picks one for you. A CSV with From, From Port, To and To Port columns adds cables.
+- **Preview first.** Every line shows what will happen (add, move, change or unchanged) with a checkbox. You can change a row's kind, height and side before importing. Heights Rackwright had to guess say "height guessed". Nothing changes until you press Import.
+- **Works after an Auvik import.** Rows are matched to devices you already have by serial, MAC, hostname or name, so importing a layout after an Auvik import moves those devices into place instead of adding copies. "Possible match" rows (for example a UPS called only by its IP) stay unticked until you check them. Importing the same file twice changes nothing.
+- If the list is taller than the rack, Rackwright offers to make the rack taller. If a spot is taken, the device goes to the nearest free spot or off-rack, and the result says so.
+
 ## 3.13.0 — 2026-11-17
 Web and desktop. Update the LXC as usual; nothing changes on the server.
 - **Needs attention.** Rackwright now warns you about expired warranties, warranties ending within 60 days, UPS batteries due for replacement (3 years after the battery date) and UPSes or PDUs loaded over 80%. It also flags racks not checked on site in 90 days. The Clients dashboard lists these for all clients; each client card shows how many are critical and how many are warnings; the client's Sites tab lists its own. Click a line to open the rack with that device selected.

@@ -84,7 +84,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
     if (!plan) return;
     const ok = onApply((d) => {
       const log = applyImport(d, plan, opts);
-      return `Imported: ${log.added} added, ${log.moved} moved, ${log.changed} changed${log.cables ? `, ${log.cables} cables` : ""}`;
+      return `Imported: ${log.added} added, ${log.moved} moved, ${log.changed} changed${log.cables ? `, ${log.cables} ${log.cables === 1 ? "cable" : "cables"}` : ""}`;
     });
     if (ok) onClose();
   };
