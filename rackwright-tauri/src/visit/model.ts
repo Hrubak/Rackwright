@@ -20,6 +20,11 @@ export function visitList(doc: Doc, rackId: number): number[] {
     .map((d) => d.id);
 }
 
+/** Same rule as the device panel: a hand edit of an Auvik-managed field locks it against the next import. */
+function lock(d: Device, key: string) {
+  if (d.auvik_id && !(d.locked ?? []).includes(key)) d.locked = [...(d.locked ?? []), key];
+}
+
 export function applyStep(
   doc: Doc, devId: number, action: VisitAction, fields: Partial<Record<VisitField, string>>, today: string,
 ): "confirmed" | "corrected" | "missing" | "gone" {
@@ -36,8 +41,8 @@ export function applyStep(
     if (raw === undefined) continue;
     const val = raw.trim();
     if (f.key === "name") {
-      if (!val || val === d.name) continue;
-      setField(d, "name", val); changed = true;
+      if (!val || val === (d.name ?? "").trim()) continue;
+      setField(d, "name", val); changed = true; lock(d, "name");
     } else if (f.key === "status") {
       const next = (val || "active") as Device["status"];
       if (next === statusOf(d)) continue;
@@ -45,8 +50,9 @@ export function applyStep(
       changed = true;
     } else {
       const cur = ((d as any)[f.key] ?? "") as string;
-      if (val === cur) continue;
+      if (val === cur.trim()) continue;
       setField(d, f.key, val); changed = true;
+      if (f.key === "model" || f.key === "serial" || f.key === "ip") lock(d, f.key);
     }
   }
   d.last_verified = today;

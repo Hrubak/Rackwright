@@ -70,6 +70,20 @@ doc = one();
 eq("finish none", finishVisit(doc, 1, { confirmed: 0, corrected: 0, missing: 0 }, T), false);
 eq("finish none unstamped", doc.racks[0].last_verified, undefined);
 
+{
+  const d1 = mkDoc([mk(1, "Example Box", 5, { serial: "S1", auvik_id: "a1" } as any)]);
+  applyStep(d1, 1, "ok", { serial: "S2" }, T);
+  eq("auvik field locked", dev(d1, 1).locked, ["serial"]);
+  applyStep(d1, 1, "ok", { serial: "S3" }, T);
+  eq("auvik lock no duplicates", dev(d1, 1).locked, ["serial"]);
+  const d2 = mkDoc([mk(1, "Example Box", 5, { serial: "S1" })]);
+  applyStep(d2, 1, "ok", { serial: "S2" }, T);
+  eq("non-auvik not locked", dev(d2, 1).locked, undefined);
+  const d3 = mkDoc([mk(1, "Example Box", 5, { serial: "S1 " })]);
+  eq("stored whitespace confirmed", applyStep(d3, 1, "ok", { serial: "S1 " }, T), "confirmed");
+  eq("stored whitespace untouched", dev(d3, 1).serial, "S1 ");
+}
+
 eq("pos U12", posLabel(mk(1, "a", 12)), "U12");
 eq("pos range", posLabel(mk(1, "a", 12, { u_size: 2 })), "U12–13");
 eq("pos left", posLabel(mk(1, "a", 12, { half: true, side: 0 })), "U12 · left");

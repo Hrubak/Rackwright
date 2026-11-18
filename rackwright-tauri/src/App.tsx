@@ -114,7 +114,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [fitTick, setFitTick] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [visitOpen, setVisitOpen] = useState(false);
+  const [visitRack, setVisitRack] = useState<number | null>(null);
   const [auvikOpen, setAuvikOpen] = useState(false);
   const [reportFor, setReportFor] = useState<string | null>(null); // "" = no client preselected
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -443,6 +443,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       const t = (e.target as HTMLElement).tagName;
       const cmd = commandFor(e);
       if (cmd === "save" || cmd === "saveAs") { e.preventDefault(); doSave(cmd === "saveAs"); return; }
+      if (visitRack != null) return; // site visit dialog is open: no other shortcut reaches the app
       if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return;
       if (cmd) {
         switch (cmd) {
@@ -465,7 +466,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [doUndo, doRedo, del, doSave, doNew, doOpen, doDuplicate, edit, selDev, place, pending, panelOpen]);
+  }, [doUndo, doRedo, del, doSave, doNew, doOpen, doDuplicate, edit, selDev, place, pending, panelOpen, visitRack]);
 
   const rackForTags = targetRack();
 
@@ -733,7 +734,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
             {selRack.kind && <div style={{ fontSize: 12, opacity: 0.7 }}>{kindLabel(selRack.kind)}, {fmtDims(selRack.width_mm, selRack.depth_mm, settings.prefs.units ?? "mm")}</div>}
             <div style={{ fontSize: 12, opacity: 0.7 }}>{rackUsage(doc, selRack).used}U used, {rackUsage(doc, selRack).free}U free</div>
             <div style={{ fontSize: 12, opacity: 0.7 }}>{selRack.last_verified ? `Checked on site ${selRack.last_verified}` : "Never checked on site"}</div>
-            <button style={{ ...btn, margin: "4px 0" }} onClick={() => setVisitOpen(true)}>Site visit</button>
+            <button style={{ ...btn, margin: "4px 0" }} onClick={() => setVisitRack(selRack.id)}>Site visit</button>
             {field("Circuit", selRack.circuit ?? "", (val) => edit((d) => { const r = d.racks.find((x) => x.id === selRack.id)!; if (val) r.circuit = val; else delete r.circuit; }, `rc${selRack.id}`))}
             <label style={{ display: "block", fontSize: 11, color: v("text-dim") }}>Voltage<br />
               <select style={{ ...inp, width: "100%" }} value={selRack.volts === 208 ? 208 : 120} onChange={(e) => edit((d) => {
@@ -832,7 +833,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         defaults={{ model: typeof settings.system.rack_default_model === "string" ? settings.system.rack_default_model : undefined, u: typeof settings.system.rack_default_u === "number" ? settings.system.rack_default_u : undefined }} onPick={onPick} onCancel={() => setPicker(null)} />}
       {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
       {unplacedOpen && <UnplacedDialog items={doc.auvik?.unplaced ?? []} onClose={() => setUnplacedOpen(false)} />}
-      {visitOpen && selRack && <Suspense fallback={null}><SiteVisit doc={doc} rackId={selRack.id} edit={edit} today={todayIso()} onClose={() => setVisitOpen(false)} /></Suspense>}
+      {visitRack != null && <Suspense fallback={null}><SiteVisit key={visitRack} doc={doc} rackId={visitRack} edit={edit} today={todayIso()} onClose={() => setVisitRack(null)} /></Suspense>}
       {importOpen && <Suspense fallback={null}><ImportText doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setImportOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
     </div>
   );

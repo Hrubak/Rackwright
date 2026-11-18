@@ -25,6 +25,9 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
   const [markedMissing, setMarkedMissing] = useState<number[]>([]);
   const [drafts, setDrafts] = useState<Drafts | null>(null);
   const matchRef = useRef<HTMLButtonElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const stepAt = useRef(0); // when the current step appeared; early presses are ignored
+  const [stampedNow, setStampedNow] = useState(false);
   const rack = doc.racks.find((r) => r.id === rackId);
   const rackName = rack?.name ?? "this rack";
 
@@ -50,6 +53,7 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
       name: d.name ?? "", status: statusOf(d), manufacturer: d.manufacturer ?? "", model: d.model ?? "",
       serial: d.serial ?? "", asset_tag: d.asset_tag ?? "", ip: d.ip ?? "",
     } });
+    stepAt.current = Date.now();
     matchRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curId]);
@@ -61,7 +65,8 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
     if (!done) { stamped.current = false; return; }
     if (list.length === 0 || !worked || stamped.current) return;
     stamped.current = true;
-    edit((d) => { finishVisit(d, rackId, counts, today); });
+    if (!doc.racks.some((x) => x.id === rackId)) return;
+    if (edit((d) => { finishVisit(d, rackId, counts, today); })) setStampedNow(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, worked]);
 
@@ -72,6 +77,8 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
   };
   const act = (action: "ok" | "missing") => {
     if (curId == null || !drafts || drafts.id !== curId) return;
+    if (Date.now() - stepAt.current < 300) return;
+    if (!doc.devices.some((x) => x.id === curId)) { setI(idx + 1); return; } // device is gone: nothing to edit
     let res: ReturnType<typeof applyStep> = "gone";
     const ok = edit((d) => { res = applyStep(d, curId, action, drafts.values, today); });
     if (!ok) return;
@@ -89,7 +96,9 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
   };
 
   const onKey = (e: React.KeyboardEvent) => {
-    e.stopPropagation(); // keep Ctrl+Z, Delete etc. from reaching the app behind the dialog
+    // keep Ctrl+Z, Delete etc. from reaching the app behind the dialog; Save still works
+    if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s")) e.stopPropagation();
+    if (e.repeat) return;
     if (e.key === "Escape") { onClose(); return; }
     if (e.key !== "Enter" || done || e.defaultPrevented) return;
     const tag = (e.target as HTMLElement).tagName;
@@ -103,7 +112,8 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
   const stepNo = Math.min(history.length + 1, Math.max(total, 1));
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onKeyDown={onKey}>
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, outline: "none" }} ref={overlayRef} tabIndex={-1} onKeyDown={onKey}
+      onMouseDown={(e) => { const t = e.target as HTMLElement; if (!t.closest("input,select,button,textarea")) overlayRef.current?.focus(); }}>
       <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 520, maxWidth: "96vw", maxHeight: "92vh", overflow: "auto", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 12 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>Site visit · {rackName}</b>
@@ -124,7 +134,7 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
             <span>Skipped</span><b>{counts.skipped}</b>
           </div>
           <div style={{ marginBottom: 12, opacity: 0.8 }}>
-            {counts.confirmed + counts.corrected + counts.missing > 0
+            {stampedNow
               ? "The rack is marked as checked today. Each confirmed or corrected device has today's date in Last checked on site."
               : "Everything was skipped, so the rack is not marked as checked."}
           </div>
