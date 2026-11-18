@@ -246,7 +246,7 @@ async function main() {
     other.nid = 3;
     const sd = mkDocs([{ id: 2, name: "A", doc: doc1 }, { id: 9, name: "Lab", doc: other }]);
     const op = planSite(inv, tenant, sd, defaults, "empty");
-    t("other rack doc: appears with fill-only change", op.other.length === 1 && op.other[0].rackId === 9 && op.other[0].diff.changes.length > 0 && op.other[0].diff.changes.every((c) => c.id.startsWith("fld:")), JSON.stringify(op.other.map((o) => o.diff.changes.map((c) => c.id))));
+    t("other rack doc: appears with fill-only change", op.other.length === 1 && op.other[0].rackId === 9 && op.other[0].diff.changes.length > 0 && op.other[0].diff.changes.every((c) => /^9:fld:/.test(c.id)), JSON.stringify(op.other.map((o) => o.diff.changes.map((c) => c.id))));
     const ro = applySite(op, new Set([...op.other[0].diff.changes.map((c) => c.id), ...op.diff!.changes.filter((c) => c.defaultOn).map((c) => c.id)]));
     const o2 = ro.others.find((x) => x.rackId === 9)!.doc;
     t("other rack doc: ip filled, nothing added, notes and rack untouched", o2.devices.length === 1 && o2.devices[0].ip === "192.0.2.31" && o2.devices[0].rack === 1 && o2.devices[0].u === 10 && o2.devices[0].notes === "keep me" && o2.racks.length === 1 && o2.cables.length === 0, JSON.stringify(o2.devices[0]));
@@ -278,27 +278,50 @@ async function main() {
     const noSite = async (): Promise<number> => { throw new Error("no site expected"); };
     {
       let n = 0; const { api, calls } = mkApi(() => (n++ === 0 ? "409" : "ok"));
-      const line = await saveSite(planA(), new Set(), ctx, api as any, noSite);
+      const line = (await saveSite(planA(), new Set(), ctx, api as any, noSite)).line;
       t("saveSite: first 409 then success", calls.filter((c) => c.startsWith("update")).length === 2 && calls.includes("get 2") && /v7 ok/.test(calls[calls.length - 1]) && !/Skipped/.test(line), calls.join("|") + " " + line);
     }
     {
       const { api, calls } = mkApi(() => "409");
-      const line = await saveSite(planA(), new Set(), ctx, api as any, noSite);
+      const line = (await saveSite(planA(), new Set(), ctx, api as any, noSite)).line;
       t("saveSite: two 409s skip", /Skipped A: someone is editing it/.test(line) && calls.filter((c) => c.startsWith("update")).length === 2, line);
       const { api: api2 } = mkApi(() => "ok");
-      const line2 = await saveSite(planA(), new Set(), ctx, api2 as any, noSite);
+      const line2 = (await saveSite(planA(), new Set(), ctx, api2 as any, noSite)).line;
       t("saveSite: next site still saves after a skipped one", !/Skipped/.test(line2) && /EX Main Office/.test(line2), line2);
     }
     {
       const { api } = mkApi(() => "500");
-      const line = await saveSite(planA(), new Set(), ctx, api as any, noSite);
+      const line = (await saveSite(planA(), new Set(), ctx, api as any, noSite)).line;
       t("saveSite: other errors give a line, no throw", /boom/.test(line), line);
     }
     {
       const { api, calls } = mkApi(() => "ok");
-      const line = await saveSite(planSite(inv, tenant, mkDocs([]), defaults, "empty"), new Set(), { clientKey: "1", siteId: null, siteName: "EX Main Office" }, api as any, async (_k, name) => { calls.push("addSite " + name); return 77; });
+      const line = (await saveSite(planSite(inv, tenant, mkDocs([]), defaults, "empty"), new Set(), { clientKey: "1", siteId: null, siteName: "EX Main Office" }, api as any, async (_k, name) => { calls.push("addSite " + name); return 77; })).line;
       t("saveSite: new site then new document", calls[0] === "addSite EX Main Office" && calls[1] === "create EX Main Office (Auvik) 77" && !!line, calls.join("|"));
     }
+    {
+      // Task 8 fixes: ids per rack, specs follow the selection
+      const dA = copy(doc1); byName(dA, "EX-SRV01").ip = "";
+      const dB = copy(other); dB.devices[0].ip = "";
+      const pp = planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: dA }, { id: 9, name: "Lab", doc: dB }]), defaults, "empty");
+      const mineIds = pp.diff!.changes.filter((c) => c.defaultOn).map((c) => c.id);
+      const rx = applySite(pp, new Set(mineIds));
+      t("untick in other rack leaves the Auvik doc's change applied", byName(rx.auvikDoc, "EX-SRV01").ip === "192.0.2.31" && rx.others.length === 0, `${byName(rx.auvikDoc, "EX-SRV01").ip} ${rx.others.length}`);
+      const rx2 = applySite(pp, new Set(pp.other[0].diff.changes.map((c) => c.id)));
+      t("tick in other rack does not apply to the Auvik doc", !byName(rx2.auvikDoc, "EX-SRV01").ip && rx2.others[0]?.doc.devices[0].ip === "192.0.2.31");
+      const dC = copy(doc1); const sC = byName(dC, "EX-SW01"); sC.ip = "10.9.9.9"; sC.specs = undefined; delete (sC as any).source;
+      const pc = planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: dC }]), defaults, "empty");
+      const rc = applySite(pc, new Set());
+      t("deselected matched device keeps its specs untouched", !byName(rc.auvikDoc, "EX-SW01").specs && byName(rc.auvikDoc, "EX-SW01").ip === "10.9.9.9");
+      const rc2 = applySite(pc, new Set(pc.diff!.changes.filter((c) => c.id.includes(":ip")).map((c) => c.id)));
+      t("ticked matched device gets its specs", !!byName(rc2.auvikDoc, "EX-SW01").specs?.["Power supplies"], JSON.stringify(byName(rc2.auvikDoc, "EX-SW01").specs));
+      const failApi = { createRack: async () => { throw new ApiError(500, "disk full"); }, updateRack: async () => ({}), getRack: async () => ({}) };
+      const rs = await saveSite(planSite(inv, tenant, mkDocs([]), defaults, "empty"), new Set(), { clientKey: "1", siteId: null, siteName: "EX Main Office" }, failApi as any, async () => 88);
+      t("saveSite reports the new site id even when the document fails", rs.siteId === 88 && rs.created === true && /disk full/.test(rs.line), JSON.stringify(rs));
+      const ru = await saveSite(planSite(inv, tenant, mkDocs([]), defaults, "empty"), new Set(), { clientKey: "1", siteId: 5, siteName: "EX Main Office" }, failApi as any, noSite);
+      t("saveSite reports an existing site id, not created", ru.siteId === 5 && ru.created === false);
+    }
+
   }
 
   console.log(fails ? `${fails} FAILED` : "all passed");

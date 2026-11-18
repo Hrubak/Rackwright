@@ -58,7 +58,7 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
     if (r.id === mine?.id) continue;
     const d = computeDiff(r.doc, plan, items, { fill });
     const changes = d.changes.filter((c) => isFld(c.id));
-    if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes } });
+    if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
     tenant, inv, siteDocs, defaults, fill, layout, parsed, items, plan, other,
@@ -88,13 +88,17 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   const rackId = doc.racks[0].id;
   const before = new Set(doc.devices.map((d) => d.id));
   const ticked = new Set(sel ?? []);
-  if (!mine || !sel) for (const id of defaultSelection(computeDiff(doc, p.plan, p.items, { fill: p.fill }))) ticked.add(id);
+  const diff0 = computeDiff(doc, p.plan, p.items, { fill: p.fill });
+  if (!mine || !sel) for (const id of defaultSelection(diff0)) ticked.add(id);
+  // A matched device is imported when it has nothing to tick, or one of its changes is ticked.
+  const hasKey = (id: string, key: string) => id.includes(":" + key + ":") || id.endsWith(":" + key);
+  const wanted = (key: string) => { const mine = diff0.changes.filter((c) => hasKey(c.id, key)); return !mine.length || mine.some((c) => ticked.has(c.id)); };
   applyInPlace(doc, p.plan, { target: "current", rackId }, p.items, ticked, { fill: p.fill });
 
   const itemOf = (d: Device) => p.items.find((i) => i.dev.apiId && (d as X).auvik_id === "api:" + i.dev.apiId);
   for (const d of doc.devices) {
     const it = itemOf(d);
-    if (it?.specs) fillSpecs(d, it.specs);
+    if (it?.specs && (!before.has(d.id) || wanted(it.key))) fillSpecs(d, it.specs);
     if (before.has(d.id) || d.rack != null) continue;   // only devices made by this run, and never one that sits in a rack
     setOffColumn(doc, d, it && specKinds.has(it.kind) ? 0 : 1);
   }
@@ -113,7 +117,8 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
     if (r.id === mine?.id) continue;
     const od = clone(r.doc);
     const diff = computeDiff(od, p.plan, p.items, { fill: p.fill });
-    const pick = sel ?? new Set(diff.changes.filter((c) => isFld(c.id) && c.defaultOn).map((c) => c.id));
+    const pre = `${r.id}:`;
+    const pick = sel ? new Set([...sel].filter((x) => x.startsWith(pre)).map((x) => x.slice(pre.length))) : new Set(diff.changes.filter((c) => isFld(c.id) && c.defaultOn).map((c) => c.id));
     let changed = false;
     for (const u of orderUnits(p.plan)) {
       const dev = diff.matched.get(u.key) as X | undefined;
@@ -151,14 +156,15 @@ const addSiteDefault: AddSite = async (clientKey, name) => {
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+export interface SaveResult { line: string; siteId: number | null; created: boolean }
 export interface SaveCtx { clientKey: string; siteId: number | null; siteName: string }
 
 /** Saves one site and returns one result line. Never throws. */
-export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api: RackApi = A, addSite: AddSite = addSiteDefault): Promise<string> {
+export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api: RackApi = A, addSite: AddSite = addSiteDefault): Promise<SaveResult> {
   const head = ctx.siteName || p.tenant.name;
+  let siteId = ctx.siteId, created = false;
   try {
-    let siteId = ctx.siteId;
-    if (siteId == null) siteId = await addSite(ctx.clientKey, ctx.siteName || p.tenant.name);
+    if (siteId == null) { siteId = await addSite(ctx.clientKey, ctx.siteName || p.tenant.name); created = true; }
     const first = applySite(p, sel);
     const notes: string[] = [];
     let saved = 0;
@@ -192,8 +198,8 @@ export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api:
       const r = p.siteDocs.racks.find((x) => x.id === o.rackId)!;
       await saveOne(o.rackId, r.name, r.version, o.doc);
     }
-    return `${head}: saved ${saved} rack document${saved === 1 ? "" : "s"}.` + (notes.length ? " " + notes.join(". ") + "." : "");
+    return { line: `${head}: saved ${saved} rack document${saved === 1 ? "" : "s"}.` + (notes.length ? " " + notes.join(". ") + "." : ""), siteId, created };
   } catch (e) {
-    return `${head}: could not save. ${msg(e)}`;
+    return { line: `${head}: could not save. ${msg(e)}`, siteId, created };
   }
 }
