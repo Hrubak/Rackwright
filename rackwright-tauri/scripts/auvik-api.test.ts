@@ -11,7 +11,7 @@ import type { Device, Doc } from "../src/types";
 import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, type AuvikApiDevice } from "../src/auvik/api/map";
 import { classify, setMode, resolvePlan as resolveP } from "../src/auvik/plan";
 import { setOffColumn } from "../src/edit";
-import { findAuvikDoc, mapTenantToSite, planSite, applySite, saveSite, type SiteDocs } from "../src/auvik/api/sync";
+import { findAuvikDoc, mapTenantToSite, planSite, applySite, saveSite, skipLine, type SiteDocs } from "../src/auvik/api/sync";
 import { parseLayout } from "../src/imports/layout";
 import { ApiError } from "../src/api";
 
@@ -202,6 +202,20 @@ async function main() {
     t("mapTenantToSite: trimmed case-insensitive name", m2.siteId === 6 && !m2.isNew);
     const m3 = mapTenantToSite({ ...tenant, name: "EX Warehouse" }, client, new Map());
     t("mapTenantToSite: new", m3.siteId === null && m3.isNew && m3.name === "EX Warehouse");
+
+    // a multi-site client with one dead site (Auvik 403): that site is skipped with a note, the others import
+    const denied = { status: "denied" as const, note: "Auvik denied access to this site.", devices: [] };
+    t("skipLine: denied site", skipLine("EX Old Site", denied) === "Auvik denied access to site EX Old Site, skipped.");
+    t("skipLine: empty site", skipLine("EX Empty", { status: "empty", note: "No devices found.", devices: [] }) === "EX Empty: skipped. No devices found.");
+    t("skipLine: read error", skipLine("EX Warehouse", new Error("Auvik is busy.")) === "EX Warehouse: skipped. Auvik is busy.");
+    t("skipLine: a site with devices is imported", skipLine("EX Main Office", inv) === "");
+    {
+      const reads = [{ n: "EX Main Office", got: inv as unknown }, { n: "EX Old Site", got: denied }];
+      const kept = reads.filter((r) => !skipLine(r.n, r.got));
+      t("multi-site with a denied site: the others are still imported", kept.length === 1 && kept[0].n === "EX Main Office");
+      const ok = applySite(planSite(inv, tenant, mkDocs([]), defaults, "empty"), new Set()).auvikDoc;
+      t("multi-site with a denied site: the readable site still builds its rack document", ok.devices.length > 0);
+    }
 
     // fresh site
     const fresh = planSite(inv, tenant, mkDocs([]), defaults, "empty");

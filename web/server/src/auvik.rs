@@ -7,7 +7,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
 
 use crate::{auth, json_ok, ApiError, ApiResult, Shared};
@@ -167,8 +168,21 @@ impl Auvik {
         &self.cfg.username
     }
 
-    /// GET `<base><path_and_query>` with Basic auth. One request at a time; retries 429/503.
+    /// GET `<base><path_and_query>` with Basic auth and a JSON answer. One request at a time; retries 429/503.
     pub async fn get(&self, path_and_query: &str) -> Result<Value, AuvikErr> {
+        match self.fetch(path_and_query, true).await? {
+            Some(v) => Ok(v),
+            None => Err(AuvikErr::Failed("Auvik sent an answer that could not be read.".to_string())),
+        }
+    }
+
+    /// Checks the key with `/authentication/verify`. Any 2xx is success: Auvik answers 200 with an empty body.
+    pub async fn verify(&self) -> Result<(), AuvikErr> {
+        self.fetch("/authentication/verify", false).await.map(|_| ())
+    }
+
+    /// The request behind `get` and `verify`. With `want_json` false a 2xx body is not read (`Ok(None)`).
+    async fn fetch(&self, path_and_query: &str, want_json: bool) -> Result<Option<Value>, AuvikErr> {
         let _guard = self.gate.lock().await;
         let url = format!("{}{}", self.cfg.base, path_and_query);
         let mut attempt = 0usize;
@@ -202,10 +216,13 @@ impl Auvik {
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 continue;
             }
+            if status.is_success() && !want_json {
+                return Ok(None);
+            }
             let body: Option<Value> = resp.json::<Value>().await.ok();
             if status.is_success() {
                 return match body {
-                    Some(v) => Ok(v),
+                    Some(v) => Ok(Some(v)),
                     None => Err(AuvikErr::Failed("Auvik sent an answer that could not be read.".to_string())),
                 };
             }
@@ -292,11 +309,26 @@ impl Auvik {
     }
 }
 
+/// Every Auvik route answers `Cache-Control: no-store`: a changed auvik.env must show after a restart
+/// without a page reload, and the browser must never keep an inventory.
+fn no_store(r: ApiResult) -> Response {
+    let mut resp = match r {
+        Ok(x) => x,
+        Err(e) => e.into_response(),
+    };
+    resp.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    resp
+}
+
 fn not_set_up() -> ApiError {
     ApiError::new(StatusCode::NOT_FOUND, FIXED_NOT_SET_UP)
 }
 
-pub async fn get_status(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
+pub async fn get_status(st: State<Shared>, headers: HeaderMap) -> Response {
+    no_store(read_status(st, headers).await)
+}
+
+async fn read_status(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
     auth(&st, &headers)?;
     let v = match st.auvik.as_ref() {
         Some(a) => json!({ "configured": true, "region": a.region(), "username": a.username() }),
@@ -305,13 +337,17 @@ pub async fn get_status(State(st): State<Shared>, headers: HeaderMap) -> ApiResu
     Ok(json_ok(&v))
 }
 
-pub async fn post_test(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
+pub async fn post_test(st: State<Shared>, headers: HeaderMap) -> Response {
+    no_store(run_test(st, headers).await)
+}
+
+async fn run_test(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
     auth(&st, &headers)?;
     let a = match st.auvik.as_ref() {
         Some(a) => a,
         None => return Err(not_set_up()),
     };
-    let v = match a.get("/authentication/verify").await {
+    let v = match a.verify().await {
         Ok(_) => json!({ "ok": true }),
         Err(AuvikErr::Denied(m)) | Err(AuvikErr::Failed(m)) => json!({ "ok": false, "error": m }),
         Err(AuvikErr::Busy) => json!({ "ok": false, "error": FIXED_BUSY }),
@@ -384,7 +420,11 @@ fn plain_token(s: &str) -> bool {
     !s.is_empty() && s.len() <= 64 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.')
 }
 
-pub async fn get_tenants(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
+pub async fn get_tenants(st: State<Shared>, headers: HeaderMap) -> Response {
+    no_store(list_tenants(st, headers).await)
+}
+
+async fn list_tenants(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
     auth(&st, &headers)?;
     let a = match st.auvik.as_ref() {
         Some(a) => a,
@@ -455,7 +495,7 @@ fn result(status: &str, note: &str, devices: Vec<Value>) -> Value {
 }
 
 fn denied_result() -> Value {
-    result("denied", "Rackwright's Auvik key can't read this site.", Vec::new())
+    result("denied", "Auvik denied access to this site.", Vec::new())
 }
 
 /// "snmp authorized, wmi notSupported": the present keys of the discoveryStatus object, in a fixed order.
@@ -550,7 +590,11 @@ async fn read_inventory(a: &Auvik, id: &str) -> Result<Value, AuvikErr> {
     Ok(result("ok", "", devices))
 }
 
-pub async fn get_inventory(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
+pub async fn get_inventory(st: State<Shared>, headers: HeaderMap, id: Path<String>) -> Response {
+    no_store(read_site(st, headers, id).await)
+}
+
+async fn read_site(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
     auth(&st, &headers)?;
     let a = match st.auvik.as_ref() {
         Some(a) => a,

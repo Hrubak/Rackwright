@@ -216,6 +216,16 @@ const addSiteDefault: AddSite = async (clientKey, name) => {
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** The preview and result line for a site that is not imported, or "" when the site is read and has devices.
+ *  `got` is what reading the site gave: its inventory, or the error it failed with. */
+export function skipLine(name: string, got: AuvikInventory | unknown): string {
+  const inv = got && typeof got === "object" && "status" in got && "devices" in got ? (got as AuvikInventory) : null;
+  if (!inv) return `${name}: skipped. ${msg(got)}`;
+  if (inv.status === "denied") return `Auvik denied access to site ${name}, skipped.`;
+  if (inv.status !== "ok" || !inv.devices.length) return `${name}: skipped. ${inv.note || "No devices in this site."}`;
+  return "";
+}
+
 export interface SaveResult { line: string; siteId: number | null; created: boolean }
 export interface SaveCtx { clientKey: string; siteId: number | null; siteName: string }
 

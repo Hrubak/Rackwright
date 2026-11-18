@@ -18,6 +18,7 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
   try {
     r = await fetch(path, {
       method, credentials: "same-origin",
+      cache: "no-store",   // API answers are live (an edited auvik.env shows after a restart without a reload)
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,

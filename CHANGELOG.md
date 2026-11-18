@@ -3,7 +3,10 @@
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
 ## 3.19.1 — 2026-11-18
-Web only; the desktop app is unchanged. Update the LXC as usual; nothing changes on the server.
+Web only; the desktop app is unchanged. Update the LXC as usual.
+- **Test connection works with a valid key.** It said "Auvik sent an answer that could not be read" because Auvik confirms a good key with an empty answer. Any success from Auvik now counts.
+- **A site Auvik won't let you read no longer stops the import.** Each site of a client is read on its own. A site Auvik refuses (for example an old site the API user can't see) shows "Auvik denied access to site X, skipped." in the preview, and the other sites import as usual.
+- **Auvik settings show after a restart.** After you edit `/etc/rackwright/auvik.env` and restart the service, Import from Auvik shows the new region and user straight away. The browser no longer keeps old answers from the server.
 - **No more doubled endpoints on older Auvik sites.** On a site you first imported from the Auvik spreadsheet, Import from Auvik no longer adds the printers, phones, PCs and VMs a second time in new Endpoints boxes. They stay in their old groups, and the old groups are no longer listed as "No longer in Auvik". Endpoints already in another rack document of the site are left there too.
 - If you imported such a site with 3.19.0, delete the extra Endpoints boxes once. The next import won't bring them back.
 - **Escape closes Import from Auvik**, wherever you clicked in the dialog. It does nothing while sites are being read or saved; press Stop first.

@@ -8,7 +8,7 @@ import { RACK_MODELS, modelById } from "../../racks";
 import { useSettings } from "../../settings/context";
 import type { Doc } from "../../types";
 import SitePreview, { SiteState, ticksOf, newSiteState } from "./SitePreview";
-import { Defaults, SiteDocs, SitePlan, mapTenantToSite, planSite, saveSite } from "./sync";
+import { Defaults, SiteDocs, SitePlan, mapTenantToSite, planSite, saveSite, skipLine } from "./sync";
 import { btn, inp } from "./ui";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -108,11 +108,14 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
       const ac = new AbortController(); abort.current = ac;
       try {
         const inv = await A.auvikInventory(t.id, ac.signal);
-        if (inv.status !== "ok" || !inv.devices.length) out.push({ tenant: t, inv: null, note: inv.note || (inv.status === "denied" ? "Auvik did not allow access to this site." : "No devices in this site.") });
+        const skip = skipLine(t.name, inv);
+        if (skip) out.push({ tenant: t, inv: null, note: skip });
         else out.push({ tenant: t, inv, note: "" });   // a site that finished is kept even if Stop landed just after
       } catch (e) {
         if (stopped.current) break;
-        out.push({ tenant: t, inv: null, note: msg(e) });
+        // one site that fails (a 403 included) is skipped; the other sites are still read and imported
+        const denied = e instanceof A.ApiError && e.status === 403;
+        out.push({ tenant: t, inv: null, note: skipLine(t.name, denied ? { status: "denied", note: "", devices: [] } : e) });
       }
     }
     abort.current = null;
@@ -145,7 +148,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
     const out: string[] = [];
     const next = { ...picks };
     for (const r of reads) {
-      if (!r.inv) { out.push(`${r.tenant.name}: skipped. ${r.note}`); continue; }
+      if (!r.inv) { out.push(r.note); continue; }
       setProgress({ n: out.length + 1, of: reads.length, name: r.tenant.name });
       try {
         const p = planFor(r, false);
@@ -242,7 +245,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
                   style={{ ...btn, marginRight: 0, background: tab === r.tenant.id ? v("border") : v("control"), opacity: r.inv ? 1 : 0.5, cursor: r.inv ? "pointer" : "default" }}>{r.tenant.name}</button>
               ))}
             </div>
-            {reads.filter((r) => !r.inv).map((r) => <div key={r.tenant.id} style={{ opacity: 0.7, marginBottom: 2 }}>Skipped {r.tenant.name}: {r.note}</div>)}
+            {reads.filter((r) => !r.inv).map((r) => <div key={r.tenant.id} style={{ opacity: 0.7, marginBottom: 2 }}>{r.note}</div>)}
             {active?.inv && plans && "error" in plans && <div style={{ color: v("danger") }}>Could not plan this site. {plans.error}</div>}
             {active?.inv && plans && "view" in plans && (
               <SitePreview key={active.tenant.id} view={plans.view} eff={plans.eff} st={sites[active.tenant.id] ?? newSiteState()}

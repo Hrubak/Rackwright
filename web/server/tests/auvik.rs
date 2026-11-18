@@ -87,6 +87,14 @@ async fn verify(State(mode): State<&'static str>, headers: HeaderMap) -> (Status
                 (StatusCode::UNAUTHORIZED, VERIFY_DENIED.to_string())
             }
         }
+        "empty_ok" => {
+            let want = format!("Basic {}", b64(format!("{USER}:{KEY}").as_bytes()));
+            if got == want {
+                (StatusCode::OK, String::new())
+            } else {
+                (StatusCode::UNAUTHORIZED, VERIFY_DENIED.to_string())
+            }
+        }
         "denied" => (StatusCode::UNAUTHORIZED, VERIFY_DENIED.to_string()),
         "echo_header" => (StatusCode::UNAUTHORIZED, json!({ "errors": [{ "title": got }] }).to_string()),
         "echo_token" => {
@@ -153,6 +161,16 @@ async fn status_configured() {
 #[tokio::test]
 async fn test_ok() {
     let (app, _d) = configured_app("ok").await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.post("/api/auvik/test", json!({})).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v, json!({"ok": true}));
+}
+
+/// Auvik's verify answers 200 with an empty body: that is success, not "could not be read".
+#[tokio::test]
+async fn test_ok_empty_body() {
+    let (app, _d) = configured_app("empty_ok").await;
     let mut c = signed_in(&app).await;
     let (s, v) = c.post("/api/auvik/test", json!({})).await;
     assert_eq!(s, StatusCode::OK);
@@ -257,6 +275,8 @@ struct Mock {
     echo500: bool,
     /// The tenant details answer 500.
     detail_fails: bool,
+    /// The component list answers 403 for tenant 1002 (its device list still reads).
+    components_403: bool,
     /// Requests to the device list.
     info_hits: AtomicUsize,
     /// Requests to all inventory routes (429 answers included).
@@ -273,6 +293,7 @@ impl Mock {
             self_loop: false,
             echo500: false,
             detail_fails: false,
+            components_403: false,
             info_hits: AtomicUsize::new(0),
             hits: AtomicUsize::new(0),
         }
@@ -357,6 +378,9 @@ async fn m_detail(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, St
 async fn m_components(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>) -> Response {
     if let Some(r) = throttle(&m) {
         return r;
+    }
+    if m.components_403 && q.get("tenants").map(|t| t.as_str()) == Some("1002") {
+        return (StatusCode::FORBIDDEN, VERIFY_DENIED.to_string()).into_response();
     }
     if q.get("tenants").map(|t| t.as_str()) == Some("1001") {
         answer(COMPONENTS_MAIN.to_string())
@@ -459,7 +483,54 @@ async fn denied_site() {
     let mut c = signed_in(&app).await;
     let (s, v) = c.get("/api/auvik/tenants/1003/inventory").await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    assert_eq!(v, json!({"status": "denied", "note": "Rackwright's Auvik key can't read this site.", "devices": []}));
+    assert_eq!(v, json!({"status": "denied", "note": "Auvik denied access to this site.", "devices": []}));
+}
+
+/// A multi-site client with a dead site: every site is read on its own, a 403 on any of a site's reads
+/// makes that site "denied", and the sites read before and after it still come back whole.
+#[tokio::test]
+async fn multi_site_one_denied() {
+    let (app, _d, _m) = inv_app(|m| m.components_403 = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants/1001/inventory").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"], "ok");
+    let main = v["devices"].as_array().unwrap().len();
+    assert!(main > 0);
+    for id in ["1003", "1002"] {
+        let (s, v) = c.get(&format!("/api/auvik/tenants/{id}/inventory")).await;
+        assert_eq!(s, StatusCode::OK, "{id}: {v}");
+        assert_eq!(v, json!({"status": "denied", "note": "Auvik denied access to this site.", "devices": []}), "{id}");
+    }
+    let (s, v) = c.get("/api/auvik/tenants/1004/inventory").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"], "empty");
+    let (s, v) = c.get("/api/auvik/tenants/1001/inventory").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["devices"].as_array().unwrap().len(), main);
+}
+
+/// Every Auvik route answers Cache-Control: no-store, errors included.
+#[tokio::test]
+async fn auvik_routes_not_cached() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let c = signed_in(&app).await;
+    let cookie = c.cookie.clone().unwrap();
+    for (method, uri, signed) in [
+        (Method::GET, "/api/auvik", true),
+        (Method::GET, "/api/auvik", false),
+        (Method::GET, "/api/auvik/tenants", true),
+        (Method::GET, "/api/auvik/tenants/1001/inventory", true),
+        (Method::GET, "/api/auvik/tenants/bad!id/inventory", true),
+    ] {
+        let mut b = Request::builder().method(method).uri(uri);
+        if signed {
+            b = b.header(header::COOKIE, cookie.as_str());
+        }
+        let resp = app.clone().oneshot(b.body(Body::empty()).unwrap()).await.unwrap();
+        let cc = resp.headers().get(header::CACHE_CONTROL).and_then(|h| h.to_str().ok()).unwrap_or("").to_string();
+        assert_eq!(cc, "no-store", "{uri} signed={signed} status={}", resp.status());
+    }
 }
 
 #[tokio::test]
