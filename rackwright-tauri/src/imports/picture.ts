@@ -236,7 +236,6 @@ async function loadImageFile(file: Blob): Promise<HTMLImageElement> {
   try {
     const img = new Image(); img.decoding = "async";
     await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("not a readable picture")); img.src = url; });
-    await (img.decode ? img.decode().catch(() => {}) : null);
     return img;
   } finally { setTimeout(() => URL.revokeObjectURL(url), 5000); }
 }
@@ -253,16 +252,22 @@ export async function parsePicture(file: Blob, name: string): Promise<DiagramMod
   const img = await loadImageFile(file); const W0 = img.naturalWidth, H0 = img.naturalHeight;
   if (!W0 || !H0) throw new Error("empty picture");
   const worker = await loadTesseract();
-  const s1 = Math.max(1, Math.min(3, 2400 / Math.max(W0, H0))); // enlarge small exports so text is big enough to read
+  const s1 = Math.min(3, 2400 / Math.max(W0, H0)); // enlarge small exports so text is readable; scale big screenshots down
   // read as drawn (text crossed by lines), then with line art erased (text inside boxes); keep the best of each word.
   // The passes run one after another on the same worker.
   const pass = async (mode: "shape" | "color" | null): Promise<Word[] | null> => {
     const cv = drawTo(img, s1);
-    if (mode && !eraseLineArt(cv, mode === "color")) return null;
     try {
-      const r = await worker.recognize(await canvasBlob(cv), {}, { tsv: true });
-      return parseTsv(r.data.tsv || "", s1);
-    } catch (e) { throw isReaderError(e) ? e : readerError(String((e as Error)?.message || e)); }
+      if (mode && !eraseLineArt(cv, mode === "color")) return null;
+      const blob = await canvasBlob(cv);
+      try {
+        const r = await worker.recognize(blob, {}, { tsv: true });
+        return parseTsv(r.data.tsv || "", s1);
+      } catch (e) { // a dead worker must not stay cached
+        worker.terminate().catch(() => {}); loadTesseract.reset();
+        throw isReaderError(e) ? e : readerError(String((e as Error)?.message || e));
+      }
+    } finally { cv.width = cv.height = 0; }
   };
   const a = (await pass(null)) || [];
   const b = [...((await pass("shape")) || []), ...((await pass("color")) || [])];
@@ -277,6 +282,9 @@ export async function parsePicture(file: Blob, name: string): Promise<DiagramMod
   b.forEach((w) => { if (words.includes(w)) w.k = "b" + w.k; });
   const { labels, lh } = wordsToLabels(words);
   const s2 = Math.min(1, 1400 / Math.max(W0, H0));
-  const { nodes, links } = analyseShapes(drawTo(img, s2), s2, words, labels, lh);
+  const cv2 = drawTo(img, s2);
+  let shapes: { nodes: DiagramNode[]; links: DiagramLink[] };
+  try { shapes = analyseShapes(cv2, s2, words, labels, lh); } finally { cv2.width = cv2.height = 0; }
+  const { nodes, links } = shapes;
   return { source: name, nodes, links, yUp: false, words: words.length };
 }

@@ -11,11 +11,14 @@ export function itemsToLines(items: PdfTextItem[]): string[] {
 
 export async function pdfText(data: ArrayBuffer): Promise<string> {
   const lib = await loadPdfJs();
-  const doc = await lib.getDocument({ data: new Uint8Array(data), isEvalSupported: false }).promise;
-  const out: string[] = [];
-  for (let i = 1; i <= Math.min(doc.numPages, 6); i++) {
-    const page = await doc.getPage(i);
-    out.push(...itemsToLines((await page.getTextContent()).items));
-  }
-  return out.join("\n");
+  const task = lib.getDocument({ data: new Uint8Array(data), isEvalSupported: false });
+  try {
+    const doc = await task.promise;
+    const out: string[] = [];
+    for (let i = 1; i <= Math.min(doc.numPages, 6); i++) {
+      const page = await doc.getPage(i);
+      out.push(...itemsToLines((await page.getTextContent()).items));
+    }
+    return out.join("\n");
+  } finally { task.destroy?.().catch(() => {}); }
 }

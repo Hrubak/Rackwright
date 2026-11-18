@@ -1,4 +1,4 @@
-import { readerBase, retrying, probeReader, checkReaderResponse, isReaderError } from "../src/imports/readers";
+import { readerBase, retrying, withTimeout, probeReader, checkReaderResponse, isReaderError } from "../src/imports/readers";
 import { itemsToLines } from "../src/imports/pdf";
 
 let fails = 0;
@@ -40,6 +40,18 @@ t("web paths", w.pdf === "/readers/pdfjs/pdf.min.mjs" && w.pdfWorker === "/reade
   let missing: unknown = null; try { checkReaderResponse({ ok: false, status: 404, headers: hdr("") }); } catch (e) { missing = e; }
   t("404 is rejected", isReaderError(missing));
   t("plain file passes", (() => { try { checkReaderResponse({ ok: true, status: 200, headers: hdr("application/gzip") }); return true; } catch { return false; } })());
+
+  // a worker that died: reset, then the next get builds a new one
+  let built = 0;
+  const wk = retrying(async () => ({ id: ++built }));
+  const w1 = await wk(); wk.reset(); const w2 = await wk();
+  t("reset builds a new one", w1.id === 1 && w2.id === 2 && (await wk()).id === 2);
+
+  let late = 0;
+  let to: unknown = null;
+  try { await withTimeout(new Promise<number>((r) => setTimeout(() => r(7), 80)), 10, (v) => { late = v; }); } catch (e) { to = e; }
+  await new Promise((r) => setTimeout(r, 120));
+  t("timeout rejects as reader error and hands over the late value", isReaderError(to) && late === 7);
 
   // pdf text lines
   const it = (str: string, x: number, y: number) => ({ str, transform: [1, 0, 0, 1, x, y] });

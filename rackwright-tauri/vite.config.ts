@@ -13,6 +13,9 @@ function copyReaders(outDir: string) {
   for (const f of ["pdf.min.mjs", "pdf.worker.min.mjs"]) copy(nm("pdfjs-dist/build/" + f), out("pdfjs/" + f));
   for (const f of ["tesseract.min.js", "worker.min.js"]) copy(nm("tesseract.js/dist/" + f), out("tesseract/" + f));
   for (const f of fs.readdirSync(nm("tesseract.js-core")).filter((n) => n.endsWith("lstm.wasm.js"))) copy(nm("tesseract.js-core/" + f), out("tesseract-core/" + f));
+  for (const f of ["tesseract-core-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js", "tesseract-core-relaxedsimd-lstm.wasm.js"]) {
+    if (!fs.existsSync(out("tesseract-core/" + f))) throw new Error("copy-readers: " + f + " is missing from tesseract.js-core; check the pinned version");
+  }
   copy(nm("@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz"), out("eng/eng.traineddata.gz"));
 }
 function copyReadersPlugin(): Plugin {
