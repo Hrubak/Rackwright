@@ -1,0 +1,62 @@
+{
+  "data": [
+    {
+      "type": "tenantDetail",
+      "id": "1000",
+      "attributes": {
+        "tenantType": "multiClient"
+      },
+      "relationships": {
+        "clients": {
+          "data": [
+            {
+              "type": "tenant",
+              "id": "1001"
+            },
+            {
+              "type": "tenant",
+              "id": "1002"
+            },
+            {
+              "type": "tenant",
+              "id": "1003"
+            },
+            {
+              "type": "tenant",
+              "id": "1004"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "tenantDetail",
+      "id": "1001",
+      "attributes": {
+        "tenantType": "client"
+      }
+    },
+    {
+      "type": "tenantDetail",
+      "id": "1002",
+      "attributes": {
+        "tenantType": "client"
+      }
+    },
+    {
+      "type": "tenantDetail",
+      "id": "1003",
+      "attributes": {
+        "tenantType": "client"
+      }
+    },
+    {
+      "type": "tenantDetail",
+      "id": "1004",
+      "attributes": {
+        "tenantType": "client"
+      }
+    }
+  ],
+  "links": {}
+}

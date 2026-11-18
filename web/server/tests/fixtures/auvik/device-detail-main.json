@@ -1,0 +1,151 @@
+{
+  "data": [
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-01",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.11"
+        ],
+        "macAddress": "00:00:5e:00:53:01",
+        "serialNumber": "EXSN0001",
+        "firmwareVersion": "4.2.1",
+        "softwareVersion": "1.0"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-02",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.12"
+        ],
+        "macAddress": "00:00:5e:00:53:02",
+        "serialNumber": "EXSN0002",
+        "firmwareVersion": "4.2.1"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-03",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.1"
+        ],
+        "macAddress": "00:00:5e:00:53:03",
+        "serialNumber": "EXSN0003",
+        "firmwareVersion": "7.0.9"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-04",
+      "attributes": {
+        "ipAddresses": [
+          "198.51.100.21"
+        ],
+        "macAddress": "00:00:5e:00:53:04",
+        "serialNumber": "EXSN0004",
+        "firmwareVersion": "6.1.0"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-05",
+      "attributes": {
+        "ipAddresses": [
+          "198.51.100.22"
+        ],
+        "macAddress": "00:00:5e:00:53:05",
+        "serialNumber": "EXSN0005",
+        "firmwareVersion": "6.1.0"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-06",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.31",
+          "192.0.2.131"
+        ],
+        "macAddress": "00:00:5e:00:53:06",
+        "serialNumber": "EXSN0006",
+        "firmwareVersion": "2.9.0",
+        "softwareVersion": "Hypervisor 8.0"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-07",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.32"
+        ],
+        "macAddress": "00:00:5e:00:53:07",
+        "serialNumber": "EXSN0007",
+        "firmwareVersion": "2.9.0",
+        "softwareVersion": "Hypervisor 8.0"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-08",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.41"
+        ],
+        "macAddress": "00:00:5e:00:53:08",
+        "serialNumber": "EXSN0008",
+        "firmwareVersion": "5.3.2"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-09",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.51"
+        ],
+        "macAddress": "00:00:5e:00:53:09"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-10",
+      "attributes": {
+        "ipAddresses": [
+          "198.51.100.61"
+        ],
+        "macAddress": "00:00:5e:00:53:0a",
+        "serialNumber": "EXSN0010",
+        "firmwareVersion": "3.1"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-11",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.2"
+        ],
+        "macAddress": "00:00:5e:00:53:0b",
+        "serialNumber": "EXSN0011",
+        "firmwareVersion": "9.1.4"
+      }
+    },
+    {
+      "type": "deviceDetail",
+      "id": "d-1001-12",
+      "attributes": {
+        "ipAddresses": [
+          "192.0.2.52"
+        ],
+        "macAddress": "00:00:5e:00:53:0c",
+        "serialNumber": "EXSN0012",
+        "firmwareVersion": "1.2"
+      }
+    }
+  ],
+  "links": {}
+}

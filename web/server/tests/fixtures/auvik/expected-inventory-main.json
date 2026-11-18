@@ -1,0 +1,274 @@
+{
+  "status": "ok",
+  "note": "",
+  "devices": [
+    {
+      "id": "d-1001-01",
+      "name": "EX-SW01",
+      "type": "switch",
+      "makeModel": "Example S48-PoE",
+      "vendor": "Example Networks",
+      "serial": "EXSN0001",
+      "firmware": "4.2.1",
+      "software": "1.0",
+      "ips": [
+        "192.0.2.11"
+      ],
+      "macs": [
+        "00:00:5e:00:53:01"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": [
+        {
+          "type": "module",
+          "name": "Slot 1 SFP+",
+          "detail": "10G SFP+ x4"
+        },
+        {
+          "type": "powerSupply",
+          "name": "PSU 1",
+          "detail": "Example PSU-500"
+        }
+      ]
+    },
+    {
+      "id": "d-1001-02",
+      "name": "EX-SW02",
+      "type": "switch",
+      "makeModel": "Example S24",
+      "vendor": "Example Networks",
+      "serial": "EXSN0002",
+      "firmware": "4.2.1",
+      "software": "",
+      "ips": [
+        "192.0.2.12"
+      ],
+      "macs": [
+        "00:00:5e:00:53:02"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-03",
+      "name": "EX-FW01",
+      "type": "firewall",
+      "makeModel": "Example FW-200",
+      "vendor": "Example Security",
+      "serial": "EXSN0003",
+      "firmware": "7.0.9",
+      "software": "",
+      "ips": [
+        "192.0.2.1"
+      ],
+      "macs": [
+        "00:00:5e:00:53:03"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": [
+        {
+          "type": "module",
+          "name": "Slot 0",
+          "detail": "EX-MOD-4G"
+        }
+      ]
+    },
+    {
+      "id": "d-1001-04",
+      "name": "EX-AP01",
+      "type": "accessPoint",
+      "makeModel": "Example AP-6",
+      "vendor": "Example Wireless",
+      "serial": "EXSN0004",
+      "firmware": "6.1.0",
+      "software": "",
+      "ips": [
+        "198.51.100.21"
+      ],
+      "macs": [
+        "00:00:5e:00:53:04"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-05",
+      "name": "EX-AP02",
+      "type": "accessPoint",
+      "makeModel": "Example AP-6",
+      "vendor": "Example Wireless",
+      "serial": "EXSN0005",
+      "firmware": "6.1.0",
+      "software": "",
+      "ips": [
+        "198.51.100.22"
+      ],
+      "macs": [
+        "00:00:5e:00:53:05"
+      ],
+      "status": "offline",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-06",
+      "name": "EX-SRV01",
+      "type": "server",
+      "makeModel": "Example R440",
+      "vendor": "Example Systems",
+      "serial": "EXSN0006",
+      "firmware": "2.9.0",
+      "software": "Hypervisor 8.0",
+      "ips": [
+        "192.0.2.31",
+        "192.0.2.131"
+      ],
+      "macs": [
+        "00:00:5e:00:53:06"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": [
+        {
+          "type": "disk",
+          "name": "Disk 0",
+          "detail": "900 GB SAS"
+        },
+        {
+          "type": "memory",
+          "name": "DIMM A1",
+          "detail": "32 GB DDR4"
+        }
+      ]
+    },
+    {
+      "id": "d-1001-07",
+      "name": "EX-SRV02",
+      "type": "server",
+      "makeModel": "Example R440",
+      "vendor": "Example Systems",
+      "serial": "EXSN0007",
+      "firmware": "2.9.0",
+      "software": "Hypervisor 8.0",
+      "ips": [
+        "192.0.2.32"
+      ],
+      "macs": [
+        "00:00:5e:00:53:07"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-08",
+      "name": "EX-NAS01",
+      "type": "storage",
+      "makeModel": "Example NAS-4",
+      "vendor": "Example Storage",
+      "serial": "EXSN0008",
+      "firmware": "5.3.2",
+      "software": "",
+      "ips": [
+        "192.0.2.41"
+      ],
+      "macs": [
+        "00:00:5e:00:53:08"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": [
+        {
+          "type": "disk",
+          "name": "Disk 0",
+          "detail": "4 TB SATA"
+        },
+        {
+          "type": "disk",
+          "name": "Disk 1",
+          "detail": "4 TB SATA"
+        }
+      ]
+    },
+    {
+      "id": "d-1001-09",
+      "name": "EX-UPS01",
+      "type": "ups",
+      "makeModel": "",
+      "vendor": "Example Power",
+      "serial": "",
+      "firmware": "",
+      "software": "",
+      "ips": [
+        "192.0.2.51"
+      ],
+      "macs": [
+        "00:00:5e:00:53:09"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-10",
+      "name": "EX-PRN01",
+      "type": "printer",
+      "makeModel": "Example LJ-300",
+      "vendor": "Example Print",
+      "serial": "EXSN0010",
+      "firmware": "3.1",
+      "software": "",
+      "ips": [
+        "198.51.100.61"
+      ],
+      "macs": [
+        "00:00:5e:00:53:0a"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-11",
+      "name": "EX-RTR01",
+      "type": "router",
+      "makeModel": "Example R-1000",
+      "vendor": "Example Networks",
+      "serial": "EXSN0011",
+      "firmware": "9.1.4",
+      "software": "",
+      "ips": [
+        "192.0.2.2"
+      ],
+      "macs": [
+        "00:00:5e:00:53:0b"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    },
+    {
+      "id": "d-1001-12",
+      "name": "EX-PDU01",
+      "type": "pdu",
+      "makeModel": "Example PDU-8",
+      "vendor": "Example Power",
+      "serial": "EXSN0012",
+      "firmware": "1.2",
+      "software": "",
+      "ips": [
+        "192.0.2.52"
+      ],
+      "macs": [
+        "00:00:5e:00:53:0c"
+      ],
+      "status": "online",
+      "discovery": "complete",
+      "components": []
+    }
+  ]
+}

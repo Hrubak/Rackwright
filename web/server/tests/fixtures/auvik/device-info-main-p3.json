@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-11",
+      "attributes": {
+        "deviceName": "EX-RTR01",
+        "deviceType": "router",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example R-1000",
+        "vendorName": "Example Networks"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-12",
+      "attributes": {
+        "deviceName": "EX-PDU01",
+        "deviceType": "pdu",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example PDU-8",
+        "vendorName": "Example Power"
+      }
+    }
+  ],
+  "links": {}
+}

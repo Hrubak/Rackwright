@@ -131,6 +131,8 @@ When Auvik is not configured, every route except `GET /api/auvik` returns 404 `{
 
 `AuvikApiDevice` = `{id, name, type, makeModel, vendor, serial, firmware, software, ips: [str], macs: [str], status, discovery: str, components: [{type, name, detail}]}`. Missing attributes are `""` or `[]`.
 
+Inventory errors are 502 with a fixed message: `"Auvik is busy. Try again in a few minutes."`, `"Auvik returned too many pages for this site."`, `"Reading this site from Auvik took too long."` (3 minute cap) or `"Auvik could not be read. Try again in a few minutes."`. A tenant the key may not read answers 200 `status:"denied"`; a tenant with no devices answers 200 `status:"empty"`. Only the path and query of `links.next` are used, against the configured base URL. `:id` may contain only letters, digits, `-` and `_` (400 otherwise).
+
 Limits: 20 s per Auvik request, one Auvik request at a time, 429/503 retried up to 5 times (each wait is `Retry-After` seconds, at most 60 s, else 1, 2, 4, 8, 16 s), pages followed up to 50 per endpoint.
 
 ## Racks (shared: every signed-in user sees and edits all of them)

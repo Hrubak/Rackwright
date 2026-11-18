@@ -2,9 +2,11 @@
 //! `Authorization` header, and never appears in a response, a log line or `Debug` output.
 //! No reqwest error text is ever used: every error is mapped to fixed text.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::Duration;
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use serde_json::{json, Value};
 
@@ -15,6 +17,33 @@ const FIXED_BUSY: &str = "Auvik is busy. Try again in a few minutes.";
 const FIXED_NOT_SET_UP: &str = "Auvik is not set up on this server.";
 const BACKOFF_SECS: [u64; 5] = [1, 2, 4, 8, 16];
 const MAX_RETRY_AFTER_SECS: u64 = 60;
+const MAX_PAGES: usize = 50;
+const INVENTORY_TIMEOUT_SECS: u64 = 180;
+const FIXED_TOO_MANY_PAGES: &str = "Auvik returned too many pages for this site.";
+const FIXED_TOO_SLOW: &str = "Reading this site from Auvik took too long.";
+const FIXED_READ_FAILED: &str = "Auvik could not be read. Try again in a few minutes.";
+
+static LOG: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// All logging in this module goes through here. Callers pass only fixed or sanitised text.
+pub fn log(msg: &str) {
+    eprintln!("rackwright-server: auvik: {msg}");
+    // The guard is taken and released here, never held across an await.
+    if let Ok(mut lines) = LOG.lock() {
+        lines.push(msg.to_string());
+        if lines.len() > 500 {
+            lines.remove(0);
+        }
+    }
+}
+
+/// The lines logged so far (for tests).
+pub fn log_lines() -> Vec<String> {
+    match LOG.lock() {
+        Ok(lines) => lines.clone(),
+        Err(_) => Vec::new(),
+    }
+}
 
 /// The API key. `Debug` prints `***`; there is no `Display`.
 #[derive(Clone)]
@@ -169,6 +198,7 @@ impl Auvik {
                     .and_then(|s| s.trim().parse::<u64>().ok());
                 let wait = retry_after.unwrap_or(BACKOFF_SECS[attempt]).min(MAX_RETRY_AFTER_SECS);
                 attempt += 1;
+                log(&format!("Auvik answered {code}; retry {attempt} in {wait}s"));
                 tokio::time::sleep(Duration::from_secs(wait)).await;
                 continue;
             }
@@ -179,6 +209,7 @@ impl Auvik {
                     None => Err(AuvikErr::Failed("Auvik sent an answer that could not be read.".to_string())),
                 };
             }
+            log(&format!("Auvik answered {code} for {path_and_query}"));
             let title: Option<String> = body
                 .as_ref()
                 .and_then(|v| v.pointer("/errors/0/title"))
@@ -188,6 +219,75 @@ impl Auvik {
                 return Err(AuvikErr::Denied(title.unwrap_or_else(|| FIXED_REFUSED.to_string())));
             }
             return Err(AuvikErr::Failed(title.unwrap_or_else(|| "Auvik returned an error.".to_string())));
+        }
+    }
+
+    /// The part of the base URL after the host, such as `/v1` (empty when none).
+    fn base_path(&self) -> &str {
+        let b = self.cfg.base.as_str();
+        match b.find("://") {
+            Some(i) => {
+                let rest = &b[i + 3..];
+                match rest.find('/') {
+                    Some(j) => &rest[j..],
+                    None => "",
+                }
+            }
+            None => "",
+        }
+    }
+
+    /// Reduces a `links.next` value (relative or absolute) to a path and query for `get`.
+    /// The host of an absolute link is never used.
+    fn next_path(&self, next: &str) -> Option<String> {
+        let rest: &str = if let Some(i) = next.find("://") {
+            let after = &next[i + 3..];
+            match after.find('/') {
+                Some(j) => &after[j..],
+                None => return None,
+            }
+        } else if next.starts_with('/') {
+            next
+        } else {
+            return None;
+        };
+        let bp = self.base_path();
+        if !bp.is_empty() && rest.starts_with(bp) {
+            let tail = &rest[bp.len()..];
+            if tail.starts_with('/') || tail.starts_with('?') {
+                return Some(tail.to_string());
+            }
+        }
+        Some(rest.to_string())
+    }
+
+    /// Follows `links.next` from `first_path`; at most 50 pages. Returns every `data` item.
+    pub async fn paged(&self, first_path: &str) -> Result<Vec<Value>, AuvikErr> {
+        let mut out: Vec<Value> = Vec::new();
+        let mut path = first_path.to_string();
+        let mut pages = 0usize;
+        loop {
+            let page = self.get(&path).await?;
+            pages += 1;
+            if let Some(items) = page.get("data").and_then(|d| d.as_array()) {
+                out.extend(items.iter().cloned());
+            }
+            let next: Option<String> = page
+                .pointer("/links/next")
+                .and_then(|n| n.as_str())
+                .filter(|n| !n.is_empty())
+                .map(|n| n.to_string());
+            let next = match next {
+                Some(n) => n,
+                None => return Ok(out),
+            };
+            if pages >= MAX_PAGES {
+                return Err(AuvikErr::Failed(FIXED_TOO_MANY_PAGES.to_string()));
+            }
+            path = match self.next_path(&next) {
+                Some(p) => p,
+                None => return Err(AuvikErr::Failed("Auvik sent an answer that could not be read.".to_string())),
+            };
         }
     }
 }
@@ -217,4 +317,218 @@ pub async fn post_test(State(st): State<Shared>, headers: HeaderMap) -> ApiResul
         Err(AuvikErr::Busy) => json!({ "ok": false, "error": FIXED_BUSY }),
     };
     Ok(json_ok(&v))
+}
+
+fn text(v: &Value, key: &str) -> String {
+    match v.pointer(&format!("/attributes/{key}")) {
+        Some(Value::String(s)) => s.trim().to_string(),
+        Some(Value::Number(n)) => n.to_string(),
+        _ => String::new(),
+    }
+}
+
+/// A string attribute from the first of `parts` that has it non-empty.
+fn text_of(parts: &[&Value], key: &str) -> String {
+    for p in parts {
+        let t = text(p, key);
+        if !t.is_empty() {
+            return t;
+        }
+    }
+    String::new()
+}
+
+fn text_list(v: &Value, key: &str) -> Vec<String> {
+    match v.pointer(&format!("/attributes/{key}")) {
+        Some(Value::Array(a)) => a
+            .iter()
+            .filter_map(|x| x.as_str())
+            .map(|x| x.trim().to_string())
+            .filter(|x| !x.is_empty())
+            .collect(),
+        Some(Value::String(s)) if !s.trim().is_empty() => vec![s.trim().to_string()],
+        _ => Vec::new(),
+    }
+}
+
+fn list_of(parts: &[&Value], key: &str) -> Vec<String> {
+    for p in parts {
+        let l = text_list(p, key);
+        if !l.is_empty() {
+            return l;
+        }
+    }
+    Vec::new()
+}
+
+fn id_of(v: &Value) -> String {
+    match v.get("id") {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Number(n)) => n.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn api_err(e: AuvikErr, what: &str) -> ApiError {
+    match e {
+        AuvikErr::Busy => {
+            log(&format!("{what}: Auvik is busy"));
+            ApiError::new(StatusCode::BAD_GATEWAY, FIXED_BUSY)
+        }
+        AuvikErr::Denied(m) => {
+            log(&format!("{what}: refused: {m}"));
+            ApiError::new(StatusCode::BAD_GATEWAY, FIXED_REFUSED)
+        }
+        AuvikErr::Failed(m) => {
+            log(&format!("{what}: failed: {m}"));
+            if m == FIXED_TOO_MANY_PAGES {
+                ApiError::new(StatusCode::BAD_GATEWAY, FIXED_TOO_MANY_PAGES)
+            } else {
+                ApiError::new(StatusCode::BAD_GATEWAY, FIXED_READ_FAILED)
+            }
+        }
+    }
+}
+
+pub async fn get_tenants(State(st): State<Shared>, headers: HeaderMap) -> ApiResult {
+    auth(&st, &headers)?;
+    let a = match st.auvik.as_ref() {
+        Some(a) => a,
+        None => return Err(not_set_up()),
+    };
+    let list = a.paged("/tenants?page[first]=1000").await.map_err(|e| api_err(e, "tenants"))?;
+    let detail = a.paged("/tenants/detail?page[first]=1000").await.map_err(|e| api_err(e, "tenant details"))?;
+    let mut kinds: HashMap<String, String> = HashMap::new();
+    let mut parents: HashMap<String, String> = HashMap::new();
+    for d in &detail {
+        let id = id_of(d);
+        kinds.insert(id.clone(), text(d, "tenantType"));
+        if let Some(kids) = d.pointer("/relationships/clients/data").and_then(|c| c.as_array()) {
+            for k in kids {
+                let kid = id_of(k);
+                if !kid.is_empty() {
+                    parents.insert(kid, id.clone());
+                }
+            }
+        }
+    }
+    let mut rows: Vec<(bool, String, Value)> = Vec::new();
+    for t in &list {
+        let id = id_of(t);
+        if id.is_empty() {
+            continue;
+        }
+        let mut name = text(t, "domainPrefix");
+        if name.is_empty() {
+            name = id.clone();
+        }
+        let multi = kinds.get(&id).map(|k| k.as_str() == "multiClient").unwrap_or(false);
+        let parent = match parents.get(&id) {
+            Some(p) => Value::String(p.clone()),
+            None => Value::Null,
+        };
+        let kind = if multi { "multiClient" } else { "client" };
+        rows.push((!multi, name.to_lowercase(), json!({ "id": id, "name": name, "type": kind, "parent": parent })));
+    }
+    rows.sort_by(|x, y| (x.0, &x.1).cmp(&(y.0, &y.1)));
+    let out: Vec<Value> = rows.into_iter().map(|r| r.2).collect();
+    Ok(json_ok(&Value::Array(out)))
+}
+
+fn result(status: &str, note: &str, devices: Vec<Value>) -> Value {
+    json!({ "status": status, "note": note, "devices": devices })
+}
+
+fn denied_result() -> Value {
+    result("denied", "Rackwright's Auvik key can't read this site.", Vec::new())
+}
+
+async fn read_inventory(a: &Auvik, id: &str) -> Result<Value, AuvikErr> {
+    let q = format!("tenants={id}&page[first]=1000");
+    let info = match a.paged(&format!("/inventory/device/info?{q}")).await {
+        Ok(v) => v,
+        Err(AuvikErr::Denied(_)) => return Ok(denied_result()),
+        Err(e) => return Err(e),
+    };
+    if info.is_empty() {
+        return Ok(result("empty", "No devices found. The site may have no collector.", Vec::new()));
+    }
+    let detail = match a.paged(&format!("/inventory/device/detail?{q}")).await {
+        Ok(v) => v,
+        Err(AuvikErr::Denied(_)) => return Ok(denied_result()),
+        Err(e) => return Err(e),
+    };
+    let comps = match a.paged(&format!("/inventory/component/info?{q}")).await {
+        Ok(v) => v,
+        Err(AuvikErr::Denied(_)) => return Ok(denied_result()),
+        Err(e) => return Err(e),
+    };
+    let mut by_detail: HashMap<String, &Value> = HashMap::new();
+    for d in &detail {
+        by_detail.insert(id_of(d), d);
+    }
+    let mut by_device: HashMap<String, Vec<Value>> = HashMap::new();
+    for c in &comps {
+        let dev = match c.pointer("/relationships/device/data/id") {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Number(n)) => n.to_string(),
+            _ => continue,
+        };
+        let mut detail_text = text(c, "description");
+        if detail_text.is_empty() {
+            detail_text = text(c, "modelNumber");
+        }
+        by_device.entry(dev).or_default().push(json!({
+            "type": text(c, "componentType"),
+            "name": text(c, "componentName"),
+            "detail": detail_text,
+        }));
+    }
+    let none = Value::Null;
+    let mut devices: Vec<Value> = Vec::new();
+    for d in &info {
+        let did = id_of(d);
+        let det: &Value = match by_detail.get(&did) {
+            Some(v) => *v,
+            None => &none,
+        };
+        let parts: [&Value; 2] = [d, det];
+        let comps_for = by_device.remove(&did).unwrap_or_default();
+        devices.push(json!({
+            "id": did,
+            "name": text_of(&parts, "deviceName"),
+            "type": text_of(&parts, "deviceType"),
+            "makeModel": text_of(&parts, "makeModel"),
+            "vendor": text_of(&parts, "vendorName"),
+            "serial": text_of(&parts, "serialNumber"),
+            "firmware": text_of(&parts, "firmwareVersion"),
+            "software": text_of(&parts, "softwareVersion"),
+            "ips": list_of(&parts, "ipAddresses"),
+            "macs": list_of(&parts, "macAddress"),
+            "status": text_of(&parts, "onlineStatus"),
+            "discovery": text_of(&parts, "discoveryStatus"),
+            "components": comps_for,
+        }));
+    }
+    Ok(result("ok", "", devices))
+}
+
+pub async fn get_inventory(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
+    auth(&st, &headers)?;
+    let a = match st.auvik.as_ref() {
+        Some(a) => a,
+        None => return Err(not_set_up()),
+    };
+    if id.is_empty() || id.len() > 64 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+        return Err(ApiError::bad("That site id is not valid."));
+    }
+    let run = tokio::time::timeout(Duration::from_secs(INVENTORY_TIMEOUT_SECS), read_inventory(a, &id)).await;
+    match run {
+        Err(_) => {
+            log("inventory: timed out");
+            Err(ApiError::new(StatusCode::BAD_GATEWAY, FIXED_TOO_SLOW))
+        }
+        Ok(Ok(v)) => Ok(json_ok(&v)),
+        Ok(Err(e)) => Err(api_err(e, "inventory")),
+    }
 }

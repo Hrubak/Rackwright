@@ -1,9 +1,13 @@
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{Query, State};
+use axum::response::{IntoResponse, Response};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use axum::http::{header, HeaderMap, Method, Request, StatusCode};
 use axum::routing::get;
 use axum::Router;
-use rackwright_server::auvik::{valid_region, AuvikCfg};
+use rackwright_server::auvik::{log_lines, valid_region, AuvikCfg};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
@@ -43,6 +47,7 @@ impl Client {
             }
         }
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        check_body(&bytes);
         let v = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
         (status, v)
     }
@@ -213,5 +218,324 @@ fn region_check() {
     }
     for bad in ["evil.com/", "US1", "", "us"] {
         assert!(!valid_region(bad), "{bad}");
+    }
+}
+
+/// Every response body read in this file goes through here, so no test can miss a leak.
+fn check_body(bytes: &[u8]) {
+    let text = String::from_utf8_lossy(bytes).to_string();
+    let token = b64(format!("{USER}:{KEY}").as_bytes());
+    assert!(!text.contains("TESTKEY"), "response contains the key: {text}");
+    assert!(!text.contains(&token), "response contains the token: {text}");
+}
+
+// ---- Tenants and inventory ----
+
+const TENANTS: &str = include_str!("fixtures/auvik/tenants.json");
+const TENANTS_DETAIL: &str = include_str!("fixtures/auvik/tenants-detail.json");
+const INFO_P1: &str = include_str!("fixtures/auvik/device-info-main-p1.json");
+const INFO_P2: &str = include_str!("fixtures/auvik/device-info-main-p2.json");
+const INFO_P3: &str = include_str!("fixtures/auvik/device-info-main-p3.json");
+const DETAIL_MAIN: &str = include_str!("fixtures/auvik/device-detail-main.json");
+const COMPONENTS_MAIN: &str = include_str!("fixtures/auvik/component-info-main.json");
+const INFO_WAREHOUSE: &str = include_str!("fixtures/auvik/device-info-warehouse.json");
+const EXPECTED_MAIN: &str = include_str!("fixtures/auvik/expected-inventory-main.json");
+
+const NO_DATA: &str = r#"{"data":[],"links":{}}"#;
+
+/// Settings for the inventory mock. `host` is the mock's own address, put into `links.next`.
+struct Mock {
+    host: String,
+    /// `links.next` points at a host nothing listens on; a call to it would hang and fail the test.
+    other_host: bool,
+    always_429: bool,
+    /// How many 429 answers (with Retry-After: 0) to give before real data.
+    rate_limits: AtomicUsize,
+    /// Page one's `links.next` points at page one itself.
+    self_loop: bool,
+    /// The device list answers 500 and echoes the Authorization header in the body.
+    echo500: bool,
+    /// Requests to the device list.
+    info_hits: AtomicUsize,
+    /// Requests to all inventory routes (429 answers included).
+    hits: AtomicUsize,
+}
+
+impl Mock {
+    fn new(host: &str) -> Mock {
+        Mock {
+            host: host.to_string(),
+            other_host: false,
+            always_429: false,
+            rate_limits: AtomicUsize::new(0),
+            self_loop: false,
+            echo500: false,
+            info_hits: AtomicUsize::new(0),
+            hits: AtomicUsize::new(0),
+        }
+    }
+}
+
+fn throttle(m: &Mock) -> Option<Response> {
+    m.hits.fetch_add(1, Ordering::SeqCst);
+    let limited = m.always_429 || m.rate_limits.load(Ordering::SeqCst) > 0;
+    if !limited {
+        return None;
+    }
+    if !m.always_429 {
+        m.rate_limits.fetch_sub(1, Ordering::SeqCst);
+    }
+    Some((StatusCode::TOO_MANY_REQUESTS, [(header::RETRY_AFTER, "0")], "{}".to_string()).into_response())
+}
+
+fn answer(body: String) -> Response {
+    (StatusCode::OK, body).into_response()
+}
+
+async fn m_tenants() -> Response {
+    answer(TENANTS.to_string())
+}
+
+async fn m_tenants_detail() -> Response {
+    answer(TENANTS_DETAIL.to_string())
+}
+
+async fn m_info(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>, headers: HeaderMap) -> Response {
+    m.info_hits.fetch_add(1, Ordering::SeqCst);
+    if let Some(r) = throttle(&m) {
+        return r;
+    }
+    if m.echo500 {
+        let got = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+        return (StatusCode::INTERNAL_SERVER_ERROR, json!({ "errors": [{ "title": got }] }).to_string()).into_response();
+    }
+    let tenant = q.get("tenants").cloned().unwrap_or_default();
+    match tenant.as_str() {
+        "1001" => {
+            let after = q.get("page[after]").cloned().unwrap_or_default();
+            let raw = match after.as_str() {
+                "p2" => INFO_P2,
+                "p3" => INFO_P3,
+                _ => INFO_P1,
+            };
+            if m.self_loop {
+                let mut v: Value = serde_json::from_str(raw).unwrap();
+                v["links"]["next"] = json!(format!("http://{}/inventory/device/info?tenants=1001&page[first]=1000", m.host));
+                return answer(v.to_string());
+            }
+            let host = if m.other_host { "203.0.113.9:9" } else { m.host.as_str() };
+            answer(raw.replace("{HOST}", host))
+        }
+        "1002" => answer(INFO_WAREHOUSE.to_string()),
+        "1003" => (StatusCode::FORBIDDEN, VERIFY_DENIED.to_string()).into_response(),
+        "1004" => answer(NO_DATA.to_string()),
+        _ => (StatusCode::NOT_FOUND, "{}".to_string()).into_response(),
+    }
+}
+
+async fn m_detail(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>) -> Response {
+    if let Some(r) = throttle(&m) {
+        return r;
+    }
+    if q.get("tenants").map(|t| t.as_str()) == Some("1001") {
+        answer(DETAIL_MAIN.to_string())
+    } else {
+        answer(NO_DATA.to_string())
+    }
+}
+
+async fn m_components(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>) -> Response {
+    if let Some(r) = throttle(&m) {
+        return r;
+    }
+    if q.get("tenants").map(|t| t.as_str()) == Some("1001") {
+        answer(COMPONENTS_MAIN.to_string())
+    } else {
+        answer(NO_DATA.to_string())
+    }
+}
+
+/// Starts the inventory mock and returns the app wired to it.
+async fn inv_app(set: impl FnOnce(&mut Mock)) -> (Router, tempfile::TempDir, Arc<Mock>) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let mut mock = Mock::new(&addr.to_string());
+    set(&mut mock);
+    let mock = Arc::new(mock);
+    let app = Router::new()
+        .route("/tenants", get(m_tenants))
+        .route("/tenants/detail", get(m_tenants_detail))
+        .route("/inventory/device/info", get(m_info))
+        .route("/inventory/device/detail", get(m_detail))
+        .route("/inventory/component/info", get(m_components))
+        .with_state(mock.clone());
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let cfg = AuvikCfg::new(&format!("http://{addr}"), USER, "us1", KEY);
+    let (router, dir) = make_app(Some(cfg));
+    (router, dir, mock)
+}
+
+const INV_MAIN: &str = "/api/auvik/tenants/1001/inventory";
+
+fn expected_main() -> Value {
+    serde_json::from_str(EXPECTED_MAIN).unwrap()
+}
+
+#[tokio::test]
+async fn tenants_listed() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let want = json!([
+        {"id": "1000", "name": "Example IT", "type": "multiClient", "parent": null},
+        {"id": "1003", "name": "EX Denied", "type": "client", "parent": "1000"},
+        {"id": "1004", "name": "EX Empty", "type": "client", "parent": "1000"},
+        {"id": "1001", "name": "EX Main Office", "type": "client", "parent": "1000"},
+        {"id": "1002", "name": "EX Warehouse", "type": "client", "parent": "1000"},
+    ]);
+    assert_eq!(v, want);
+}
+
+#[tokio::test]
+async fn pagination_three_pages() {
+    let (app, _d, m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, expected_main());
+    assert_eq!(v["devices"].as_array().unwrap().len(), 12);
+    assert_eq!(m.info_hits.load(Ordering::SeqCst), 3);
+}
+
+#[tokio::test]
+async fn rate_limited_then_ok() {
+    let (app, _d, m) = inv_app(|m| m.rate_limits = AtomicUsize::new(2)).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, expected_main());
+    // Two 429 answers, then three device pages, device details and components.
+    assert_eq!(m.hits.load(Ordering::SeqCst), 7);
+}
+
+#[tokio::test]
+async fn busy_after_retries() {
+    let (app, _d, m) = inv_app(|m| m.always_429 = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::BAD_GATEWAY);
+    assert_eq!(v["error"], "Auvik is busy. Try again in a few minutes.");
+    // The first try plus five retries.
+    assert_eq!(m.hits.load(Ordering::SeqCst), 6);
+}
+
+#[tokio::test]
+async fn denied_site() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants/1003/inventory").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, json!({"status": "denied", "note": "Rackwright's Auvik key can't read this site.", "devices": []}));
+}
+
+#[tokio::test]
+async fn empty_site() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants/1004/inventory").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, json!({"status": "empty", "note": "No devices found. The site may have no collector.", "devices": []}));
+}
+
+#[tokio::test]
+async fn warehouse_without_details() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants/1002/inventory").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"], "ok");
+    let devs = v["devices"].as_array().unwrap();
+    assert_eq!(devs.len(), 3);
+    assert_eq!(devs[0]["name"], "EX-WSW01");
+    assert_eq!(devs[0]["serial"], "");
+    assert_eq!(devs[0]["ips"], json!([]));
+    assert_eq!(devs[0]["components"], json!([]));
+}
+
+#[tokio::test]
+async fn missing_fields() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ups = v["devices"].as_array().unwrap().iter().find(|d| d["name"] == "EX-UPS01").unwrap().clone();
+    assert_eq!(ups["makeModel"], "");
+    assert_eq!(ups["serial"], "");
+    assert_eq!(ups["firmware"], "");
+    assert_eq!(ups["software"], "");
+    assert_eq!(ups["components"], json!([]));
+    assert_eq!(ups["ips"], json!(["192.0.2.51"]));
+}
+
+#[tokio::test]
+async fn next_loop_capped() {
+    let (app, _d, m) = inv_app(|m| m.self_loop = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::BAD_GATEWAY);
+    assert_eq!(v["error"], "Auvik returned too many pages for this site.");
+    assert_eq!(m.info_hits.load(Ordering::SeqCst), 50);
+}
+
+#[tokio::test]
+async fn next_other_host_ignored() {
+    let (app, _d, _m) = inv_app(|m| m.other_host = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, expected_main());
+}
+
+#[tokio::test]
+async fn bad_site_id_and_signed_out() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, _) = c.get("/api/auvik/tenants/a.b/inventory").await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let mut out = Client::new(&app);
+    let (s, _) = out.get("/api/auvik/tenants").await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = out.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn not_configured_tenants() {
+    let (app, _d) = make_app(None);
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert_eq!(v["error"], "Auvik is not set up on this server.");
+    let (s, _) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn key_never_leaks() {
+    // Every response in this file is also checked by `check_body` inside `Client::call`.
+    let token = b64(format!("{USER}:{KEY}").as_bytes());
+    let (app, _d, _m) = inv_app(|m| m.echo500 = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::BAD_GATEWAY);
+    assert_eq!(v["error"], "Auvik could not be read. Try again in a few minutes.");
+    let lines = log_lines();
+    assert!(!lines.is_empty());
+    for l in &lines {
+        assert!(!l.contains("TESTKEY"), "{l}");
+        assert!(!l.contains(&token), "{l}");
     }
 }

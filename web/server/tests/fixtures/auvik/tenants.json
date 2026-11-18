@@ -1,0 +1,40 @@
+{
+  "data": [
+    {
+      "type": "tenant",
+      "id": "1000",
+      "attributes": {
+        "domainPrefix": "Example IT"
+      }
+    },
+    {
+      "type": "tenant",
+      "id": "1001",
+      "attributes": {
+        "domainPrefix": "EX Main Office"
+      }
+    },
+    {
+      "type": "tenant",
+      "id": "1002",
+      "attributes": {
+        "domainPrefix": "EX Warehouse"
+      }
+    },
+    {
+      "type": "tenant",
+      "id": "1003",
+      "attributes": {
+        "domainPrefix": "EX Denied"
+      }
+    },
+    {
+      "type": "tenant",
+      "id": "1004",
+      "attributes": {
+        "domainPrefix": "EX Empty"
+      }
+    }
+  ],
+  "links": {}
+}

@@ -1,0 +1,67 @@
+{
+  "data": [
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-06",
+      "attributes": {
+        "deviceName": "EX-SRV01",
+        "deviceType": "server",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example R440",
+        "vendorName": "Example Systems"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-07",
+      "attributes": {
+        "deviceName": "EX-SRV02",
+        "deviceType": "server",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example R440",
+        "vendorName": "Example Systems"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-08",
+      "attributes": {
+        "deviceName": "EX-NAS01",
+        "deviceType": "storage",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example NAS-4",
+        "vendorName": "Example Storage"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-09",
+      "attributes": {
+        "deviceName": "EX-UPS01",
+        "deviceType": "ups",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "",
+        "vendorName": "Example Power"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-10",
+      "attributes": {
+        "deviceName": "EX-PRN01",
+        "deviceType": "printer",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example LJ-300",
+        "vendorName": "Example Print"
+      }
+    }
+  ],
+  "links": {
+    "next": "http://{HOST}/inventory/device/info?tenants=1001&page[first]=1000&page[after]=p3"
+  }
+}

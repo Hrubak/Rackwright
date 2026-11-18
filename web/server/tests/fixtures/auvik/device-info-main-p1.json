@@ -1,0 +1,67 @@
+{
+  "data": [
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-01",
+      "attributes": {
+        "deviceName": "EX-SW01",
+        "deviceType": "switch",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example S48-PoE",
+        "vendorName": "Example Networks"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-02",
+      "attributes": {
+        "deviceName": "EX-SW02",
+        "deviceType": "switch",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example S24",
+        "vendorName": "Example Networks"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-03",
+      "attributes": {
+        "deviceName": "EX-FW01",
+        "deviceType": "firewall",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example FW-200",
+        "vendorName": "Example Security"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-04",
+      "attributes": {
+        "deviceName": "EX-AP01",
+        "deviceType": "accessPoint",
+        "onlineStatus": "online",
+        "discoveryStatus": "complete",
+        "makeModel": "Example AP-6",
+        "vendorName": "Example Wireless"
+      }
+    },
+    {
+      "type": "deviceInfo",
+      "id": "d-1001-05",
+      "attributes": {
+        "deviceName": "EX-AP02",
+        "deviceType": "accessPoint",
+        "onlineStatus": "offline",
+        "discoveryStatus": "complete",
+        "makeModel": "Example AP-6",
+        "vendorName": "Example Wireless"
+      }
+    }
+  ],
+  "links": {
+    "next": "http://{HOST}/inventory/device/info?tenants=1001&page[first]=1000&page[after]=p2"
+  }
+}

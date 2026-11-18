@@ -1,0 +1,124 @@
+{
+  "data": [
+    {
+      "type": "componentInfo",
+      "id": "c-1001-01",
+      "attributes": {
+        "componentType": "module",
+        "componentName": "Slot 1 SFP+",
+        "description": "10G SFP+ x4"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-01"
+          }
+        }
+      }
+    },
+    {
+      "type": "componentInfo",
+      "id": "c-1001-02",
+      "attributes": {
+        "componentType": "powerSupply",
+        "componentName": "PSU 1",
+        "description": "Example PSU-500"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-01"
+          }
+        }
+      }
+    },
+    {
+      "type": "componentInfo",
+      "id": "c-1001-03",
+      "attributes": {
+        "componentType": "module",
+        "componentName": "Slot 0",
+        "modelNumber": "EX-MOD-4G"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-03"
+          }
+        }
+      }
+    },
+    {
+      "type": "componentInfo",
+      "id": "c-1001-04",
+      "attributes": {
+        "componentType": "disk",
+        "componentName": "Disk 0",
+        "description": "900 GB SAS"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-06"
+          }
+        }
+      }
+    },
+    {
+      "type": "componentInfo",
+      "id": "c-1001-05",
+      "attributes": {
+        "componentType": "memory",
+        "componentName": "DIMM A1",
+        "description": "32 GB DDR4"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-06"
+          }
+        }
+      }
+    },
+    {
+      "type": "componentInfo",
+      "id": "c-1001-06",
+      "attributes": {
+        "componentType": "disk",
+        "componentName": "Disk 0",
+        "description": "4 TB SATA"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-08"
+          }
+        }
+      }
+    },
+    {
+      "type": "componentInfo",
+      "id": "c-1001-07",
+      "attributes": {
+        "componentType": "disk",
+        "componentName": "Disk 1",
+        "description": "4 TB SATA"
+      },
+      "relationships": {
+        "device": {
+          "data": {
+            "type": "deviceInfo",
+            "id": "d-1001-08"
+          }
+        }
+      }
+    }
+  ],
+  "links": {}
+}

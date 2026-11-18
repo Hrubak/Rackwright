@@ -736,6 +736,8 @@ pub fn build_app_with(data_dir: &FsPath, static_dir: &FsPath, auvik_cfg: Option<
         .route("/api/links/:id", axum::routing::patch(clients::patch_link).delete(clients::delete_link))
         .route("/api/auvik", get(auvik::get_status))
         .route("/api/auvik/test", post(auvik::post_test))
+        .route("/api/auvik/tenants", get(auvik::get_tenants))
+        .route("/api/auvik/tenants/:id/inventory", get(auvik::get_inventory))
         .route("/api/route_cables", post(route_cables))
         .route("/api/port_positions", post(port_positions))
         .route("/api/admin/update", get(update::get_update).post(update::post_update))
