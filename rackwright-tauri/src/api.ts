@@ -1,6 +1,7 @@
 import type { Room } from "./rooms/types";
 // HTTP client for the web build (see web/API.md). Only used when VITE_TARGET === "web".
 import { Doc } from "./types";
+import type { AuvikApiDevice } from "./auvik/api/map";
 
 export interface User { id: number; email: string; name: string; is_admin: boolean }
 export interface RackMeta { id: number; name: string; version: number; updated_at: string; updated_by: string; site_id?: number | null; site?: string; client_id?: number | null; client?: string }
@@ -12,15 +13,16 @@ export class ApiError extends Error {
 let onUnauthorized: () => void = () => {};
 export const setUnauthorizedHandler = (f: () => void) => { onUnauthorized = f; };
 
-export async function api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+export async function api<T = any>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let r: Response;
   try {
     r = await fetch(path, {
       method, credentials: "same-origin",
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     });
-  } catch (e) { throw new ApiError(0, "Cannot reach the server"); }
+  } catch (e) { throw new ApiError(0, signal?.aborted ? "Stopped waiting for the server" : "Cannot reach the server"); }
   let j: any = {};
   try { j = await r.json(); } catch { /* empty or non-JSON body */ }
   if (!r.ok) {
@@ -149,3 +151,16 @@ export async function getAsset(name: string): Promise<Blob | null> {
 }
 export const getClientReport = (id: number) => api<Record<string, unknown>>("GET", `/api/clients/${id}/report`);
 export const putClientReport = (id: number, o: unknown) => api("PUT", `/api/clients/${id}/report`, o);
+
+// Auvik (web only, see web/API.md)
+export interface AuvikTenant { id: string; name: string; type: "multiClient" | "client"; parent: string | null }
+export interface AuvikInventory { status: "ok" | "denied" | "empty"; note: string; devices: AuvikApiDevice[] }
+export const auvikStatus = () => api<{ configured: boolean; region: string; username: string }>("GET", "/api/auvik");
+export const auvikTest = () => api<{ ok: boolean; error?: string }>("POST", "/api/auvik/test");
+export const auvikTenants = () => api<AuvikTenant[]>("GET", "/api/auvik/tenants");
+/** One site can take a while: wait up to 4 minutes, or until the caller cancels. */
+export function auvikInventory(id: string, signal?: AbortSignal): Promise<AuvikInventory> {
+  const limit = AbortSignal.timeout(4 * 60 * 1000);
+  const both = signal ? AbortSignal.any([limit, signal]) : limit;
+  return api<AuvikInventory>("GET", `/api/auvik/tenants/${encodeURIComponent(id)}/inventory`, undefined, both);
+}

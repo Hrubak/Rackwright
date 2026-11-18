@@ -11,6 +11,9 @@ import type { Device, Doc } from "../src/types";
 import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, type AuvikApiDevice } from "../src/auvik/api/map";
 import { classify } from "../src/auvik/plan";
 import { setOffColumn } from "../src/edit";
+import { findAuvikDoc, mapTenantToSite, planSite, applySite, saveSite, type SiteDocs } from "../src/auvik/api/sync";
+import { parseLayout } from "../src/imports/layout";
+import { ApiError } from "../src/api";
 
 let fails = 0;
 const t = (name: string, ok: boolean, extra = "") => { if (!ok) fails++; console.log((ok ? "PASS " : "FAIL ") + name + (extra ? "  " + extra : "")); };
@@ -174,6 +177,128 @@ async function main() {
     setOffColumn(doc, n1, 1); doc.devices.push(n1);
     t("setOffColumn leaves existing devices alone", old.fx === n0.fx && old.fy === 123 && n2.fy > 123 && old.rack === null);
     t("setOffColumn columns and stacking", n0.rack === null && n0.fx === n2.fx && n1.fx < n0.fx && n2.fy > n0.fy && n1.fy === 0 && n0.fy === 0, `${n0.fx} ${n1.fx} ${n2.fy}`);
+  }
+
+  // --- Task 8: per-site plan, fill rules, safe save
+  {
+    const inv = JSON.parse(readFileSync(new URL("../../web/server/tests/fixtures/auvik/expected-inventory-main.json", import.meta.url), "utf8")) as { status: "ok"; note: string; devices: AuvikApiDevice[] };
+    const tenant = { id: "t-1001", name: "EX Main Office", type: "client" as const, parent: "t-1" };
+    const defaults = { model: "apc-ar3100", u: 42 };
+    const empty = (): Doc => ({ v: 1, nid: 1, racks: [], devices: [], cables: [] });
+    const mkDocs = (racks: { id: number; name: string; doc: Doc }[]): SiteDocs => ({ siteId: 5, racks: racks.map((r) => ({ ...r, version: 1 })) });
+    const withAuvik = (tenantId: string | undefined): Doc => ({ ...empty(), auvik: { site: "x", ...(tenantId ? { tenant: tenantId } : {}), imported: "2026-01-01", unplaced: [], virtual: [] } as any });
+    const copy = (d: Doc) => JSON.parse(JSON.stringify(d)) as Doc;
+
+    t("findAuvikDoc by tenant after rename", findAuvikDoc(mkDocs([{ id: 1, name: "Other", doc: empty() }, { id: 2, name: "Renamed (Auvik)", doc: withAuvik("t-1001") }]), "t-1001")?.id === 2);
+    const lg = findAuvikDoc(mkDocs([{ id: 1, name: "A", doc: empty() }, { id: 3, name: "B", doc: withAuvik(undefined) }]), "t-1001");
+    t("findAuvikDoc legacy xlsx doc", lg?.id === 3 && lg.legacy === true);
+    t("findAuvikDoc two legacy docs is ambiguous", findAuvikDoc(mkDocs([{ id: 3, name: "B", doc: withAuvik(undefined) }, { id: 4, name: "C", doc: withAuvik(undefined) }]), "t-1001") === null);
+    t("findAuvikDoc other tenant's doc is not ours", findAuvikDoc(mkDocs([{ id: 2, name: "X", doc: withAuvik("t-other") }]), "t-1001") === null);
+
+    const client = { key: "1", name: "Example IT", notes: "", links: [], sites: [{ id: 5, name: "Main office", address: "", notes: "", racks: [] }, { id: 6, name: " ex main office ", address: "", notes: "", racks: [] }] };
+    const linked = new Map<number, SiteDocs>([[5, mkDocs([{ id: 2, name: "R", doc: withAuvik("t-1001") }])]]);
+    t("mapTenantToSite: tenant link wins", mapTenantToSite(tenant, client, linked).siteId === 5);
+    const m2 = mapTenantToSite(tenant, client, new Map());
+    t("mapTenantToSite: trimmed case-insensitive name", m2.siteId === 6 && !m2.isNew);
+    const m3 = mapTenantToSite({ ...tenant, name: "EX Warehouse" }, client, new Map());
+    t("mapTenantToSite: new", m3.siteId === null && m3.isNew && m3.name === "EX Warehouse");
+
+    // fresh site
+    const fresh = planSite(inv, tenant, mkDocs([]), defaults, "empty");
+    t("planSite fresh: no diff, target new", fresh.diff === null && fresh.target.docId === null);
+    const doc1 = applySite(fresh, new Set()).auvikDoc;
+    t("fresh: one rack", doc1.racks.length === 1 && doc1.racks[0].u === 42);
+    const byName = (d: Doc, n: string) => d.devices.find((x) => x.name === n)!;
+    const rackKind = ["EX-SW01", "EX-SW02", "EX-FW01", "EX-SRV01", "EX-NAS01", "EX-UPS01", "EX-RTR01", "EX-PDU01"].map((n) => byName(doc1, n));
+    t("fresh: rack-kind devices off-rack in column 0", rackKind.every((d) => d && d.rack === null && d.fx === rackKind[0].fx), JSON.stringify(rackKind.map((d) => d?.fx)));
+    t("fresh: APs and the endpoint box in column 1", byName(doc1, "EX-AP01").fx < rackKind[0].fx && byName(doc1, "EX-AP02").fx === byName(doc1, "EX-AP01").fx && doc1.devices.filter((d) => d.type === "Endpoints").every((d) => d.fx === byName(doc1, "EX-AP01").fx));
+    t("fresh: auvik meta", doc1.auvik?.tenant === "t-1001" && doc1.auvik?.source === "api" && doc1.auvik?.site === "EX Main Office" && /^\d{4}-\d\d-\d\d/.test(doc1.auvik?.imported || ""));
+    const srv = byName(doc1, "EX-SRV01");
+    t("fresh: specs written and tagged", !!srv.specs?.["Memory"] && srv.source?.["specs.Memory"] === "auvik", JSON.stringify(srv.specs));
+
+    // re-import: switch moved into the rack keeps its place, fills only empty fields
+    const doc2 = copy(doc1);
+    const sw = byName(doc2, "EX-SW01");
+    sw.rack = doc2.racks[0].id; sw.u = 40; sw.side = 0; sw.serial = ""; sw.ip = "10.0.0.1"; sw.source = { ip: "manual" } as any; sw.specs = { CPU: "mine" };
+    const again = planSite(inv, tenant, mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: doc2 }]), defaults, "empty");
+    t("re-import: targets the existing doc", again.target.docId === 2 && again.diff !== null);
+    const r2 = applySite(again, new Set(again.diff!.changes.filter((c) => c.defaultOn).map((c) => c.id)));
+    const sw2 = byName(r2.auvikDoc, "EX-SW01");
+    t("re-import: moved switch keeps rack and u", sw2.rack === doc2.racks[0].id && sw2.u === 40);
+    t("re-import: empty serial filled, set ip kept", sw2.serial === "EXSN0001" && sw2.ip === "10.0.0.1", `${sw2.serial} ${sw2.ip}`);
+    t("re-import: existing spec never overwritten", sw2.specs?.["CPU"] === "mine");
+    t("re-import: no duplicate devices", r2.auvikDoc.devices.filter((d) => d.name === "EX-SW01").length === 1 && r2.auvikDoc.devices.length === doc2.devices.length);
+
+    // overwrite ticks set values but not manual ones
+    const doc3 = copy(doc1);
+    const s3 = byName(doc3, "EX-SW01"); s3.ip = "10.0.0.9"; s3.source = { ip: "csv" } as any;
+    const s4 = byName(doc3, "EX-SW02"); s4.ip = "10.0.0.8"; s4.source = { ip: "manual" } as any;
+    const ow = planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: doc3 }]), defaults, "overwrite");
+    const fldIp = ow.diff!.changes.filter((c) => c.id.endsWith(":ip"));
+    t("overwrite: csv ip ticked, manual ip not", fldIp.some((c) => c.defaultOn) && fldIp.some((c) => !c.defaultOn), JSON.stringify(fldIp.map((c) => [c.id, c.defaultOn])));
+    const rOw = applySite(ow, new Set(ow.diff!.changes.filter((c) => c.defaultOn).map((c) => c.id)));
+    t("overwrite: applied csv, kept manual", byName(rOw.auvikDoc, "EX-SW01").ip === "192.0.2.11" && byName(rOw.auvikDoc, "EX-SW02").ip === "10.0.0.8");
+
+    // other rack document of the site: fill-only
+    const other = empty();
+    other.racks.push({ id: 1, name: "Lab", u: 42, x: 0, y: 0 } as any);
+    other.devices.push({ id: 2, name: "EX-SRV01", type: "Server", u_size: 1, rack: 1, u: 10, side: 0, half: false, rows: 0, fx: 0, fy: 0, face: "front", ports: [], serial: "EXSN0006", ip: "", notes: "keep me" } as Device);
+    other.nid = 3;
+    const sd = mkDocs([{ id: 2, name: "A", doc: doc1 }, { id: 9, name: "Lab", doc: other }]);
+    const op = planSite(inv, tenant, sd, defaults, "empty");
+    t("other rack doc: appears with fill-only change", op.other.length === 1 && op.other[0].rackId === 9 && op.other[0].diff.changes.length > 0 && op.other[0].diff.changes.every((c) => c.id.startsWith("fld:")), JSON.stringify(op.other.map((o) => o.diff.changes.map((c) => c.id))));
+    const ro = applySite(op, new Set([...op.other[0].diff.changes.map((c) => c.id), ...op.diff!.changes.filter((c) => c.defaultOn).map((c) => c.id)]));
+    const o2 = ro.others.find((x) => x.rackId === 9)!.doc;
+    t("other rack doc: ip filled, nothing added, notes and rack untouched", o2.devices.length === 1 && o2.devices[0].ip === "192.0.2.31" && o2.devices[0].rack === 1 && o2.devices[0].u === 10 && o2.devices[0].notes === "keep me" && o2.racks.length === 1 && o2.cables.length === 0, JSON.stringify(o2.devices[0]));
+
+    // layout auto-place
+    const spec = parseLayout("Empty (2U)\nEX-SW01 (1U)\n");
+    const lp = planSite(inv, tenant, mkDocs([]), defaults, "empty", spec);
+    const sl = byName(applySite(lp, new Set()).auvikDoc, "EX-SW01");
+    const rl = applySite(lp, new Set()).auvikDoc;
+    t("layout: EX-SW01 at U40, others off-rack", sl.rack === rl.racks[0].id && sl.u === 40 && rl.devices.filter((d) => d.name !== "EX-SW01").every((d) => d.rack === null) && !!lp.layoutRows?.length, `${sl.rack} ${sl.u}`);
+
+    // saveSite with a mocked API
+    const mkApi = (script: () => "ok" | "409" | "500") => {
+      const calls: string[] = [];
+      const api = {
+        createRack: async (name: string, _d: Doc, site: number | null) => { calls.push(`create ${name} ${site}`); return { id: 50, name, version: 1 } as any; },
+        updateRack: async (id: number, name: string, _d: Doc, version: number) => {
+          const r = script(); calls.push(`update ${id} v${version} ${r}`);
+          if (r === "409") throw new ApiError(409, "conflict", { version: version + 1, updated_by: "Sam" });
+          if (r === "500") throw new ApiError(500, "boom");
+          return { id, name, version: version + 1 } as any;
+        },
+        getRack: async (id: number) => { calls.push(`get ${id}`); return { id, name: "A", version: 7, doc: copy(doc1) } as any; },
+      };
+      return { api, calls };
+    };
+    const planA = () => planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: copy(doc1) }]), defaults, "empty");
+    const ctx = { clientKey: "1", siteId: 5, siteName: "EX Main Office" };
+    const noSite = async (): Promise<number> => { throw new Error("no site expected"); };
+    {
+      let n = 0; const { api, calls } = mkApi(() => (n++ === 0 ? "409" : "ok"));
+      const line = await saveSite(planA(), new Set(), ctx, api as any, noSite);
+      t("saveSite: first 409 then success", calls.filter((c) => c.startsWith("update")).length === 2 && calls.includes("get 2") && /v7 ok/.test(calls[calls.length - 1]) && !/Skipped/.test(line), calls.join("|") + " " + line);
+    }
+    {
+      const { api, calls } = mkApi(() => "409");
+      const line = await saveSite(planA(), new Set(), ctx, api as any, noSite);
+      t("saveSite: two 409s skip", /Skipped A: someone is editing it/.test(line) && calls.filter((c) => c.startsWith("update")).length === 2, line);
+      const { api: api2 } = mkApi(() => "ok");
+      const line2 = await saveSite(planA(), new Set(), ctx, api2 as any, noSite);
+      t("saveSite: next site still saves after a skipped one", !/Skipped/.test(line2) && /EX Main Office/.test(line2), line2);
+    }
+    {
+      const { api } = mkApi(() => "500");
+      const line = await saveSite(planA(), new Set(), ctx, api as any, noSite);
+      t("saveSite: other errors give a line, no throw", /boom/.test(line), line);
+    }
+    {
+      const { api, calls } = mkApi(() => "ok");
+      const line = await saveSite(planSite(inv, tenant, mkDocs([]), defaults, "empty"), new Set(), { clientKey: "1", siteId: null, siteName: "EX Main Office" }, api as any, async (_k, name) => { calls.push("addSite " + name); return 77; });
+      t("saveSite: new site then new document", calls[0] === "addSite EX Main Office" && calls[1] === "create EX Main Office (Auvik) 77" && !!line, calls.join("|"));
+    }
   }
 
   console.log(fails ? `${fails} FAILED` : "all passed");
