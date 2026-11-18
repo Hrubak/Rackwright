@@ -2,6 +2,13 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.16.0 — 2026-11-17
+Web and desktop. Update the LXC as usual; nothing changes on the server. (Site visit was planned as 3.14.0; it ships now, after 3.15.0.)
+- **Site visit.** Select a rack and press Site visit in the rack panel. Rackwright walks the rack from the top down, one device at a time. Check the device in that spot, fix its name, status, manufacturer, model, serial, asset tag or IP if they are wrong, and press Matches. If it isn't there, press Not in the rack: it moves off-rack and is set to Offline. Skip leaves a device alone, and Back goes to the previous one.
+- When you finish, confirmed and corrected devices get today's date, and the rack panel shows "Checked on site" with the date. If you skipped everything, the rack is not marked. Each step is one undo (Ctrl+Z after you close the visit). Corrections to Auvik devices are locked, so the next Auvik import won't put the old values back.
+- **Last checked on site** is a new date field in each device's Specs.
+- **Client report.** The Needs attention section now counts racks not checked on site in 90 days. Until you do a site visit, every rack counts as never checked.
+
 ## 3.15.0 — 2026-11-17
 Web and desktop. Update the LXC as usual; nothing changes on the server.
 - **Import text or CSV.** File › Import text or CSV… replaces the old rack list import. Paste text or choose a .txt or .csv file (on the web you can also drop it in), then press Preview.

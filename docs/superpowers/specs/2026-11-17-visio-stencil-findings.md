@@ -1,6 +1,6 @@
 # Visio stencil import: findings
 
-Date: 2026-11-17. Status: research only, no release assigned yet (after 3.16.0).
+Date: 2026-11-17. Status: research only, no release assigned yet (after 3.17.0).
 
 Goal: turn vendor Visio stencils (for example the collection at github.com/bhdicaire/visioStencils) into Rackwright faceplates, so a device can show the vendor's real front or rear picture.
 

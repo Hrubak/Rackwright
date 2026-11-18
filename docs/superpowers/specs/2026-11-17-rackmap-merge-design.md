@@ -85,10 +85,10 @@ Trace each device's power path (device → PDU → UPS → circuit) using Rackwr
 | 3.11.0 | New layout: Clients dashboard home, client tabs, equipment sidebar, tabbed device panel, new device fields. |
 | 3.12.0 | Rooms and floor plans (data, migration, editor, inter-rack cabling, PDF). |
 | 3.13.0 | Needs attention, duplicate IPs, power budget. |
-| 3.14.0 | Site-visit mode. |
+| 3.16.0 | Site-visit mode (planned as 3.14.0; shipped after 3.15.0). |
 | 3.15.0 | Imports: text and CSV, preview and reorganise. |
-| 3.16.0 | Imports: Visio, SVG, PDF, pictures (OCR), folder. |
-| 3.17.0 | Word report (moved from 3.11.0). |
+| 3.17.0 | Imports: Visio, SVG, PDF, pictures (OCR), folder. |
+| 3.18.0 | Word report (moved from 3.11.0). |
 
 Each release gets its own plan, ships alone, and follows the usual release steps (changelog, shared version, both builds, tests, customer-data scan, "Push it").
 
