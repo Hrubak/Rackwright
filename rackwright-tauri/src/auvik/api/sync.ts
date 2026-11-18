@@ -39,7 +39,7 @@ export function mapTenantToSite(t: AuvikTenant, client: ClientItem, docsBySite: 
 export interface SitePlan {
   tenant: AuvikTenant;
   target: { docId: number | null; version: number | null; name: string; legacy: boolean };
-  inv: AuvikInventory; siteDocs: SiteDocs; defaults: Defaults; fill: Fill; layout?: ImportSpec;
+  inv: AuvikInventory; siteDocs: SiteDocs; defaults: Defaults; fill: Fill; layout?: ImportSpec; hosts?: Record<string, string>;
   parsed: ParsedAuvik; items: ApiPlanItem[]; plan: ImportPlan;
   diff: Diff | null;                                          // null when the site has no Auvik document yet
   other: { rackId: number; rackName: string; diff: Diff }[]; // fill-only changes in the site's other rack documents
@@ -48,10 +48,11 @@ export interface SitePlan {
 
 const isFld = (id: string) => id.startsWith("fld:");
 
-export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec): SitePlan {
+export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>): SitePlan {
   const found = findAuvikDoc(siteDocs, tenant.id);
   const mine = found ? siteDocs.racks.find((r) => r.id === found.id)! : null;
-  const { parsed, items } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }));
+  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }));
+  const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
   for (const r of siteDocs.racks) {
@@ -61,7 +62,7 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, parsed, items, plan, other,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, parsed, items, plan, other,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
     diff: mine ? computeDiff(mine.doc, plan, items, { fill }) : null,
   };
@@ -178,7 +179,7 @@ export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api:
       try {
         const r = await api.getRack(id);
         const docs: SiteDocs = { ...p.siteDocs, racks: p.siteDocs.racks.map((x) => (x.id === id ? { id, name: r.name, version: r.version, doc: r.doc } : x)) };
-        const np = planSite(p.inv, p.tenant, docs, p.defaults, p.fill, p.layout);
+        const np = planSite(p.inv, p.tenant, docs, p.defaults, p.fill, p.layout, p.hosts);
         const out = applySite(np, sel);
         const nd = np.target.docId === id ? out.auvikDoc : out.others.find((o) => o.rackId === id)?.doc;
         if (!nd) return;   // their version needs nothing from us

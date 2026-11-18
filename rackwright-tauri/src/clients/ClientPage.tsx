@@ -14,8 +14,12 @@ import type { ClientTab } from "../home/Dashboard";
 import { useSettings } from "../settings/context";
 import FloorTab from "../rooms/FloorTab";
 import { ClientItem, RackItem, SiteItem, clientStore } from "./store";
+import { IS_WEB } from "../backend";
+import { auvikStatus } from "../api";
 
 const ImportToClient = lazy(() => import("./ImportToClient"));
+// Web only: the desktop build never imports auvik/api/*.
+const ImportAuvikApi = IS_WEB ? lazy(() => import("../auvik/api/ImportAuvikApi")) : null;
 
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", marginRight: 5, cursor: "pointer", fontSize: 12 } as const;
 const small = { ...btn, padding: "1px 7px", fontSize: 11 } as const;
@@ -60,6 +64,9 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
   const [busy, setBusy] = useState(false);
   const [siteForm, setSiteForm] = useState<{ id: number | null; name: string; address: string; notes: string } | null>(null);
   const [importOpen, setImportOpen] = useState(!!startImport);
+  const [apiOpen, setApiOpen] = useState(false);
+  const [auvikOn, setAuvikOn] = useState(false);   // web: the server has an Auvik key
+  useEffect(() => { if (IS_WEB) auvikStatus().then((s) => setAuvikOn(s.configured), () => setAuvikOn(false)); }, []);
   const [picker, setPicker] = useState<{ siteId: number; items: RackItem[] | null } | null>(null);
 
   const reloadClient = useCallback(async () => {
@@ -185,6 +192,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
           <div style={{ marginBottom: 12 }}>
             <button style={btn} onClick={() => setSiteForm({ id: null, name: "", address: "", notes: "" })}>Add site</button>
             <button style={btn} onClick={() => setImportOpen(true)}>Import Auvik</button>
+            {IS_WEB && auvikOn && <button style={btn} onClick={() => setApiOpen(true)}>Import from Auvik</button>}
           </div>
           {siteForm && (
                   <div style={{ border: `1px solid ${v("border")}`, borderRadius: 6, padding: 10, marginBottom: 12, maxWidth: 520, background: v("card") }}>
@@ -258,6 +266,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
                 </div>
         </>
       )}
+      {apiOpen && ImportAuvikApi && <Suspense fallback={null}><ImportAuvikApi client={client} onDone={refresh} onClose={() => setApiOpen(false)} /></Suspense>}
       {importOpen && <Suspense fallback={null}><ImportToClient client={client} onDone={refresh} onClose={() => setImportOpen(false)} /></Suspense>}
     </div>
   );
