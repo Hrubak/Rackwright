@@ -76,7 +76,7 @@ export function csvToSpec(text: string): ImportSpec {
     return spec;
   }
   const nameI = col("name", "device", "devicename", "hostname", "host", "equipment", "asset");
-  if (nameI < 0) { spec.warnings.push("Couldn’t find a Name / Device / Hostname column."); return spec; }
+  if (nameI < 0) { spec.warnings.push("Couldn't find a Name, Device or Hostname column."); return spec; }
   const rackI = col("rack", "rackname", "cabinet"), conI = col("connectedto", "connections");
   for (const { cells: r, line } of data) {
     const pairs: [string, string][] = [[ "name", r[nameI] ]]; // the chosen name column always supplies the name

@@ -96,8 +96,10 @@ const rmText = "RACK EX-R1 42U\nU40 switch EX-SW01 ip=10.0.0.2 model=ICX7150\nU3
 eq("auto csv", readImport("Name,Type,Rack,U,Model,IP\nEX-SW01,Switch,EX-R1,40,ICX7150,10.0.0.2\nEX-NAS01,NAS,EX-R1,10,DS920,10.0.0.9\n", "auto").kind, "inventory");
 eq("auto rackmap", readImport(rmText, "auto").kind, "rackmap");
 eq("auto layout", readImport(layText, "auto").kind, "layout");
-eq("forced rackmap on layout", readImport(layText, "rackmap").warnings.slice(-1), ["Nothing in the RackMap text format was found."]);
+const frw = readImport(layText, "rackmap").warnings;
+eq("forced rackmap on layout", [frw.slice(0, -1).every((w) => /^Line \d+ not understood: /.test(w)), frw.filter((w) => !w.startsWith("Line ")), frw.length], [true, ["Nothing in the RackMap text format was found."], layText.split("
+").filter((l) => l.trim()).length + 1]);
 eq("forced layout on empty", readImport("", "layout").warnings, ["No devices were found in the list."]);
-eq("forced csv keeps warnings", readImport("Foo,Bar\n1,2\n", "csv").warnings.slice(-1), ["Couldn't find a Name, Device or Hostname column."]);
+eq("forced csv keeps warnings", readImport("Foo,Bar\n1,2\n", "csv").warnings, ["Couldn't find a Name, Device or Hostname column."]);
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

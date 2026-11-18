@@ -14,7 +14,7 @@ function withWarning(spec: ImportSpec, text: string): ImportSpec {
 }
 
 export function readImport(text: string, mode: ReadMode): ImportSpec {
-  if (mode === "csv") return withWarning(csvToSpec(text), "Couldn't find a Name, Device or Hostname column.");
+  if (mode === "csv") return csvToSpec(text);
   if (mode === "rackmap") return withWarning(parseRackmapText(text), "Nothing in the RackMap text format was found.");
   if (mode === "layout") return withWarning(parseLayout(text), "No devices were found in the list.");
   if (looksDelimited(text)) return csvToSpec(text);
