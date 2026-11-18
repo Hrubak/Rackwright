@@ -14,7 +14,11 @@ function withWarning(spec: ImportSpec, text: string): ImportSpec {
 }
 
 export function readImport(text: string, mode: ReadMode): ImportSpec {
-  if (mode === "csv") return csvToSpec(text);
+  if (mode === "csv") {
+    const spec = csvToSpec(text);
+    if (foundNothing(spec) && spec.warnings.length === 0) spec.warnings.push("No rows could be read.");
+    return spec;
+  }
   if (mode === "rackmap") return withWarning(parseRackmapText(text), "Nothing in the RackMap text format was found.");
   if (mode === "layout") return withWarning(parseLayout(text), "No devices were found in the list.");
   if (looksDelimited(text)) return csvToSpec(text);
