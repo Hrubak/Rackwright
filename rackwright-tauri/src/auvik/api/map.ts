@@ -15,7 +15,7 @@ export const TYPE_WORDS: Record<string, string> = {
   server: "Server", hypervisor: "Hypervisor", storage: "Storage", ups: "UPS", pdu: "PDU",
   accessPoint: "Access Point", thinAccessPoint: "Access Point", wirelessController: "Controller", controller: "Controller",
   virtualMachine: "Virtual Machine", workstation: "Workstation", printer: "Printer", copier: "Printer",
-  voipPhone: "IP Phone", ipPhone: "IP Phone", phone: "Phone", camera: "Camera", internetOfThings: "Internet of Things",
+  voipPhone: "IP Phone", ipPhone: "IP Phone", phone: "Phone", camera: "Camera", internetOfThings: "IoT",
   ipmi: "Intelligent Platform Management Interface", unknown: "Unknown",
 };
 
@@ -62,6 +62,8 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx): { 
       const specs = src ? specsOf(src.components) : {};
       const out: ApiPlanItem = { ...i };
       if (i.mode === "vm" && i.host) out.hostGuessed = true;
+      if (i.kind === "controller" && i.mode === "skip" && !/virtual|vm/i.test(`${i.dev.name} ${i.dev.model}`)) { out.mode = "off"; out.virtual = false; }   // a real controller is inventory, never silently dropped
+      if (i.kind === "ipmi" && i.host === "new") { out.mode = "off"; out.host = null; }   // no host to attach to: off-rack only, a layout places devices
       if (Object.keys(specs).length) out.specs = specs;
       return out;
     }),

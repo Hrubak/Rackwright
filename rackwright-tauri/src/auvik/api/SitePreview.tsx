@@ -86,7 +86,17 @@ export default function SitePreview({ view, eff, st, setSt, targetName, isNew }:
       {st.layout && <div style={{ marginBottom: 6, opacity: 0.85 }}>
         {eff.layoutRows?.length ? <>Will be placed in the rack: {eff.layoutRows.map((r) => `${r.match?.name ?? r.dev.name} (U${r.dev.u ?? "?"})`).join(", ")}.</> : "No device matched the layout, so nothing will be placed."}
       </div>}
-      {st.view === "changes" && changes.length > 0 && <ChangesList changes={changes} isOn={isOn} setOn={setOn} />}
+      {st.view === "changes" && changes.length > 0 && (
+        <div style={{ overflow: "auto", flex: 1, minHeight: 200 }}>
+          {(eff.diff?.changes.length ?? 0) > 0 && <ChangesList changes={eff.diff!.changes} isOn={isOn} setOn={setOn} />}
+          {eff.other.map((o) => (
+            <div key={o.rackId}>
+              <div style={{ fontWeight: 600, margin: "10px 0 4px" }}>In {o.rackName}</div>
+              <ChangesList changes={o.diff.changes} isOn={isOn} setOn={setOn} />
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4, flex: 1, minHeight: 200, display: st.view === "changes" && changes.length > 0 ? "none" : undefined }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ position: "sticky", top: 0, background: v("border-faint") }}>

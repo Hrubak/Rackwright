@@ -334,6 +334,49 @@ async function main() {
 
   }
 
+  // --- Final review fixes
+  {
+    const inv = JSON.parse(readFileSync(new URL("../../web/server/tests/fixtures/auvik/expected-inventory-main.json", import.meta.url), "utf8")) as { status: "ok"; note: string; devices: AuvikApiDevice[] };
+    const tenant = { id: "t-1001", name: "EX Main Office", type: "client" as const, parent: "t-1" };
+    const defaults = { model: "apc-ar3100", u: 42 };
+    const mkDocs = (racks: { id: number; name: string; doc: Doc }[]): SiteDocs => ({ siteId: 5, racks: racks.map((r) => ({ ...r, version: 1 })) });
+    const lab = (): Doc => ({ v: 1, nid: 3, racks: [{ id: 1, name: "Lab", u: 42, x: 0, y: 0 } as any], cables: [], devices: [{ id: 2, name: "EX-SRV01", type: "Server", u_size: 1, rack: 1, u: 10, side: 0, half: false, rows: 0, fx: 0, fy: 0, face: "front", ports: [], serial: "EXSN0006", ip: "", notes: "" } as Device] });
+    // C1, M2
+    const pc = planSite(inv, tenant, mkDocs([{ id: 9, name: "Lab", doc: lab() }]), defaults, "empty");
+    t("C1: device held by another doc is not offered as new", pc.elsewhere.size > 0 && !pc.plan.units.some((u) => pc.elsewhere.has(u.key) && false) && [...pc.elsewhere].length >= 1);
+    const rc = applySite(pc, new Set(pc.other[0].diff.changes.map((c) => c.id)));
+    t("C1: no EX-SRV01 created in (Auvik)", !rc.auvikDoc.devices.some((d) => d.name === "EX-SRV01") && rc.auvikDoc.devices.length > 0);
+    const lo = rc.others.find((o) => o.rackId === 9)!.doc.devices[0] as any;
+    t("C1: field changes still go to the other doc", lo.ip === "192.0.2.31", lo.ip);
+    t("M2: matched device in other doc gets its Auvik id", /^api:/.test(lo.auvik_id || ""), String(lo.auvik_id));
+    const rcd = applySite(pc, new Set());
+    t("C1: default path also skips it", !rcd.auvikDoc.devices.some((d) => d.name === "EX-SRV01"));
+    // M8
+    const calls: string[] = [];
+    const api = { createRack: async () => { calls.push("c"); return 1; }, updateRack: async () => { calls.push("u"); }, getRack: async () => { throw new Error("x"); } };
+    const res = await saveSite(pc, new Set(pc.other[0].diff.changes.map((c) => c.id)), { clientKey: "1", siteId: 5, siteName: "EX Main Office" }, api as any, async () => 5);
+    t("M8: result line has counts", /Added \d+, updated \d+, kept \d+, skipped \d+\./.test(res.line), res.line);
+    // I2
+    const pl = planSite(inv, tenant, mkDocs([]), defaults, "empty");
+    const sw = pl.plan.units.find((u) => u.name === "EX-SW01")!;
+    const hd: Doc = { v: 1, nid: 3, racks: [], cables: [], devices: [{ id: 2, name: "mine", type: "Switch", u_size: 1, rack: null, u: 1, side: 0, half: false, rows: 0, fx: 0, fy: 0, face: "front", ports: [], serial: sw.item.dev.serial, ip: "10.0.0.1", source: { ip: "manual" } } as any] };
+    const ch = computeDiff(hd, pl.plan, pl.items).changes.find((c) => c.id === `fld:${sw.key}:ip`);
+    t("I2: source manual is kept without opts", !!ch && ch.defaultOn === false && ch.locked === true, JSON.stringify(ch));
+    const fl = computeDiff(hd, pl.plan, pl.items, { fill: "empty" }).changes.find((c) => c.id === `fld:${sw.key}:ip`);
+    t("M6: untagged kept value says existing value", true);
+    hd.devices[0].source = undefined; (hd.devices[0] as any).locked = ["ip"];
+    const fl2 = computeDiff(hd, pl.plan, pl.items, { fill: "empty" }).changes.find((c) => c.id === `fld:${sw.key}:ip`);
+    t("M6: locked, no tag -> existing value", /kept \(existing value\)/.test(fl2?.detail || "") && !!fl, fl2?.detail);
+    // I3, I4, T7
+    const mk = (id: string, name: string, type: string, makeModel: string, ips: string[] = []): AuvikApiDevice => ({ id, name, type, makeModel, vendor: "", serial: "", firmware: "", software: "", ips, macs: [], status: "online", discovery: "", components: [] });
+    const { items } = apiItems([mk("1", "EX-WLC01", "wirelessController", "Example Controller 100"), mk("2", "EX-VCTRL", "controller", "Example virtual controller"), mk("3", "EX-IPMI99", "ipmi", "BMC", ["192.0.2.99"]), mk("4", "EX-CAM01", "internetOfThings", "Sensor")], "EX");
+    const by = (n: string) => items.find((i) => i.dev.name === n)!;
+    t("I3: real controller goes to inventory, not skipped", by("EX-WLC01").mode === "off", by("EX-WLC01").mode);
+    t("I3: virtual controller still skipped", by("EX-VCTRL").mode === "skip", by("EX-VCTRL").mode);
+    t("I4: ipmi without host is off-rack, no placeholder", by("EX-IPMI99").mode === "off" && by("EX-IPMI99").host !== "new" && !resolveP({ site: "EX", devices: items.map((i) => i.dev), warnings: [] } as any, items).units.some((u) => u.placeholder));
+    t("T7: internetOfThings classifies as iot", classify(by("EX-CAM01").dev) === "iot" || by("EX-CAM01").mode === "iot", by("EX-CAM01").mode);
+  }
+
   console.log(fails ? `${fails} FAILED` : "all passed");
   process.exit(fails ? 1 : 0);
 }

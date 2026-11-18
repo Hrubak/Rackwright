@@ -43,10 +43,13 @@ export interface SitePlan {
   parsed: ParsedAuvik; items: ApiPlanItem[]; plan: ImportPlan;
   diff: Diff | null;                                          // null when the site has no Auvik document yet
   other: { rackId: number; rackName: string; diff: Diff }[]; // fill-only changes in the site's other rack documents
+  elsewhere: Set<string>;                                      // plan unit keys already held by another rack document: never added to "(Auvik)"
   layoutRows?: Row[];
 }
 
 const isFld = (id: string) => id.startsWith("fld:");
+/** A device found in another rack document is left where it is: it is not offered as new here. */
+const dropElsewhere = (d: Diff, keys: Set<string>): Diff => ({ ...d, changes: d.changes.filter((c) => !(c.id.startsWith("new:") && keys.has(c.id.slice(4)))) });
 
 export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>): SitePlan {
   const found = findAuvikDoc(siteDocs, tenant.id);
@@ -55,16 +58,18 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
   const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
+  const elsewhere = new Set<string>();
   for (const r of siteDocs.racks) {
     if (r.id === mine?.id) continue;
     const d = computeDiff(r.doc, plan, items, { fill });
+    for (const k of d.matched.keys()) elsewhere.add(k);
     const changes = d.changes.filter((c) => isFld(c.id));
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, parsed, items, plan, other,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, parsed, items, plan, other, elsewhere,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
-    diff: mine ? computeDiff(mine.doc, plan, items, { fill }) : null,
+    diff: mine ? dropElsewhere(computeDiff(mine.doc, plan, items, { fill }), elsewhere) : null,
   };
   if (layout) p.layoutRows = build(p, null).rows;
   return p;
@@ -116,8 +121,9 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   const rackId = doc.racks[0].id;
   const before = new Set(doc.devices.map((d) => d.id));
   const ticked = new Set(sel ?? []);
-  const diff0 = computeDiff(doc, p.plan, p.items, { fill: p.fill });
+  const diff0 = dropElsewhere(computeDiff(doc, p.plan, p.items, { fill: p.fill }), p.elsewhere);
   if (!mine || !sel) for (const id of defaultSelection(diff0)) ticked.add(id);
+  for (const k of p.elsewhere) ticked.delete(`new:${k}`);
   // A matched device is imported when it has nothing to tick, or one of its changes is ticked.
   const hasKey = (id: string, key: string) => id.includes(":" + key + ":") || id.endsWith(":" + key);
   const wanted = (key: string) => { const mine = diff0.changes.filter((c) => hasKey(c.id, key)); return !mine.length || mine.some((c) => ticked.has(c.id)); };
@@ -137,7 +143,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   if (p.layout) {
     const opts = { rackId, newRackName: "Rack 1", newRackU: p.defaults.u, growRack: false };
     const ip = planImport(doc, p.layout, opts);
-    rows = ip.rows.filter((r) => r.match && r.action === "move");   // place devices that exist; never add the list's own rows
+    rows = ip.rows.filter((r) => r.match && r.match.rack == null && r.action === "move");   // place devices that exist; never add the list's own rows
     if (rows.length) applyImport(doc, { ...ip, rows: rows.map((r) => ({ ...r, on: true })) }, opts);
   }
   doc.auvik = { ...doc.auvik, tenant: p.tenant.id, source: "api", unplaced: [], site: p.tenant.name, imported: new Date().toISOString().slice(0, 10) } as Doc["auvik"];
@@ -156,6 +162,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
       for (const f of deviceFields(dev, u)) {
         if (!pick.has(`fld:${u.key}:${f.field}`)) continue;
         (dev as any)[f.field] = f.to; setSource(dev, f.field, "auvik");
+        if (!dev.auvik_id && u.item.dev.apiId) dev.auvik_id = "api:" + u.item.dev.apiId;
         if (dev.locked) dev.locked = dev.locked.filter((x) => x !== f.field);
         changed = true;
       }
@@ -179,9 +186,9 @@ const addSiteDefault: AddSite = async (clientKey, name) => {
   const { clientStore } = await import("../../clients/store");
   const s = clientStore();
   await s.addSite(clientKey, { name });
-  const id = (await s.get(clientKey)).sites.find((x) => x.name === name)?.id;
-  if (id == null) throw new Error("The new site could not be found.");
-  return id;
+  const ids = (await s.get(clientKey)).sites.filter((x) => x.name === name).map((x) => x.id);
+  if (!ids.length) throw new Error("The new site could not be found.");
+  return Math.max(...ids);   // the one just made is the newest
 };
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -228,7 +235,12 @@ export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api:
       const r = p.siteDocs.racks.find((x) => x.id === o.rackId)!;
       await saveOne(o.rackId, r.name, r.version, o.doc);
     }
-    return { line: `${head}: saved ${saved} rack document${saved === 1 ? "" : "s"}.` + (notes.length ? " " + notes.join(". ") + "." : ""), siteId, created };
+    const fl = [...(p.diff?.changes ?? []), ...p.other.flatMap((o) => o.diff.changes)].filter((c) => c.cat === "field");
+    const updated = fl.filter((c) => sel.has(c.id)).length, kept = fl.length - updated;
+    const mineDoc = p.target.docId != null ? p.siteDocs.racks.find((r) => r.id === p.target.docId) : undefined;
+    const added = Math.max(0, first.auvikDoc.devices.length - (mineDoc?.doc.devices.length ?? 0));
+    const skipped = p.items.filter((i) => i.mode === "skip").length;
+    return { line: `${head}: saved ${saved} rack document${saved === 1 ? "" : "s"}. Added ${added}, updated ${updated}, kept ${kept}, skipped ${skipped}.` + (notes.length ? " " + notes.join(". ") + "." : ""), siteId, created };
   } catch (e) {
     return { line: `${head}: could not save. ${msg(e)}`, siteId, created };
   }

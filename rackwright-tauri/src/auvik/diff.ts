@@ -86,12 +86,12 @@ export function findEp(list: Ep[], m: { key: string; mac: string; name: string }
 }
 
 export interface FieldChange { field: string; from: string; to: string; kept: boolean }
-/** Field differences between a document device and what Auvik says now. */
 export interface DiffOpts { fill?: "empty" | "overwrite" }
+/** Field differences between a document device and what Auvik says now. */
 export function deviceFields(d: X, u: PlanUnit): FieldChange[] {
   if (u.placeholder) return [];
   const a = u.item.dev, out: FieldChange[] = [];
-  const add = (field: string, from: string, to: string, kept = false) => out.push({ field, from, to, kept: kept || has(d.locked, field) });
+  const add = (field: string, from: string, to: string, kept = false) => out.push({ field, from, to, kept: kept || has(d.locked, field) || d.source?.[field] === "manual" });
   const ip = a.ips[0] || "";
   if (ip && ip !== (d.ip || "")) add("ip", d.ip || "", ip);
   if (a.serial && a.serial !== (d.serial || "")) add("serial", d.serial || "", a.serial);
@@ -146,8 +146,8 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
       if (opts?.fill) {
         const manual = isManual(d, f.field);
         const on = opts.fill === "overwrite" ? !manual : (f.from === "" && !manual);
-        const src = d.source?.[f.field] ?? (manual ? "manual" : "auvik");
-        changes.push({ id: `fld:${u.key}:${f.field}`, cat: "field", title: d.name, detail: on ? f.field : `${f.field} - kept (from ${src})`, from: f.from, to: f.to, locked: manual, defaultOn: on });
+        const src = d.source?.[f.field] ?? "manual";
+        changes.push({ id: `fld:${u.key}:${f.field}`, cat: "field", title: d.name, detail: on ? f.field : `${f.field} - kept (${d.source?.[f.field] ? "from " + src : "existing value"})`, from: f.from, to: f.to, locked: manual, defaultOn: on });
         continue;
       }
       changes.push({ id: `fld:${u.key}:${f.field}`, cat: "field", title: d.name, detail: f.field, from: f.from, to: f.to, locked: f.kept, defaultOn: !f.kept });
@@ -269,7 +269,7 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
 
   // ---- missing
   if (items.length) {
-    for (const d of findMissing(doc, items)) changes.push({ id: `rmdev:${d.id}`, cat: "missingDev", title: d.name, detail: "Not in this export. Kept unless you tick it.", defaultOn: false });
+    for (const d of findMissing(doc, items)) changes.push({ id: `rmdev:${d.id}`, cat: "missingDev", title: d.name, detail: (opts?.fill ? "No longer in Auvik" : "Not in this export") + ". Kept unless you tick it.", defaultOn: false });
   }
   const boxKeys = new Set(boxes.map((b) => b.key));
   for (const d of all) {
