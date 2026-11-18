@@ -2,13 +2,13 @@
 import { normMac } from "../auvik/parse";
 import type { Device, Doc, Rack } from "../types";
 import { placeLayout } from "./layout";
-import type { ImportDevice, ImportLink, ImportRack, ImportSpec } from "./spec";
+import type { ImportDevice, ImportLink, ImportKind, ImportRack, ImportSpec } from "./spec";
 
 export interface ImportOpts { rackId: number | null; newRackName: string; newRackU: number; growRack: boolean }
 export type Action = "add" | "move" | "change" | "same";
 export interface FieldDiff { field: string; from: string; to: string; kept: boolean }
-export interface Row { id: string; dev: ImportDevice; match: Device | null; action: Action; diffs: FieldDiff[]; on: boolean; reason?: string }
-export interface ImportPlan { rows: Row[]; notInImport: Device[]; links: ImportLink[]; racks: ImportRack[]; needU: number; rackU: number }
+export interface Row { id: string; dev: ImportDevice; match: Device | null; action: Action; diffs: FieldDiff[]; on: boolean; reason?: string; offRack?: boolean } // offRack: a new diagram device with no drawn rack goes off-rack, not into the target rack
+export interface ImportPlan { rows: Row[]; notInImport: Device[]; links: ImportLink[]; racks: ImportRack[]; needU: number; rackU: number; kind: ImportKind }
 
 export const POSSIBLE_REASON = "Possible match — check before importing";
 const low = (s: unknown) => String(s ?? "").trim().toLowerCase();
@@ -161,6 +161,7 @@ function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
     }
     if (!hit) {
       const row: Row = { id, dev: d, match: null, action: "add", diffs: [], on: true };
+      if (spec.kind === "diagram" && d.rack === undefined && d.u == null) row.offRack = true;
       rows.push(row);
       pending.push(row);
       return;
@@ -193,5 +194,5 @@ function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
   if (target.id != null) racks.add(target.id);
   for (const r of named.values()) if (r.id != null) racks.add(r.id);
   const notInImport = devs.filter((x) => x.rack != null && racks.has(x.rack) && !claimed.has(x.id));
-  return { rows, notInImport, links: spec.links, racks: spec.racks.map((r) => ({ ...r })), needU, rackU };
+  return { rows, notInImport, links: spec.links, racks: spec.racks.map((r) => ({ ...r })), needU, rackU, kind: spec.kind };
 }

@@ -22,7 +22,7 @@ export interface ImportDevice {
 }
 export interface ImportRack { name: string; u: number | null; circuit?: string; notes?: string }
 export interface ImportLink { a: string; ap: string; b: string; bp: string; type?: string; label?: string; length?: string; color?: string }
-export type ImportKind = "layout" | "rackmap" | "inventory" | "cabling";
+export type ImportKind = "layout" | "rackmap" | "inventory" | "cabling" | "diagram";
 export interface ImportSpec { kind: ImportKind; racks: ImportRack[]; devices: ImportDevice[]; links: ImportLink[]; notes: string[]; warnings: string[] }
 
 export const TYPE_MAP: Record<string, string> = {
