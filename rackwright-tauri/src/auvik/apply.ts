@@ -5,7 +5,7 @@ import { RACK_MODELS, RackSpec, modelById, specOf } from "../racks";
 import { ImportPlan, PlanGroup, PlanItem, PlanUnit, PortRef, groupTemplate, locatePort, summarize } from "./plan";
 import type { AuvikDevice } from "./parse";
 import { setSource } from "../source";
-import { Ep, X, computeDiff, defaultSelection, deviceFields, findMissing, orderUnits } from "./diff";
+import { DiffOpts, Ep, X, computeDiff, defaultSelection, deviceFields, findMissing, orderUnits } from "./diff";
 export { findMissing };
 
 export interface ApplyOptions {
@@ -49,10 +49,10 @@ function rackSpecOf(r: Rack): RackSpec | undefined {
 }
 
 /** `sel` = ids of the changes to apply (see diff.ts). Without it, everything the review ticks by default is applied. */
-export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, items: PlanItem[] = [], sel?: Set<string>): ApplyResult {
+export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, items: PlanItem[] = [], sel?: Set<string>, diffOpts?: DiffOpts): ApplyResult {
   const res: ApplyResult = { managers: 0, added: 0, updated: 0, groups: 0, vmBoxes: 0, cablesAdded: 0, cablesSkipped: 0, racksAdded: 0, missing: [], message: "" };
   const devOf = new Map<string, Device>();
-  const diff = computeDiff(doc, plan, items);
+  const diff = computeDiff(doc, plan, items, diffOpts);
   const ticked = sel ?? defaultSelection(diff);
   const on = (id: string) => ticked.has(id);
   res.missing = diff.changes.filter((c) => c.cat === "missingDev").map((c) => c.title);
@@ -158,7 +158,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     const oldNotes = d.notes;
     d.notes = mergeNotes(d.notes, noteLine(a));
     if (d.notes !== oldNotes && d.source?.notes !== "manual") setSource(d, "notes", "auvik");
-    d.auvik_id = u.key; d.auvik_name = u.name; d.auvik_macs = a.macs; d.auvik_model = a.model;
+    d.auvik_id = a.apiId ? "api:" + a.apiId : u.key; d.auvik_name = u.name; d.auvik_macs = a.macs; d.auvik_model = a.model;
   };
 
   // --- devices

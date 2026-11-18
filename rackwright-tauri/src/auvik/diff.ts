@@ -8,6 +8,7 @@
 //   gone:<cable id>         remove a cable             rmdev:<device id>     remove a device    rmm:<box id>:<member>  remove a member
 // <cable> is the plan cable key, <unit> the plan unit key, <box> the plan group / VM box key.
 import { Cable, Device, Doc } from "../types";
+import { isManual } from "../source";
 import { ImportPlan, PlanCable, PlanItem, PlanUnit, PortRef, identOf, locatePort, matchesDevice } from "./plan";
 import { normMac } from "./parse";
 
@@ -80,6 +81,7 @@ export function findEp(list: Ep[], m: { key: string; mac: string; name: string }
 
 export interface FieldChange { field: string; from: string; to: string; kept: boolean }
 /** Field differences between a document device and what Auvik says now. */
+export interface DiffOpts { fill?: "empty" | "overwrite" }
 export function deviceFields(d: X, u: PlanUnit): FieldChange[] {
   if (u.placeholder) return [];
   const a = u.item.dev, out: FieldChange[] = [];
@@ -118,7 +120,7 @@ const describe = (c: Conn) => {
   return `${side(c.a)} to ${side(c.b)}`;
 };
 
-export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = []): Diff {
+export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], opts?: DiffOpts): Diff {
   const changes: Change[] = [];
   const matched = matchUnits(doc, plan);
   const members = new Map<string, MemberLoc>();
@@ -135,6 +137,13 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = []):
       continue;
     }
     for (const f of deviceFields(d, u)) {
+      if (opts?.fill) {
+        const manual = isManual(d, f.field);
+        const on = opts.fill === "overwrite" ? !manual : (f.from === "" && !manual);
+        const src = d.source?.[f.field] ?? (manual ? "manual" : "auvik");
+        changes.push({ id: `fld:${u.key}:${f.field}`, cat: "field", title: d.name, detail: on ? f.field : `${f.field} - kept (from ${src})`, from: f.from, to: f.to, locked: manual, defaultOn: on });
+        continue;
+      }
       changes.push({ id: `fld:${u.key}:${f.field}`, cat: "field", title: d.name, detail: f.field, from: f.from, to: f.to, locked: f.kept, defaultOn: !f.kept });
     }
   }

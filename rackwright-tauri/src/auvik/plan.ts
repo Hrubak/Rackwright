@@ -27,7 +27,7 @@ export interface PlanItem {
 }
 
 export const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-export const auvikKey = (d: AuvikDevice) => d.serial || d.macs[0] || d.name;
+export const auvikKey = (d: AuvikDevice) => (d.apiId ? "api:" + d.apiId : d.serial || d.macs[0] || d.name);
 
 // ---------------------------------------------------------------- classification
 export function classify(d: Pick<AuvikDevice, "type" | "name" | "model">): Kind {
@@ -627,13 +627,22 @@ export function locatePort(dev: Pick<Device, "ports">, iface: string, u?: Pick<P
 }
 
 // ---------------------------------------------------------------- matching against devices already in the document
-export interface Ident { key: string; serial: string; macs: string[]; name: string }
-export const identOf = (d: AuvikDevice, key = auvikKey(d)): Ident => ({ key, serial: d.serial, macs: d.macs.map(normMac), name: d.name });
+export interface Ident { key: string; serial: string; macs: string[]; name: string; apiKey: string | null; ips: string[]; host: string }
+export const identOf = (d: AuvikDevice, key = auvikKey(d)): Ident => ({
+  key, serial: d.serial, macs: d.macs.map(normMac), name: d.name,
+  apiKey: d.apiId ? "api:" + d.apiId : null, ips: d.ips.filter(Boolean), host: (d.hostname || d.name || "").toLowerCase(),
+});
 
-/** Existing device -> same device in a new export: serial, then MAC, then name. */
+/** Existing device -> same device in a new import: Auvik id, serial, MAC, IP + host name, then (Auvik-added devices only) Auvik name. */
 export function matchesDevice(d: Device & { auvik_id?: string; auvik_name?: string; auvik_macs?: string[] }, id: Ident): boolean {
+  if (id.apiKey && d.auvik_id === id.apiKey) return true;
+  if (id.serial && (d.serial === id.serial || (!!d.auvik_id && d.auvik_id.split("#")[0] === id.serial))) return true;
+  if (id.macs.length) {
+    const mine = [...(d.auvik_macs || []), d.mac || ""].filter(Boolean).map(normMac);
+    if (mine.some((m) => id.macs.includes(m))) return true;
+  }
+  const dh = (d.hostname || d.name || "").toLowerCase();
+  if (d.ip && id.ips.includes(d.ip) && dh && dh === id.host) return true;
   if (!d.auvik_id) return false;
-  if (id.serial && (d.serial === id.serial || d.auvik_id.split("#")[0] === id.serial)) return true;
-  if (id.macs.length && (d.auvik_macs || []).some((m) => id.macs.includes(normMac(m)))) return true;
   return (d.auvik_name || "").toLowerCase() === id.name.toLowerCase() && !!id.name;
 }
