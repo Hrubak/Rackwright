@@ -32,6 +32,24 @@ pub struct AuvikCfg {
     username: String,
     region: String,
     key: Secret,
+    /// base64(user:key), the credential part of the Authorization header.
+    token: Secret,
+}
+
+fn b64(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(T[((n >> 18) & 63) as usize] as char);
+        out.push(T[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { T[((n >> 6) & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    out
 }
 
 /// True for `^[a-z]{2,3}[0-9]{1,2}$`.
@@ -48,6 +66,7 @@ impl AuvikCfg {
             username: username.to_string(),
             region: region.to_string(),
             key: Secret(key.to_string()),
+            token: Secret(b64(format!("{username}:{key}").as_bytes())),
         }
     }
 
@@ -89,9 +108,14 @@ pub struct Auvik {
     gate: tokio::sync::Mutex<()>,
 }
 
-/// A safe message: the fixed text when `s` contains the key, else `s` cut to 200 characters.
-fn sanitize(s: &str, key: &str) -> String {
-    if !key.is_empty() && s.contains(key) {
+/// A safe message: the fixed text when `s` contains the key, its base64 token, "basic " or "authorization", else `s` cut to 200 characters.
+fn sanitize(s: &str, key: &str, token: &str) -> String {
+    let lower = s.to_lowercase();
+    if (!key.is_empty() && s.contains(key))
+        || (!token.is_empty() && s.contains(token))
+        || lower.contains("basic ")
+        || lower.contains("authorization")
+    {
         return FIXED_REFUSED.to_string();
     }
     s.chars().take(200).collect()
@@ -141,6 +165,7 @@ impl Auvik {
                     .headers()
                     .get("retry-after")
                     .and_then(|v| v.to_str().ok())
+                    // An HTTP-date (not seconds) fails to parse and falls back to the fixed backoff.
                     .and_then(|s| s.trim().parse::<u64>().ok());
                 let wait = retry_after.unwrap_or(BACKOFF_SECS[attempt]).min(MAX_RETRY_AFTER_SECS);
                 attempt += 1;
@@ -158,7 +183,7 @@ impl Auvik {
                 .as_ref()
                 .and_then(|v| v.pointer("/errors/0/title"))
                 .and_then(|t| t.as_str())
-                .map(|t| sanitize(t, &self.cfg.key.0));
+                .map(|t| sanitize(t, &self.cfg.key.0, &self.cfg.token.0));
             if code == 401 || code == 403 {
                 return Err(AuvikErr::Denied(title.unwrap_or_else(|| FIXED_REFUSED.to_string())));
             }

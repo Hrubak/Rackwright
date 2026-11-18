@@ -131,7 +131,7 @@ When Auvik is not configured, every route except `GET /api/auvik` returns 404 `{
 
 `AuvikApiDevice` = `{id, name, type, makeModel, vendor, serial, firmware, software, ips: [str], macs: [str], status, discovery: str, components: [{type, name, detail}]}`. Missing attributes are `""` or `[]`.
 
-Limits: 20 s per Auvik request, one Auvik request at a time, 429/503 retried up to 5 times, pages followed up to 50 per endpoint.
+Limits: 20 s per Auvik request, one Auvik request at a time, 429/503 retried up to 5 times (each wait is `Retry-After` seconds, at most 60 s, else 1, 2, 4, 8, 16 s), pages followed up to 50 per endpoint.
 
 ## Racks (shared: every signed-in user sees and edits all of them)
 

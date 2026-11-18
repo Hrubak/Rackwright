@@ -83,6 +83,11 @@ async fn verify(State(mode): State<&'static str>, headers: HeaderMap) -> (Status
             }
         }
         "denied" => (StatusCode::UNAUTHORIZED, VERIFY_DENIED.to_string()),
+        "echo_header" => (StatusCode::UNAUTHORIZED, json!({ "errors": [{ "title": got }] }).to_string()),
+        "echo_token" => {
+            let token = got.trim_start_matches("Basic ").to_string();
+            (StatusCode::UNAUTHORIZED, json!({ "errors": [{ "title": format!("Bad login {token}") }] }).to_string())
+        }
         _ => {
             let title = format!("Bad login {got} for key {KEY}");
             (StatusCode::UNAUTHORIZED, json!({ "errors": [{ "title": title }] }).to_string())
@@ -167,6 +172,21 @@ async fn test_echo_filtered() {
     assert_eq!(v["ok"], false);
     assert_eq!(v["error"], "Auvik refused the request.");
     assert!(!v.to_string().contains("TESTKEY"));
+}
+
+#[tokio::test]
+async fn test_echo_header_only_filtered() {
+    let token = b64(format!("{USER}:{KEY}").as_bytes());
+    for mode in ["echo_header", "echo_token"] {
+        let (app, _d) = configured_app(mode).await;
+        let mut c = signed_in(&app).await;
+        let (s, v) = c.post("/api/auvik/test", json!({})).await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(v["error"], "Auvik refused the request.", "{mode}");
+        let text = v.to_string();
+        assert!(!text.contains("TESTKEY"), "{mode}");
+        assert!(!text.contains(&token), "{mode}");
+    }
 }
 
 #[tokio::test]
