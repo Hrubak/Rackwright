@@ -153,7 +153,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
                         {d.kind !== "note" && <>
                           <input type="number" min={1} style={{ ...inp, width: 44 }} value={d.height ?? ""} onChange={(e) => editDev(i, { height: Math.max(1, parseInt(e.target.value) || 1), heightGuessed: false })} /> U{" "}
                           {d.kind !== "empty" && <select style={inp} value={d.side ?? 0} onChange={(e) => editDev(i, { side: +e.target.value })}>
-                            <option value={0}>Rack</option><option value={1}>Side 1</option><option value={2}>Side 2</option>
+                            <option value={0}>Full width</option><option value={1}>Left</option><option value={2}>Right</option>
                           </select>}
                         </>}
                       </div>}

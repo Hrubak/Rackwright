@@ -100,7 +100,7 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
       continue;
     }
     if (row.match) {
-      const m = row.match;
+      const m = doc.devices.find((x) => x.id === row.match!.id) ?? row.match; // the plan may come from another copy of the doc (dry run on a clone)
       for (const df of row.diffs) if (!df.kept) setField(m, df.field, df.to);
       mergeExtras(m, row);
       if (row.action === "change") { log.changed++; continue; }

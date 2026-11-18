@@ -95,7 +95,7 @@ export function parseLayout(text: string): ImportSpec {
       return;
     }
     const wc = words(t);
-    if (wc >= 9 || (t.endsWith(".") && wc >= 6)) {
+    if (!t.includes("|") && (wc >= 9 || (t.endsWith(".") && wc >= 6))) {
       group = undefined;
       spec.devices.push({ kind: "note", line: i, name: t, type: null, rack: undefined, u: null, height: 0, face, fields: {}, ports: null, specs: {}, services: [] });
       return;

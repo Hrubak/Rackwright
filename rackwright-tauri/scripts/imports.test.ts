@@ -188,5 +188,46 @@ for (const grow of [true, false]) {
   applyImport(d, planImport(d, sp, aopts), aopts);
   eq("power_w skips NaN", [d.devices[0].power_w, d.devices[1].power_w], [undefined, 350]);
 }
+{
+const rdoc: Doc = { v: 1, nid: 100, racks: [{ id: 1, name: "EX-MDF", u: 42, x: 0, y: 0 }], cables: [], devices: [
+  mk(1, "esxi.example.com", { u: 30 }), mk(2, "EX-NAS01", { u: 20, face: "both", serial: "S1" }), mk(3, "EX-NAS02", { rack: null, face: "both" }),
+  mk(4, "EX-MDF-STK01 Member 1", { type: "Switch", u: 10 }), mk(5, "EX-MDF-STK01 Member 2", { type: "Switch", u: 11 }), mk(6, "EX-MDF-STK01 Member 3", { type: "Switch", u: 12 }),
+  mk(7, "Device@192.0.2.5", { type: "UPS", model: "APC", rack: null }), mk(8, "EX-OLD", { u: 5 }) ] };
+const rtext = `[Front of the rack full-width]
+HP ProLiant DL380 Gen10 (VM HOST) esxi.example.com
+[Back of Rack]
+1 U RACK EMPTY SPACE
+1 U RACK EMPTY SPACE
+(EX-MDF-STACK)
+48Port Ruckus POE
+48Port Ruckus POE
+24Port Ruckus POE
+
+
+one two three four five six seven eight nine ten eleven twelve thirteen.
+TripLite KVM Switch
+SonicWall 370    |  Phone Switch (should be decommissioned).
+Cisco Catalyst 2900 series, Carrier Equipment
+[Front of the Rack]
+TripLite KVM with Screen/Keyboard
+[Front of the rack full-width]
+Synology EX-NAS01
+Synology EX-NAS02
+Datto
+
+[Front of the rack full-width]
+APC Smart-UPS X 3000
+APC Battery Pack
+`;
+const o = { rackId: 1, newRackName: "N", newRackU: 42, growRack: false };
+const before = JSON.stringify(rdoc);
+const sp = parseLayout(rtext);
+eq("pipe line is two devices, not a note", sp.devices.filter((d) => d.line === sp.devices.find((x) => x.name === "SonicWall 370")!.line).map((d) => [d.kind, d.name, d.side]), [["device", "SonicWall 370", 0], ["device", "Phone Switch (should be decommissioned).", 1]]);
+const rp = planImport(rdoc, sp, o);
+eq("matched row takes the device's size", [rp.rows[0].dev.height, rp.rows[0].dev.u, rp.rows[1].dev.u], [1, 42, 39]);
+const dry = applyImport(JSON.parse(JSON.stringify(rdoc)), rp, o);
+eq("dry run leaves the real doc alone", JSON.stringify(rdoc), before);
+eq("no warnings when a slot is freed by a move", dry.warnings, []);
+}
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

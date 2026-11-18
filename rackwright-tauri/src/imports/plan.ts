@@ -31,6 +31,20 @@ const brandWords = (...s: (string | undefined)[]) =>
 interface Target { id: number | null; name: string; u: number; rack?: Rack }
 
 export function planImport(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
+  const first = planOnce(doc, input, opts);
+  if (input.kind !== "layout") return first;
+  // A matched device's real size beats a guessed height: use it and place again so the rows below shift.
+  let adjusted: ImportSpec | null = null;
+  for (const row of first.rows) {
+    if (!row.match || !row.dev.heightGuessed || row.match.u_size === row.dev.height) continue;
+    adjusted = adjusted ?? { ...input, devices: input.devices.map((d) => ({ ...d })) };
+    const d = adjusted.devices[+row.id.slice(1)];
+    d.height = row.match.u_size; d.heightGuessed = false;
+  }
+  return adjusted ? planOnce(doc, adjusted, opts) : first;
+}
+
+function planOnce(doc: Doc, input: ImportSpec, opts: ImportOpts): ImportPlan {
   const spec: ImportSpec = { ...input, devices: input.devices.map((d) => ({ ...d })) }; // placed on a copy; the input stays untouched
   const docTarget = opts.rackId != null ? doc.racks.find((r) => r.id === opts.rackId) : undefined;
   const target: Target = docTarget ? { id: docTarget.id, name: docTarget.name, u: docTarget.u, rack: docTarget } : { id: null, name: opts.newRackName, u: opts.newRackU };
