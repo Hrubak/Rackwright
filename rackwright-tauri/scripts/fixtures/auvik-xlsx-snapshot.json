@@ -1,0 +1,6456 @@
+{
+ "A": {
+  "doc": {
+   "v": 1,
+   "nid": 328,
+   "racks": [
+    {
+     "id": 14,
+     "name": "Example Co rack 1",
+     "u": 42,
+     "x": 0,
+     "y": 0,
+     "numbering": "up",
+     "color": "#3a3d42",
+     "notes": "",
+     "kind": "cabinet",
+     "model": "apc-ar3100",
+     "model_name": "APC NetShelter SX AR3100",
+     "width_mm": 600,
+     "depth_mm": 1070
+    }
+   ],
+   "devices": [
+    {
+     "id": 1,
+     "name": "EX-UPS",
+     "model": "APC Smart-UPS 3000",
+     "type": "UPS",
+     "u_size": 2,
+     "rack": 14,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#23262a",
+     "ip": "10.99.182.53",
+     "serial": "",
+     "notes": "Auvik: UPS; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:02:A5:0C",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 2,
+       "name": "Out1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 3,
+       "name": "Out2",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 4,
+       "name": "Out3",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 5,
+       "name": "Out4",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 6,
+       "name": "Out5",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 7,
+       "name": "Out6",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 8,
+       "name": "Out7",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 9,
+       "name": "Out8",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 10,
+       "name": "Out9",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 11,
+       "name": "Input",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 12,
+       "name": "Network",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 13,
+       "name": "Battery",
+       "type": "Other",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "ups",
+      "brand": "APC",
+      "bc": "#3dae2b",
+      "body": "#23262a",
+      "lab": "#e6e8eb"
+     },
+     "auvik_id": "02:00:5E:02:A5:0C",
+     "auvik_name": "EX-UPS",
+     "auvik_macs": [
+      "02:00:5E:02:A5:0C"
+     ],
+     "auvik_model": "APC Smart-UPS 3000"
+    },
+    {
+     "id": 15,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 3,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 16,
+     "name": "EX-NAS",
+     "model": "Synology RS1221+",
+     "type": "Storage",
+     "u_size": 2,
+     "rack": 14,
+     "u": 4,
+     "side": 0,
+     "half": false,
+     "color": "#2a2c30",
+     "ip": "10.99.190.101",
+     "serial": "",
+     "notes": "Auvik: Storage; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:FF:3E:24",
+     "rows": 4,
+     "ports": [
+      {
+       "id": 17,
+       "name": "LAN1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 18,
+       "name": "LAN2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 19,
+       "name": "LAN3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 20,
+       "name": "LAN4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 21,
+       "name": "PSU1",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "syn_rack",
+      "bays": 8,
+      "brows": 2,
+      "size": "3.5"
+     },
+     "auvik_id": "02:00:5E:FF:3E:24",
+     "auvik_name": "EX-NAS",
+     "auvik_macs": [
+      "02:00:5E:FF:3E:24"
+     ],
+     "auvik_model": "Synology RS1221+"
+    },
+    {
+     "id": 22,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 6,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 23,
+     "name": "EX-FW",
+     "model": "SonicWALL TZ 570",
+     "type": "Firewall",
+     "u_size": 1,
+     "rack": 14,
+     "u": 42,
+     "side": 0,
+     "half": false,
+     "color": "#1d1f23",
+     "ip": "10.99.117.30",
+     "serial": "FWSER1",
+     "notes": "Auvik: Firewall; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:00:00:01",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 24,
+       "name": "X0",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 25,
+       "name": "X1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 26,
+       "name": "X2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 27,
+       "name": "X3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 28,
+       "name": "X4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 29,
+       "name": "X5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 30,
+       "name": "X6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 31,
+       "name": "X7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 32,
+       "name": "X8",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 33,
+       "name": "X9",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 34,
+       "name": "Console",
+       "type": "Console",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "fw",
+      "brand": "SONICWALL",
+      "bc": "#e4002b",
+      "body": "#1d1f23",
+      "lab": "#e6e8eb",
+      "kit": true
+     },
+     "auvik_id": "FWSER1",
+     "auvik_name": "EX-FW",
+     "auvik_macs": [
+      "02:00:5E:00:00:01"
+     ],
+     "auvik_model": "SonicWALL TZ 570"
+    },
+    {
+     "id": 35,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 41,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 36,
+     "name": "EX-RTR",
+     "model": "Cisco ISR 4331",
+     "type": "Router",
+     "u_size": 1,
+     "rack": 14,
+     "u": 40,
+     "side": 0,
+     "half": false,
+     "color": "#cfd3d8",
+     "ip": "10.99.22.93",
+     "serial": "",
+     "notes": "Auvik: Router; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:01:56:D4",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 37,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 38,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 39,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 40,
+       "name": "SFP1",
+       "type": "SFP",
+       "label": ""
+      },
+      {
+       "id": 41,
+       "name": "Console",
+       "type": "Console",
+       "label": ""
+      },
+      {
+       "id": 42,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "fw",
+      "brand": "CISCO",
+      "bc": "#049fd9",
+      "body": "#cfd3d8",
+      "lab": "#1b1e22",
+      "desk": false
+     },
+     "auvik_id": "02:00:5E:01:56:D4",
+     "auvik_name": "EX-RTR",
+     "auvik_macs": [
+      "02:00:5E:01:56:D4"
+     ],
+     "auvik_model": "Cisco ISR 4331"
+    },
+    {
+     "id": 43,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 39,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 44,
+     "name": "EX-CORE",
+     "model": "Brocade ICX7250-48-HPOE",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 38,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.163.136",
+     "serial": "COREser",
+     "notes": "Auvik: Layer 3 Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:53:DF:DF",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 45,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 46,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 47,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 48,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 49,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 50,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 51,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 52,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 53,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 54,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 55,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 56,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 57,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 58,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 59,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 60,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 61,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 62,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 63,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 64,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 65,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 66,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 67,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 68,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 69,
+       "name": "25",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 70,
+       "name": "26",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 71,
+       "name": "27",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 72,
+       "name": "28",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 73,
+       "name": "29",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 74,
+       "name": "30",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 75,
+       "name": "31",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 76,
+       "name": "32",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 77,
+       "name": "33",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 78,
+       "name": "34",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 79,
+       "name": "35",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 80,
+       "name": "36",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 81,
+       "name": "37",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 82,
+       "name": "38",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 83,
+       "name": "39",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 84,
+       "name": "40",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 85,
+       "name": "41",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 86,
+       "name": "42",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 87,
+       "name": "43",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 88,
+       "name": "44",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 89,
+       "name": "45",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 90,
+       "name": "46",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 91,
+       "name": "47",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 92,
+       "name": "48",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 93,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 94,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 95,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 96,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 97,
+       "name": "SFP+5",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 98,
+       "name": "SFP+6",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 99,
+       "name": "SFP+7",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 100,
+       "name": "SFP+8",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 101,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": true
+     },
+     "auvik_id": "COREser",
+     "auvik_name": "EX-CORE",
+     "auvik_macs": [
+      "02:00:5E:53:DF:DF"
+     ],
+     "auvik_model": "Brocade ICX7250-48-HPOE"
+    },
+    {
+     "id": 102,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 37,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 103,
+     "name": "EX-SW-02",
+     "model": "HP 2530-24G-PoE+",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 36,
+     "side": 0,
+     "half": false,
+     "color": "#3b6ea8",
+     "ip": "10.99.113.170",
+     "serial": "HPser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:D5:41:B9",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 104,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 105,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 106,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 107,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 108,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 109,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 110,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 111,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 112,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 113,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 114,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 115,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 116,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 117,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 118,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 119,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 120,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 121,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 122,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 123,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 124,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 125,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 126,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 127,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 128,
+       "name": "SFP1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 129,
+       "name": "SFP2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 130,
+       "name": "SFP3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 131,
+       "name": "SFP4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 132,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "HPser",
+     "auvik_name": "EX-SW-02",
+     "auvik_macs": [
+      "02:00:5E:D5:41:B9"
+     ],
+     "auvik_model": "HP 2530-24G-PoE+"
+    },
+    {
+     "id": 133,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 35,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 134,
+     "name": "EX-SW-STACK unit 1",
+     "model": "Brocade ICX7150",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 34,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.139.48",
+     "serial": "STKser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:8C:3F:3F",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 135,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 136,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 137,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 138,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 139,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 140,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 141,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 142,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 143,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 144,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 145,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 146,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 147,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 148,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 149,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 150,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 151,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 152,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 153,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 154,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 155,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 156,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 157,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 158,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 159,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 160,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 161,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 162,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 163,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": false
+     },
+     "auvik_id": "STKser#1",
+     "auvik_name": "EX-SW-STACK unit 1",
+     "auvik_macs": [
+      "02:00:5E:8C:3F:3F"
+     ],
+     "auvik_model": "Brocade ICX7150"
+    },
+    {
+     "id": 164,
+     "name": "EX-SW-STACK unit 2",
+     "model": "Brocade ICX7150",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 33,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.139.48",
+     "serial": "STKser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:8C:3F:3F",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 165,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 166,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 167,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 168,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 169,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 170,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 171,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 172,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 173,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 174,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 175,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 176,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 177,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 178,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 179,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 180,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 181,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 182,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 183,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 184,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 185,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 186,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 187,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 188,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 189,
+       "name": "25",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 190,
+       "name": "26",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 191,
+       "name": "27",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 192,
+       "name": "28",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 193,
+       "name": "29",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 194,
+       "name": "30",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 195,
+       "name": "31",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 196,
+       "name": "32",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 197,
+       "name": "33",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 198,
+       "name": "34",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 199,
+       "name": "35",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 200,
+       "name": "36",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 201,
+       "name": "37",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 202,
+       "name": "38",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 203,
+       "name": "39",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 204,
+       "name": "40",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 205,
+       "name": "41",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 206,
+       "name": "42",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 207,
+       "name": "43",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 208,
+       "name": "44",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 209,
+       "name": "45",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 210,
+       "name": "46",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 211,
+       "name": "47",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 212,
+       "name": "48",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 213,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 214,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 215,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 216,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 217,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": false
+     },
+     "auvik_id": "STKser#2",
+     "auvik_name": "EX-SW-STACK unit 2",
+     "auvik_macs": [
+      "02:00:5E:8C:3F:3F"
+     ],
+     "auvik_model": "Brocade ICX7150"
+    },
+    {
+     "id": 218,
+     "name": "EX-SW-STACK unit 3",
+     "model": "Brocade ICX7150",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 32,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.139.48",
+     "serial": "STKser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:8C:3F:3F",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 219,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 220,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 221,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 222,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 223,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 224,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 225,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 226,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 227,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 228,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 229,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 230,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 231,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 232,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 233,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 234,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 235,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 236,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 237,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 238,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 239,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 240,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 241,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 242,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 243,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 244,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 245,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 246,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 247,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": false
+     },
+     "auvik_id": "STKser#3",
+     "auvik_name": "EX-SW-STACK unit 3",
+     "auvik_macs": [
+      "02:00:5E:8C:3F:3F"
+     ],
+     "auvik_model": "Brocade ICX7150"
+    },
+    {
+     "id": 248,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 31,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 249,
+     "name": "EX-WLC",
+     "model": "",
+     "type": "Wireless",
+     "u_size": 1,
+     "rack": 14,
+     "u": 30,
+     "side": 0,
+     "half": false,
+     "color": "#2f8f8f",
+     "ip": "10.99.164.95",
+     "serial": "",
+     "notes": "Auvik: Wireless Controller; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:03:7C:D6",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 250,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 251,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 252,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 253,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 254,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "02:00:5E:03:7C:D6",
+     "auvik_name": "EX-WLC",
+     "auvik_macs": [
+      "02:00:5E:03:7C:D6"
+     ],
+     "auvik_model": ""
+    },
+    {
+     "id": 255,
+     "name": "EX-ESX1",
+     "model": "Dell PowerEdge R640",
+     "type": "Server",
+     "u_size": 1,
+     "rack": 14,
+     "u": 29,
+     "side": 0,
+     "half": false,
+     "color": "#2a2c30",
+     "ip": "10.99.155.88",
+     "serial": "ESX1ser",
+     "notes": "Auvik: Hypervisor; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:71:F4:77\nOOBM: iDRAC EX-ESX1-iDRAC; IP 10.99.151.20; MAC 02:00:5E:A8:EC:6B",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 256,
+       "name": "NIC1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 257,
+       "name": "NIC2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 258,
+       "name": "NIC3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 259,
+       "name": "NIC4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 260,
+       "name": "iDRAC",
+       "type": "Mgmt",
+       "label": ""
+      },
+      {
+       "id": 261,
+       "name": "PSU1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 262,
+       "name": "PSU2",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "dell",
+      "bays": 10,
+      "brows": 1,
+      "size": "2.5"
+     },
+     "auvik_id": "ESX1ser",
+     "auvik_name": "EX-ESX1",
+     "auvik_macs": [
+      "02:00:5E:71:F4:77"
+     ],
+     "auvik_model": "Dell PowerEdge R640",
+     "oobm": {
+      "name": "EX-ESX1-iDRAC",
+      "ip": "10.99.151.20",
+      "mac": "02:00:5E:A8:EC:6B",
+      "key": "02:00:5E:A8:EC:6B",
+      "portId": 260
+     }
+    },
+    {
+     "id": 263,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 28,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 264,
+     "name": "EX-SRV2",
+     "model": "Generic server",
+     "type": "Server",
+     "u_size": 1,
+     "rack": 14,
+     "u": 27,
+     "side": 0,
+     "half": false,
+     "color": "#4b5563",
+     "ip": "10.99.1.200",
+     "serial": "",
+     "notes": "Auvik: Server; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:36:C1:C3",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 265,
+       "name": "NIC1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 266,
+       "name": "NIC2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 267,
+       "name": "NIC3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 268,
+       "name": "NIC4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 269,
+       "name": "iDRAC",
+       "type": "Mgmt",
+       "label": ""
+      },
+      {
+       "id": 270,
+       "name": "PSU1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 271,
+       "name": "PSU2",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "02:00:5E:36:C1:C3",
+     "auvik_name": "EX-SRV2",
+     "auvik_macs": [
+      "02:00:5E:36:C1:C3"
+     ],
+     "auvik_model": "Generic server"
+    },
+    {
+     "id": 272,
+     "name": "EX-PDU",
+     "model": "APC Basic Rack PDU AP7900B",
+     "type": "PDU",
+     "u_size": 1,
+     "rack": 14,
+     "u": 26,
+     "side": 0,
+     "half": false,
+     "color": "#23262a",
+     "ip": "10.99.7.28",
+     "serial": "",
+     "notes": "Auvik: PDU; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:00:32:63",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 273,
+       "name": "Out1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 274,
+       "name": "Out2",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 275,
+       "name": "Out3",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 276,
+       "name": "Out4",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 277,
+       "name": "Out5",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 278,
+       "name": "Out6",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 279,
+       "name": "Out7",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 280,
+       "name": "Out8",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 281,
+       "name": "Input",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 307,
+       "name": "Eth10",
+       "type": "RJ45",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "pdu",
+      "brand": "APC",
+      "bc": "#3dae2b",
+      "body": "#23262a",
+      "lab": "#e6e8eb"
+     },
+     "auvik_id": "02:00:5E:00:32:63",
+     "auvik_name": "EX-PDU",
+     "auvik_macs": [
+      "02:00:5E:00:32:63"
+     ],
+     "auvik_model": "APC Basic Rack PDU AP7900B"
+    },
+    {
+     "id": 282,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 25,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 283,
+     "name": "EX-AP1",
+     "model": "Ubiquiti U6 Pro",
+     "type": "Wireless",
+     "u_size": 1,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": true,
+     "color": "#eceef1",
+     "ip": "10.99.128.179",
+     "serial": "",
+     "notes": "Auvik: Access Point; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:F9:89:82",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 284,
+       "name": "Eth",
+       "type": "RJ45",
+       "label": ""
+      }
+     ],
+     "fx": -560,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "uap",
+      "off": true
+     },
+     "auvik_id": "02:00:5E:F9:89:82",
+     "auvik_name": "EX-AP1",
+     "auvik_macs": [
+      "02:00:5E:F9:89:82"
+     ],
+     "auvik_model": "Ubiquiti U6 Pro"
+    },
+    {
+     "id": 285,
+     "name": "EX-AP2",
+     "model": "Acme Wifi 9",
+     "type": "Wireless",
+     "u_size": 1,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": true,
+     "color": "#eceef1",
+     "ip": "10.99.129.10",
+     "serial": "",
+     "notes": "Auvik: Access Point; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:F9:89:A1",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 286,
+       "name": "Eth",
+       "type": "RJ45",
+       "label": ""
+      }
+     ],
+     "fx": -560,
+     "fy": 100,
+     "face": "both",
+     "plate": {
+      "k": "uap",
+      "off": true
+     },
+     "auvik_id": "02:00:5E:F9:89:A1",
+     "auvik_name": "EX-AP2",
+     "auvik_macs": [
+      "02:00:5E:F9:89:A1"
+     ],
+     "auvik_model": "Acme Wifi 9"
+    },
+    {
+     "id": 294,
+     "name": "Endpoints on EX-SW-02",
+     "model": "7 devices (3 other, 2 phones, 1 PC, 1 printer)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-02",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 287,
+       "name": "Phone 1",
+       "type": "RJ45",
+       "label": "3"
+      },
+      {
+       "id": 288,
+       "name": "Phone 2",
+       "type": "RJ45",
+       "label": "4"
+      },
+      {
+       "id": 289,
+       "name": "PC-1",
+       "type": "RJ45",
+       "label": "5"
+      },
+      {
+       "id": 290,
+       "name": "Printer-1",
+       "type": "RJ45",
+       "label": "6"
+      },
+      {
+       "id": 291,
+       "name": "Unidentified Device",
+       "type": "RJ45",
+       "label": "20"
+      },
+      {
+       "id": 292,
+       "name": "Unidentified Device (2)",
+       "type": "RJ45",
+       "label": "21"
+      },
+      {
+       "id": 293,
+       "name": "Device@10.99.1.77",
+       "type": "RJ45",
+       "label": "22"
+      }
+     ],
+     "fx": -560,
+     "fy": 200,
+     "face": "front",
+     "auvik_id": "g:HPser",
+     "endpoints": [
+      {
+       "name": "Phone 1",
+       "type": "IP Phone",
+       "model": "",
+       "ip": "10.99.153.50",
+       "mac": "02:00:5E:6B:8F:39",
+       "port": "3",
+       "status": "Up",
+       "kind": "phone",
+       "key": "02:00:5E:6B:8F:39"
+      },
+      {
+       "name": "Phone 2",
+       "type": "IP Phone",
+       "model": "",
+       "ip": "10.99.154.81",
+       "mac": "02:00:5E:6B:8F:58",
+       "port": "4",
+       "status": "Up",
+       "kind": "phone",
+       "key": "02:00:5E:6B:8F:58"
+      },
+      {
+       "name": "PC-1",
+       "type": "Workstation",
+       "model": "",
+       "ip": "10.99.159.28",
+       "mac": "02:00:5E:78:68:93",
+       "port": "5",
+       "status": "Up",
+       "kind": "pc",
+       "key": "02:00:5E:78:68:93"
+      },
+      {
+       "name": "Printer-1",
+       "type": "Printer",
+       "model": "",
+       "ip": "10.99.192.139",
+       "mac": "02:00:5E:AC:78:1A",
+       "port": "6",
+       "status": "Up",
+       "kind": "printer",
+       "key": "02:00:5E:AC:78:1A"
+      },
+      {
+       "name": "Unidentified Device",
+       "type": "Unknown",
+       "model": "",
+       "ip": "10.99.188.111",
+       "mac": "02:00:5E:03:A6:F6",
+       "port": "20",
+       "status": "Up",
+       "kind": "other",
+       "key": "02:00:5E:03:A6:F6"
+      },
+      {
+       "name": "Unidentified Device (2)",
+       "type": "Unknown",
+       "model": "",
+       "ip": "10.99.188.111",
+       "mac": "02:00:5E:03:A6:F7",
+       "port": "21",
+       "status": "Up",
+       "kind": "other",
+       "key": "02:00:5E:03:A6:F7"
+      },
+      {
+       "name": "Device@10.99.1.77",
+       "type": "Generic Device",
+       "model": "",
+       "ip": "10.99.1.77",
+       "mac": "02:00:5E:0C:C6:32",
+       "port": "22",
+       "status": "Up",
+       "kind": "other",
+       "key": "02:00:5E:0C:C6:32"
+      }
+     ]
+    },
+    {
+     "id": 297,
+     "name": "Endpoints on EX-SW-STACK unit 1",
+     "model": "2 devices (1 phone, 1 IoT device)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-STACK unit 1",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 295,
+       "name": "Phone 3",
+       "type": "RJ45",
+       "label": "GigabitEthernet1/1/3"
+      },
+      {
+       "id": 296,
+       "name": "Cam-1",
+       "type": "RJ45",
+       "label": "2.5GigabitEthernet1/1/7"
+      }
+     ],
+     "fx": -560,
+     "fy": 288,
+     "face": "front",
+     "auvik_id": "g:STKser#1",
+     "endpoints": [
+      {
+       "name": "Phone 3",
+       "type": "Telecommunications Device",
+       "model": "",
+       "ip": "10.99.155.112",
+       "mac": "02:00:5E:6B:8F:77",
+       "port": "GigabitEthernet1/1/3",
+       "status": "Up",
+       "kind": "phone",
+       "key": "02:00:5E:6B:8F:77"
+      },
+      {
+       "name": "Cam-1",
+       "type": "Generic Device",
+       "model": "Camera",
+       "ip": "10.99.85.38",
+       "mac": "02:00:5E:29:73:C5",
+       "port": "2.5GigabitEthernet1/1/7",
+       "status": "Up",
+       "kind": "iot",
+       "key": "02:00:5E:29:73:C5"
+      }
+     ]
+    },
+    {
+     "id": 299,
+     "name": "Endpoints on EX-SW-STACK unit 3",
+     "model": "1 device (1 PC)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-STACK unit 3",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 298,
+       "name": "PC-2",
+       "type": "RJ45",
+       "label": "GigabitEthernet3/1/22"
+      }
+     ],
+     "fx": -560,
+     "fy": 376,
+     "face": "front",
+     "auvik_id": "g:STKser#3",
+     "endpoints": [
+      {
+       "name": "PC-2",
+       "type": "Workstation",
+       "model": "",
+       "ip": "10.99.160.59",
+       "mac": "02:00:5E:78:68:B2",
+       "port": "GigabitEthernet3/1/22",
+       "status": "Up",
+       "kind": "pc",
+       "key": "02:00:5E:78:68:B2"
+      }
+     ]
+    },
+    {
+     "id": 301,
+     "name": "Endpoints on EX-SW-STACK unit 2",
+     "model": "1 device (1 PC)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-STACK unit 2",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 300,
+       "name": "PC-3",
+       "type": "RJ45",
+       "label": "GigabitEthernet2/1/30"
+      }
+     ],
+     "fx": -560,
+     "fy": 464,
+     "face": "front",
+     "auvik_id": "g:STKser#2",
+     "endpoints": [
+      {
+       "name": "PC-3",
+       "type": "Workstation",
+       "model": "",
+       "ip": "10.99.161.90",
+       "mac": "02:00:5E:78:68:D1",
+       "port": "GigabitEthernet2/1/30",
+       "status": "Up",
+       "kind": "pc",
+       "key": "02:00:5E:78:68:D1"
+      }
+     ]
+    },
+    {
+     "id": 302,
+     "name": "VMs (no host)",
+     "model": "1 device (1 VM)",
+     "type": "Virtual machines",
+     "u_size": 1,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#4b3f72",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik virtual machines with no known host",
+     "rows": 0,
+     "ports": [],
+     "fx": -560,
+     "fy": 552,
+     "face": "front",
+     "auvik_id": "vm:none",
+     "endpoints": [
+      {
+       "name": "EX-VM1",
+       "type": "Virtual Machine",
+       "model": "VMware",
+       "ip": "10.99.16.107",
+       "mac": "02:00:5E:03:0A:0A",
+       "port": "",
+       "status": "Up",
+       "kind": "vm",
+       "key": "02:00:5E:03:0A:0A"
+      }
+     ]
+    }
+   ],
+   "cables": [
+    {
+     "id": 303,
+     "a": 45,
+     "b": 25,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-CORE GigabitEthernet1/1/1",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 304,
+     "a": 84,
+     "b": 159,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 1 10GigabitEthernet1/2/1",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 305,
+     "a": 92,
+     "b": 127,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 24",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 306,
+     "a": 12,
+     "b": 49,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-CORE GigabitEthernet1/1/5",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 308,
+     "a": 307,
+     "b": 105,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 2",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 309,
+     "a": 37,
+     "b": 46,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-CORE GigabitEthernet1/1/2",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 310,
+     "a": 256,
+     "b": 113,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 10",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 311,
+     "a": 260,
+     "b": 114,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 11",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 312,
+     "a": 265,
+     "b": 116,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 13",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 313,
+     "a": 17,
+     "b": 117,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 14",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 314,
+     "a": 284,
+     "b": 115,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 12",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 315,
+     "a": 286,
+     "b": 173,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 2 GigabitEthernet2/1/9",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 316,
+     "a": 250,
+     "b": 118,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 15",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 317,
+     "a": 287,
+     "b": 106,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 3",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 318,
+     "a": 288,
+     "b": 107,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 4",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 319,
+     "a": 289,
+     "b": 108,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 5",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 320,
+     "a": 290,
+     "b": 109,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 6",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 321,
+     "a": 291,
+     "b": 123,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 20",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 322,
+     "a": 292,
+     "b": 124,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 21",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 323,
+     "a": 293,
+     "b": 125,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 22",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 324,
+     "a": 295,
+     "b": 137,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 1 GigabitEthernet1/1/3",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 325,
+     "a": 296,
+     "b": 141,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 1 2.5GigabitEthernet1/1/7",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 326,
+     "a": 298,
+     "b": 240,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 3 GigabitEthernet3/1/22",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 327,
+     "a": 300,
+     "b": 194,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 2 GigabitEthernet2/1/30",
+     "logical": "",
+     "notes": ""
+    }
+   ],
+   "auvik": {
+    "site": "Example Co",
+    "unplaced": [
+     {
+      "name": "Orphan Laptop",
+      "type": "Workstation",
+      "model": "",
+      "ip": "10.99.100.63",
+      "mac": "02:00:5E:0C:85:C6",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Wifi Laptop",
+      "type": "Workstation",
+      "model": "",
+      "ip": "10.99.111.140",
+      "mac": "02:00:5E:7C:45:13",
+      "status": "Up",
+      "reason": "connected to EX-AP1, which is not a switch"
+     }
+    ],
+    "virtual": [
+     "EX-SZ"
+    ]
+   }
+  },
+  "changes": [
+   [
+    "cn:02:00:5E:00:32:63|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:01:56:D4|COREser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:02:A5:0C|COREser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:03:7C:D6|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:36:C1:C3|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:A8:EC:6B|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:F9:89:82|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:F9:89:A1|STKser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:02:00:5E:FF:3E:24|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:COREser|FWSER1",
+    "newCable",
+    true
+   ],
+   [
+    "cn:COREser|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:COREser|STKser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:ESX1ser|HPser",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:03:A6:F6",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:03:A6:F7",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:0C:C6:32",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:6B:8F:39",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:6B:8F:58",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:78:68:93",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:HPser|02:00:5E:AC:78:1A",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:STKser#1|02:00:5E:29:73:C5",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:STKser#1|02:00:5E:6B:8F:77",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:STKser#2|02:00:5E:78:68:D1",
+    "newCable",
+    true
+   ],
+   [
+    "cn:g:STKser#3|02:00:5E:78:68:B2",
+    "newCable",
+    true
+   ],
+   [
+    "new:02:00:5E:00:32:63",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:01:56:D4",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:02:A5:0C",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:03:7C:D6",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:36:C1:C3",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:F9:89:82",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:F9:89:A1",
+    "new",
+    true
+   ],
+   [
+    "new:02:00:5E:FF:3E:24",
+    "new",
+    true
+   ],
+   [
+    "new:COREser",
+    "new",
+    true
+   ],
+   [
+    "new:ESX1ser",
+    "new",
+    true
+   ],
+   [
+    "new:FWSER1",
+    "new",
+    true
+   ],
+   [
+    "new:HPser",
+    "new",
+    true
+   ],
+   [
+    "new:STKser#1",
+    "new",
+    true
+   ],
+   [
+    "new:STKser#2",
+    "new",
+    true
+   ],
+   [
+    "new:STKser#3",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:03:A6:F6",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:03:A6:F7",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:0C:C6:32",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:6B:8F:39",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:6B:8F:58",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:78:68:93",
+    "new",
+    true
+   ],
+   [
+    "newm:g:HPser|02:00:5E:AC:78:1A",
+    "new",
+    true
+   ],
+   [
+    "newm:g:STKser#1|02:00:5E:29:73:C5",
+    "new",
+    true
+   ],
+   [
+    "newm:g:STKser#1|02:00:5E:6B:8F:77",
+    "new",
+    true
+   ],
+   [
+    "newm:g:STKser#2|02:00:5E:78:68:D1",
+    "new",
+    true
+   ],
+   [
+    "newm:g:STKser#3|02:00:5E:78:68:B2",
+    "new",
+    true
+   ],
+   [
+    "newm:vm:none|02:00:5E:03:0A:0A",
+    "new",
+    true
+   ]
+  ]
+ },
+ "B": {
+  "doc": {
+   "v": 1,
+   "nid": 360,
+   "racks": [
+    {
+     "id": 14,
+     "name": "Example Co rack 1",
+     "u": 42,
+     "x": 0,
+     "y": 0,
+     "numbering": "up",
+     "color": "#3a3d42",
+     "notes": "",
+     "kind": "cabinet",
+     "model": "apc-ar3100",
+     "model_name": "APC NetShelter SX AR3100",
+     "width_mm": 600,
+     "depth_mm": 1070
+    },
+    {
+     "id": 358,
+     "name": "Example Co rack 1",
+     "u": 42,
+     "x": 618,
+     "y": 0,
+     "numbering": "up",
+     "color": "#3a3d42",
+     "notes": "",
+     "kind": "cabinet",
+     "model": "apc-ar3100",
+     "model_name": "APC NetShelter SX AR3100",
+     "width_mm": 600,
+     "depth_mm": 1070
+    }
+   ],
+   "devices": [
+    {
+     "id": 1,
+     "name": "EX-UPS",
+     "model": "APC Smart-UPS 3000",
+     "type": "UPS",
+     "u_size": 2,
+     "rack": 14,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#23262a",
+     "ip": "10.99.182.53",
+     "serial": "",
+     "notes": "Auvik: UPS; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:02:A5:0C",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 2,
+       "name": "Out1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 3,
+       "name": "Out2",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 4,
+       "name": "Out3",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 5,
+       "name": "Out4",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 6,
+       "name": "Out5",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 7,
+       "name": "Out6",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 8,
+       "name": "Out7",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 9,
+       "name": "Out8",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 10,
+       "name": "Out9",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 11,
+       "name": "Input",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 12,
+       "name": "Network",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 13,
+       "name": "Battery",
+       "type": "Other",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "ups",
+      "brand": "APC",
+      "bc": "#3dae2b",
+      "body": "#23262a",
+      "lab": "#e6e8eb"
+     },
+     "auvik_id": "02:00:5E:02:A5:0C",
+     "auvik_name": "EX-UPS",
+     "auvik_macs": [
+      "02:00:5E:02:A5:0C"
+     ],
+     "auvik_model": "APC Smart-UPS 3000"
+    },
+    {
+     "id": 15,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 3,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 16,
+     "name": "EX-NAS",
+     "model": "Synology RS1221+",
+     "type": "Storage",
+     "u_size": 2,
+     "rack": 14,
+     "u": 4,
+     "side": 0,
+     "half": false,
+     "color": "#2a2c30",
+     "ip": "10.99.190.101",
+     "serial": "",
+     "notes": "Auvik: Storage; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:FF:3E:24",
+     "rows": 4,
+     "ports": [
+      {
+       "id": 17,
+       "name": "LAN1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 18,
+       "name": "LAN2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 19,
+       "name": "LAN3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 20,
+       "name": "LAN4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 21,
+       "name": "PSU1",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "syn_rack",
+      "bays": 8,
+      "brows": 2,
+      "size": "3.5"
+     },
+     "auvik_id": "02:00:5E:FF:3E:24",
+     "auvik_name": "EX-NAS",
+     "auvik_macs": [
+      "02:00:5E:FF:3E:24"
+     ],
+     "auvik_model": "Synology RS1221+"
+    },
+    {
+     "id": 22,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 6,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 23,
+     "name": "EX-FW",
+     "model": "SonicWALL TZ 570",
+     "type": "Firewall",
+     "u_size": 1,
+     "rack": 14,
+     "u": 42,
+     "side": 0,
+     "half": false,
+     "color": "#1d1f23",
+     "ip": "10.99.117.30",
+     "serial": "FWSER1",
+     "notes": "Auvik: Firewall; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:00:00:01",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 24,
+       "name": "X0",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 25,
+       "name": "X1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 26,
+       "name": "X2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 27,
+       "name": "X3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 28,
+       "name": "X4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 29,
+       "name": "X5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 30,
+       "name": "X6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 31,
+       "name": "X7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 32,
+       "name": "X8",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 33,
+       "name": "X9",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 34,
+       "name": "Console",
+       "type": "Console",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "fw",
+      "brand": "SONICWALL",
+      "bc": "#e4002b",
+      "body": "#1d1f23",
+      "lab": "#e6e8eb",
+      "kit": true
+     },
+     "auvik_id": "FWSER1",
+     "auvik_name": "EX-FW",
+     "auvik_macs": [
+      "02:00:5E:00:00:01"
+     ],
+     "auvik_model": "SonicWALL TZ 570"
+    },
+    {
+     "id": 35,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 41,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 36,
+     "name": "EX-RTR",
+     "model": "Cisco ISR 4331",
+     "type": "Router",
+     "u_size": 1,
+     "rack": 14,
+     "u": 40,
+     "side": 0,
+     "half": false,
+     "color": "#cfd3d8",
+     "ip": "10.99.22.93",
+     "serial": "",
+     "notes": "Auvik: Router; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:01:56:D4",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 37,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 38,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 39,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 40,
+       "name": "SFP1",
+       "type": "SFP",
+       "label": ""
+      },
+      {
+       "id": 41,
+       "name": "Console",
+       "type": "Console",
+       "label": ""
+      },
+      {
+       "id": 42,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "fw",
+      "brand": "CISCO",
+      "bc": "#049fd9",
+      "body": "#cfd3d8",
+      "lab": "#1b1e22",
+      "desk": false
+     },
+     "auvik_id": "02:00:5E:01:56:D4",
+     "auvik_name": "EX-RTR",
+     "auvik_macs": [
+      "02:00:5E:01:56:D4"
+     ],
+     "auvik_model": "Cisco ISR 4331"
+    },
+    {
+     "id": 43,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 39,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 44,
+     "name": "EX-CORE",
+     "model": "Brocade ICX7250-48-HPOE",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 38,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.163.136",
+     "serial": "COREser",
+     "notes": "Auvik: Layer 3 Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:53:DF:DF",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 45,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 46,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 47,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 48,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 49,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 50,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 51,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 52,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 53,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 54,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 55,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 56,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 57,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 58,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 59,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 60,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 61,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 62,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 63,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 64,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 65,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 66,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 67,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 68,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 69,
+       "name": "25",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 70,
+       "name": "26",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 71,
+       "name": "27",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 72,
+       "name": "28",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 73,
+       "name": "29",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 74,
+       "name": "30",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 75,
+       "name": "31",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 76,
+       "name": "32",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 77,
+       "name": "33",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 78,
+       "name": "34",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 79,
+       "name": "35",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 80,
+       "name": "36",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 81,
+       "name": "37",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 82,
+       "name": "38",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 83,
+       "name": "39",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 84,
+       "name": "40",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 85,
+       "name": "41",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 86,
+       "name": "42",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 87,
+       "name": "43",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 88,
+       "name": "44",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 89,
+       "name": "45",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 90,
+       "name": "46",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 91,
+       "name": "47",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 92,
+       "name": "48",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 93,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 94,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 95,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 96,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 97,
+       "name": "SFP+5",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 98,
+       "name": "SFP+6",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 99,
+       "name": "SFP+7",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 100,
+       "name": "SFP+8",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 101,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": true
+     },
+     "auvik_id": "COREser",
+     "auvik_name": "EX-CORE",
+     "auvik_macs": [
+      "02:00:5E:53:DF:DF"
+     ],
+     "auvik_model": "Brocade ICX7250-48-HPOE",
+     "locked": [
+      "ip"
+     ]
+    },
+    {
+     "id": 102,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 37,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 103,
+     "name": "EX-SW-02",
+     "model": "HP 2530-24G-PoE+",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 36,
+     "side": 0,
+     "half": false,
+     "color": "#3b6ea8",
+     "ip": "10.99.113.170",
+     "serial": "HPser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:D5:41:B9",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 104,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 105,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 106,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 107,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 108,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 109,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 110,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 111,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 112,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 113,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 114,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 115,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 116,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 117,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 118,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 119,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 120,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 121,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 122,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 123,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 124,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 125,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 126,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 127,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 128,
+       "name": "SFP1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 129,
+       "name": "SFP2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 130,
+       "name": "SFP3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 131,
+       "name": "SFP4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 132,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "HPser",
+     "auvik_name": "EX-SW-02",
+     "auvik_macs": [
+      "02:00:5E:D5:41:B9"
+     ],
+     "auvik_model": "HP 2530-24G-PoE+"
+    },
+    {
+     "id": 133,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 35,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 134,
+     "name": "EX-SW-STACK unit 1",
+     "model": "Brocade ICX7150",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 34,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.139.48",
+     "serial": "STKser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:8C:3F:3F",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 135,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 136,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 137,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 138,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 139,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 140,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 141,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 142,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 143,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 144,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 145,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 146,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 147,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 148,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 149,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 150,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 151,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 152,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 153,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 154,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 155,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 156,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 157,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 158,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 159,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 160,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 161,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 162,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 163,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": false
+     },
+     "auvik_id": "STKser#1",
+     "auvik_name": "EX-SW-STACK unit 1",
+     "auvik_macs": [
+      "02:00:5E:8C:3F:3F"
+     ],
+     "auvik_model": "Brocade ICX7150"
+    },
+    {
+     "id": 164,
+     "name": "EX-SW-STACK unit 2",
+     "model": "Brocade ICX7150",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 33,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.139.48",
+     "serial": "STKser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:8C:3F:3F",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 165,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 166,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 167,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 168,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 169,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 170,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 171,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 172,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 173,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 174,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 175,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 176,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 177,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 178,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 179,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 180,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 181,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 182,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 183,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 184,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 185,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 186,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 187,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 188,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 189,
+       "name": "25",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 190,
+       "name": "26",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 191,
+       "name": "27",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 192,
+       "name": "28",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 193,
+       "name": "29",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 194,
+       "name": "30",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 195,
+       "name": "31",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 196,
+       "name": "32",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 197,
+       "name": "33",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 198,
+       "name": "34",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 199,
+       "name": "35",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 200,
+       "name": "36",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 201,
+       "name": "37",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 202,
+       "name": "38",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 203,
+       "name": "39",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 204,
+       "name": "40",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 205,
+       "name": "41",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 206,
+       "name": "42",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 207,
+       "name": "43",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 208,
+       "name": "44",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 209,
+       "name": "45",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 210,
+       "name": "46",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 211,
+       "name": "47",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 212,
+       "name": "48",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 213,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 214,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 215,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 216,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 217,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": false
+     },
+     "auvik_id": "STKser#2",
+     "auvik_name": "EX-SW-STACK unit 2",
+     "auvik_macs": [
+      "02:00:5E:8C:3F:3F"
+     ],
+     "auvik_model": "Brocade ICX7150"
+    },
+    {
+     "id": 218,
+     "name": "EX-SW-STACK unit 3",
+     "model": "Brocade ICX7150",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 14,
+     "u": 32,
+     "side": 0,
+     "half": false,
+     "color": "#e4e6e9",
+     "ip": "10.99.139.48",
+     "serial": "STKser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:8C:3F:3F",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 219,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 220,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 221,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 222,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 223,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 224,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 225,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 226,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 227,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 228,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 229,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 230,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 231,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 232,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 233,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 234,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 235,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 236,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 237,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 238,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 239,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 240,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 241,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 242,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 243,
+       "name": "SFP+1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 244,
+       "name": "SFP+2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 245,
+       "name": "SFP+3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 246,
+       "name": "SFP+4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 247,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "sw",
+      "brand": "RUCKUS",
+      "bc": "#f26b21",
+      "body": "#e4e6e9",
+      "lab": "#1b1e22",
+      "poe": false
+     },
+     "auvik_id": "STKser#3",
+     "auvik_name": "EX-SW-STACK unit 3",
+     "auvik_macs": [
+      "02:00:5E:8C:3F:3F"
+     ],
+     "auvik_model": "Brocade ICX7150"
+    },
+    {
+     "id": 248,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 31,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 249,
+     "name": "EX-WLC",
+     "model": "",
+     "type": "Wireless",
+     "u_size": 1,
+     "rack": 14,
+     "u": 30,
+     "side": 0,
+     "half": false,
+     "color": "#2f8f8f",
+     "ip": "10.99.164.95",
+     "serial": "",
+     "notes": "Auvik: Wireless Controller; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:03:7C:D6",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 250,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 251,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 252,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 253,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 254,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "02:00:5E:03:7C:D6",
+     "auvik_name": "EX-WLC",
+     "auvik_macs": [
+      "02:00:5E:03:7C:D6"
+     ],
+     "auvik_model": ""
+    },
+    {
+     "id": 255,
+     "name": "EX-ESX1",
+     "model": "Dell PowerEdge R640",
+     "type": "Server",
+     "u_size": 1,
+     "rack": 14,
+     "u": 29,
+     "side": 0,
+     "half": false,
+     "color": "#2a2c30",
+     "ip": "10.99.155.88",
+     "serial": "ESX1ser",
+     "notes": "Auvik: Hypervisor; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:71:F4:77\nOOBM: iDRAC EX-ESX1-iDRAC; IP 10.99.151.20; MAC 02:00:5E:A8:EC:6B",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 256,
+       "name": "NIC1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 257,
+       "name": "NIC2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 258,
+       "name": "NIC3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 259,
+       "name": "NIC4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 260,
+       "name": "iDRAC",
+       "type": "Mgmt",
+       "label": ""
+      },
+      {
+       "id": 261,
+       "name": "PSU1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 262,
+       "name": "PSU2",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "dell",
+      "bays": 10,
+      "brows": 1,
+      "size": "2.5"
+     },
+     "auvik_id": "ESX1ser",
+     "auvik_name": "EX-ESX1",
+     "auvik_macs": [
+      "02:00:5E:71:F4:77"
+     ],
+     "auvik_model": "Dell PowerEdge R640",
+     "oobm": {
+      "name": "EX-ESX1-iDRAC",
+      "ip": "10.99.151.20",
+      "mac": "02:00:5E:A8:EC:6B",
+      "key": "02:00:5E:A8:EC:6B",
+      "portId": 260
+     }
+    },
+    {
+     "id": 263,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 28,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 264,
+     "name": "EX-SRV2",
+     "model": "Generic server",
+     "type": "Server",
+     "u_size": 1,
+     "rack": 14,
+     "u": 27,
+     "side": 0,
+     "half": false,
+     "color": "#4b5563",
+     "ip": "10.99.1.200",
+     "serial": "",
+     "notes": "Auvik: Server; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:36:C1:C3",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 265,
+       "name": "NIC1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 266,
+       "name": "NIC2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 267,
+       "name": "NIC3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 268,
+       "name": "NIC4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 269,
+       "name": "iDRAC",
+       "type": "Mgmt",
+       "label": ""
+      },
+      {
+       "id": 270,
+       "name": "PSU1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 271,
+       "name": "PSU2",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "02:00:5E:36:C1:C3",
+     "auvik_name": "EX-SRV2",
+     "auvik_macs": [
+      "02:00:5E:36:C1:C3"
+     ],
+     "auvik_model": "Generic server"
+    },
+    {
+     "id": 272,
+     "name": "EX-PDU",
+     "model": "APC Basic Rack PDU AP7900B",
+     "type": "PDU",
+     "u_size": 1,
+     "rack": 14,
+     "u": 26,
+     "side": 0,
+     "half": false,
+     "color": "#23262a",
+     "ip": "10.99.7.28",
+     "serial": "",
+     "notes": "Auvik: PDU; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:00:32:63",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 273,
+       "name": "Out1",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 274,
+       "name": "Out2",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 275,
+       "name": "Out3",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 276,
+       "name": "Out4",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 277,
+       "name": "Out5",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 278,
+       "name": "Out6",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 279,
+       "name": "Out7",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 280,
+       "name": "Out8",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 281,
+       "name": "Input",
+       "type": "Power",
+       "label": ""
+      },
+      {
+       "id": 307,
+       "name": "Eth10",
+       "type": "RJ45",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "gen",
+      "style": "pdu",
+      "brand": "APC",
+      "bc": "#3dae2b",
+      "body": "#23262a",
+      "lab": "#e6e8eb"
+     },
+     "auvik_id": "02:00:5E:00:32:63",
+     "auvik_name": "EX-PDU",
+     "auvik_macs": [
+      "02:00:5E:00:32:63"
+     ],
+     "auvik_model": "APC Basic Rack PDU AP7900B"
+    },
+    {
+     "id": 282,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 14,
+     "u": 25,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    },
+    {
+     "id": 283,
+     "name": "EX-AP1",
+     "model": "Ubiquiti U6 Pro",
+     "type": "Wireless",
+     "u_size": 1,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": true,
+     "color": "#eceef1",
+     "ip": "10.99.128.179",
+     "serial": "",
+     "notes": "Auvik: Access Point; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:F9:89:82",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 284,
+       "name": "Eth",
+       "type": "RJ45",
+       "label": ""
+      }
+     ],
+     "fx": -560,
+     "fy": 0,
+     "face": "both",
+     "plate": {
+      "k": "uap",
+      "off": true
+     },
+     "auvik_id": "02:00:5E:F9:89:82",
+     "auvik_name": "EX-AP1",
+     "auvik_macs": [
+      "02:00:5E:F9:89:82"
+     ],
+     "auvik_model": "Ubiquiti U6 Pro"
+    },
+    {
+     "id": 285,
+     "name": "EX-AP2",
+     "model": "Acme Wifi 9",
+     "type": "Wireless",
+     "u_size": 1,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": true,
+     "color": "#eceef1",
+     "ip": "10.99.129.10",
+     "serial": "",
+     "notes": "Auvik: Access Point; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:F9:89:A1",
+     "rows": 1,
+     "ports": [
+      {
+       "id": 286,
+       "name": "Eth",
+       "type": "RJ45",
+       "label": ""
+      }
+     ],
+     "fx": -560,
+     "fy": 100,
+     "face": "both",
+     "plate": {
+      "k": "uap",
+      "off": true
+     },
+     "auvik_id": "02:00:5E:F9:89:A1",
+     "auvik_name": "EX-AP2",
+     "auvik_macs": [
+      "02:00:5E:F9:89:A1"
+     ],
+     "auvik_model": "Acme Wifi 9"
+    },
+    {
+     "id": 294,
+     "name": "Endpoints on EX-SW-02",
+     "model": "7 devices (3 other, 2 phones, 1 PC, 1 printer)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-02",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 287,
+       "name": "Phone 1",
+       "type": "RJ45",
+       "label": "3"
+      },
+      {
+       "id": 288,
+       "name": "Phone 2",
+       "type": "RJ45",
+       "label": "4"
+      },
+      {
+       "id": 289,
+       "name": "PC-1",
+       "type": "RJ45",
+       "label": "5"
+      },
+      {
+       "id": 290,
+       "name": "Printer-1",
+       "type": "RJ45",
+       "label": "6"
+      },
+      {
+       "id": 291,
+       "name": "Unidentified Device",
+       "type": "RJ45",
+       "label": "20"
+      },
+      {
+       "id": 292,
+       "name": "Unidentified Device (2)",
+       "type": "RJ45",
+       "label": "21"
+      },
+      {
+       "id": 293,
+       "name": "Device@10.99.1.77",
+       "type": "RJ45",
+       "label": "22"
+      }
+     ],
+     "fx": -560,
+     "fy": 200,
+     "face": "front",
+     "auvik_id": "g:HPser",
+     "endpoints": [
+      {
+       "name": "Phone 1",
+       "type": "IP Phone",
+       "model": "",
+       "ip": "10.99.153.50",
+       "mac": "02:00:5E:6B:8F:39",
+       "port": "3",
+       "status": "Up",
+       "kind": "phone",
+       "key": "02:00:5E:6B:8F:39"
+      },
+      {
+       "name": "Phone 2",
+       "type": "IP Phone",
+       "model": "",
+       "ip": "10.99.154.81",
+       "mac": "02:00:5E:6B:8F:58",
+       "port": "4",
+       "status": "Up",
+       "kind": "phone",
+       "key": "02:00:5E:6B:8F:58"
+      },
+      {
+       "name": "PC-1",
+       "type": "Workstation",
+       "model": "",
+       "ip": "10.99.159.28",
+       "mac": "02:00:5E:78:68:93",
+       "port": "5",
+       "status": "Up",
+       "kind": "pc",
+       "key": "02:00:5E:78:68:93"
+      },
+      {
+       "name": "Printer-1",
+       "type": "Printer",
+       "model": "",
+       "ip": "10.99.192.139",
+       "mac": "02:00:5E:AC:78:1A",
+       "port": "6",
+       "status": "Up",
+       "kind": "printer",
+       "key": "02:00:5E:AC:78:1A"
+      },
+      {
+       "name": "Unidentified Device",
+       "type": "Unknown",
+       "model": "",
+       "ip": "10.99.188.111",
+       "mac": "02:00:5E:03:A6:F6",
+       "port": "20",
+       "status": "Up",
+       "kind": "other",
+       "key": "02:00:5E:03:A6:F6"
+      },
+      {
+       "name": "Unidentified Device (2)",
+       "type": "Unknown",
+       "model": "",
+       "ip": "10.99.188.111",
+       "mac": "02:00:5E:03:A6:F7",
+       "port": "21",
+       "status": "Up",
+       "kind": "other",
+       "key": "02:00:5E:03:A6:F7"
+      },
+      {
+       "name": "Device@10.99.1.77",
+       "type": "Generic Device",
+       "model": "",
+       "ip": "10.99.1.77",
+       "mac": "02:00:5E:0C:C6:32",
+       "port": "22",
+       "status": "Up",
+       "kind": "other",
+       "key": "02:00:5E:0C:C6:32"
+      }
+     ]
+    },
+    {
+     "id": 297,
+     "name": "Endpoints on EX-SW-STACK unit 1",
+     "model": "2 devices (1 phone, 1 IoT device)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-STACK unit 1",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 295,
+       "name": "Phone 3",
+       "type": "RJ45",
+       "label": "GigabitEthernet1/1/3"
+      },
+      {
+       "id": 296,
+       "name": "Cam-1",
+       "type": "RJ45",
+       "label": "2.5GigabitEthernet1/1/7"
+      }
+     ],
+     "fx": -560,
+     "fy": 288,
+     "face": "front",
+     "auvik_id": "g:STKser#1",
+     "endpoints": [
+      {
+       "name": "Phone 3",
+       "type": "Telecommunications Device",
+       "model": "",
+       "ip": "10.99.155.112",
+       "mac": "02:00:5E:6B:8F:77",
+       "port": "GigabitEthernet1/1/3",
+       "status": "Up",
+       "kind": "phone",
+       "key": "02:00:5E:6B:8F:77"
+      },
+      {
+       "name": "Cam-1",
+       "type": "Generic Device",
+       "model": "Camera",
+       "ip": "10.99.85.38",
+       "mac": "02:00:5E:29:73:C5",
+       "port": "2.5GigabitEthernet1/1/7",
+       "status": "Up",
+       "kind": "iot",
+       "key": "02:00:5E:29:73:C5"
+      }
+     ]
+    },
+    {
+     "id": 299,
+     "name": "Endpoints on EX-SW-STACK unit 3",
+     "model": "1 device (1 PC)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-STACK unit 3",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 298,
+       "name": "PC-2",
+       "type": "RJ45",
+       "label": "GigabitEthernet3/1/22"
+      }
+     ],
+     "fx": -560,
+     "fy": 376,
+     "face": "front",
+     "auvik_id": "g:STKser#3",
+     "endpoints": [
+      {
+       "name": "PC-2",
+       "type": "Workstation",
+       "model": "",
+       "ip": "10.99.160.59",
+       "mac": "02:00:5E:78:68:B2",
+       "port": "GigabitEthernet3/1/22",
+       "status": "Up",
+       "kind": "pc",
+       "key": "02:00:5E:78:68:B2"
+      }
+     ]
+    },
+    {
+     "id": 301,
+     "name": "Endpoints on EX-SW-STACK unit 2",
+     "model": "1 device (1 PC)",
+     "type": "Endpoints",
+     "u_size": 2,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#44566a",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik endpoint group on EX-SW-STACK unit 2",
+     "rows": 2,
+     "ports": [
+      {
+       "id": 300,
+       "name": "PC-3",
+       "type": "RJ45",
+       "label": "GigabitEthernet2/1/30"
+      }
+     ],
+     "fx": -560,
+     "fy": 464,
+     "face": "front",
+     "auvik_id": "g:STKser#2",
+     "endpoints": [
+      {
+       "name": "PC-3",
+       "type": "Workstation",
+       "model": "",
+       "ip": "10.99.161.90",
+       "mac": "02:00:5E:78:68:D1",
+       "port": "GigabitEthernet2/1/30",
+       "status": "Up",
+       "kind": "pc",
+       "key": "02:00:5E:78:68:D1"
+      }
+     ]
+    },
+    {
+     "id": 302,
+     "name": "VMs (no host)",
+     "model": "1 device (1 VM)",
+     "type": "Virtual machines",
+     "u_size": 1,
+     "rack": null,
+     "u": 1,
+     "side": 0,
+     "half": false,
+     "color": "#4b3f72",
+     "ip": "",
+     "serial": "",
+     "notes": "Auvik virtual machines with no known host",
+     "rows": 0,
+     "ports": [],
+     "fx": -560,
+     "fy": 552,
+     "face": "front",
+     "auvik_id": "vm:none",
+     "endpoints": [
+      {
+       "name": "EX-VM1",
+       "type": "Virtual Machine",
+       "model": "VMware",
+       "ip": "10.99.16.107",
+       "mac": "02:00:5E:03:0A:0A",
+       "port": "",
+       "status": "Up",
+       "kind": "vm",
+       "key": "02:00:5E:03:0A:0A"
+      }
+     ]
+    },
+    {
+     "id": 328,
+     "name": "EX-NEW",
+     "model": "HP 2530-24G-PoE+",
+     "type": "Switch",
+     "u_size": 1,
+     "rack": 358,
+     "u": 42,
+     "side": 0,
+     "half": false,
+     "color": "#3b6ea8",
+     "ip": "10.99.118.69",
+     "serial": "NEWser",
+     "notes": "Auvik: Switch; status Up; software 1.0; firmware 2.0; MAC 02:00:5E:FF:4D:A4",
+     "rows": 0,
+     "ports": [
+      {
+       "id": 329,
+       "name": "1",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 330,
+       "name": "2",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 331,
+       "name": "3",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 332,
+       "name": "4",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 333,
+       "name": "5",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 334,
+       "name": "6",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 335,
+       "name": "7",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 336,
+       "name": "8",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 337,
+       "name": "9",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 338,
+       "name": "10",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 339,
+       "name": "11",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 340,
+       "name": "12",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 341,
+       "name": "13",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 342,
+       "name": "14",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 343,
+       "name": "15",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 344,
+       "name": "16",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 345,
+       "name": "17",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 346,
+       "name": "18",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 347,
+       "name": "19",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 348,
+       "name": "20",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 349,
+       "name": "21",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 350,
+       "name": "22",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 351,
+       "name": "23",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 352,
+       "name": "24",
+       "type": "RJ45",
+       "label": ""
+      },
+      {
+       "id": 353,
+       "name": "SFP1",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 354,
+       "name": "SFP2",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 355,
+       "name": "SFP3",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 356,
+       "name": "SFP4",
+       "type": "SFP+",
+       "label": ""
+      },
+      {
+       "id": 357,
+       "name": "Power",
+       "type": "Power",
+       "label": ""
+      }
+     ],
+     "fx": 0,
+     "fy": 0,
+     "face": "front",
+     "auvik_id": "NEWser",
+     "auvik_name": "EX-NEW",
+     "auvik_macs": [
+      "02:00:5E:FF:4D:A4"
+     ],
+     "auvik_model": "HP 2530-24G-PoE+"
+    },
+    {
+     "id": 359,
+     "name": "Cable manager",
+     "model": "",
+     "type": "Cable manager",
+     "u_size": 1,
+     "rack": 358,
+     "u": 41,
+     "side": 0,
+     "half": false,
+     "color": "#222428",
+     "ip": "",
+     "serial": "",
+     "notes": "",
+     "rows": 0,
+     "ports": [],
+     "fx": 0,
+     "fy": 0,
+     "face": "both"
+    }
+   ],
+   "cables": [
+    {
+     "id": 303,
+     "a": 45,
+     "b": 25,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-CORE GigabitEthernet1/1/1",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 304,
+     "a": 84,
+     "b": 159,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 1 10GigabitEthernet1/2/1",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 305,
+     "a": 92,
+     "b": 127,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 24",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 306,
+     "a": 12,
+     "b": 49,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-CORE GigabitEthernet1/1/5",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 308,
+     "a": 307,
+     "b": 105,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 2",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 309,
+     "a": 37,
+     "b": 46,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-CORE GigabitEthernet1/1/2",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 310,
+     "a": 256,
+     "b": 113,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 10",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 311,
+     "a": 260,
+     "b": 114,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 11",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 312,
+     "a": 265,
+     "b": 116,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 13",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 313,
+     "a": 17,
+     "b": 117,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 14",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 314,
+     "a": 284,
+     "b": 115,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 12",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 315,
+     "a": 286,
+     "b": 173,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 2 GigabitEthernet2/1/9",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 316,
+     "a": 250,
+     "b": 118,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 15",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 317,
+     "a": 287,
+     "b": 106,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 3",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 318,
+     "a": 288,
+     "b": 107,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 4",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 319,
+     "a": 289,
+     "b": 108,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 5",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 320,
+     "a": 290,
+     "b": 109,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 6",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 321,
+     "a": 291,
+     "b": 123,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 20",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 322,
+     "a": 292,
+     "b": 124,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 21",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 323,
+     "a": 293,
+     "b": 125,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-02 22",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 324,
+     "a": 295,
+     "b": 137,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 1 GigabitEthernet1/1/3",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 325,
+     "a": 296,
+     "b": 141,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 1 2.5GigabitEthernet1/1/7",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 326,
+     "a": 298,
+     "b": 240,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 3 GigabitEthernet3/1/22",
+     "logical": "",
+     "notes": ""
+    },
+    {
+     "id": 327,
+     "a": 300,
+     "b": 194,
+     "color": "#1f6feb",
+     "style": "solid",
+     "type": "Cat6",
+     "length": 3,
+     "unit": "ft",
+     "label": "EX-SW-STACK unit 2 GigabitEthernet2/1/30",
+     "logical": "",
+     "notes": ""
+    }
+   ],
+   "auvik": {
+    "site": "Example Co",
+    "unplaced": [
+     {
+      "name": "Phone 1",
+      "type": "IP Phone",
+      "model": "",
+      "ip": "10.99.153.50",
+      "mac": "02:00:5E:6B:8F:39",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Phone 2",
+      "type": "IP Phone",
+      "model": "",
+      "ip": "10.99.154.81",
+      "mac": "02:00:5E:6B:8F:58",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "PC-1",
+      "type": "Workstation",
+      "model": "",
+      "ip": "10.99.159.28",
+      "mac": "02:00:5E:78:68:93",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Printer-1",
+      "type": "Printer",
+      "model": "",
+      "ip": "10.99.192.139",
+      "mac": "02:00:5E:AC:78:1A",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Unidentified Device",
+      "type": "Unknown",
+      "model": "",
+      "ip": "10.99.188.111",
+      "mac": "02:00:5E:03:A6:F6",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Unidentified Device (2)",
+      "type": "Unknown",
+      "model": "",
+      "ip": "10.99.188.111",
+      "mac": "02:00:5E:03:A6:F7",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Device@10.99.1.77",
+      "type": "Generic Device",
+      "model": "",
+      "ip": "10.99.1.77",
+      "mac": "02:00:5E:0C:C6:32",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Orphan Laptop",
+      "type": "Workstation",
+      "model": "",
+      "ip": "10.99.100.63",
+      "mac": "02:00:5E:0C:85:C6",
+      "status": "Up",
+      "reason": "not connected to anything in the export"
+     },
+     {
+      "name": "Wifi Laptop",
+      "type": "Workstation",
+      "model": "",
+      "ip": "10.99.111.140",
+      "mac": "02:00:5E:7C:45:13",
+      "status": "Up",
+      "reason": "connected to EX-AP1, which is not a switch"
+     }
+    ],
+    "virtual": [
+     "EX-SZ",
+     "EX-WLC"
+    ]
+   }
+  },
+  "changes": [
+   [
+    "fld:COREser:ip",
+    "field",
+    false
+   ],
+   [
+    "new:NEWser",
+    "new",
+    true
+   ],
+   [
+    "rmdev:103",
+    "missingDev",
+    false
+   ],
+   [
+    "rmdev:294",
+    "missingDev",
+    false
+   ]
+  ]
+ }
+}
