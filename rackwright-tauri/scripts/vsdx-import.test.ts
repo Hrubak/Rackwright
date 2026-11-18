@@ -18,6 +18,7 @@ async function make(): Promise<Uint8Array> {
   z.file("visio/pages/page1.xml", `<PageContents xmlns="http://schemas.microsoft.com/office/visio/2012/main"><Shapes>
     <Shape ID="1" Master="1">${box(0, 5)}<Section N="Property"><Row N="NetName"><Cell N="Label" V="Network Name"/><Cell N="Value" V="EX-SW01"/></Row></Section></Shape>
     <Shape ID="2" Master="2">${box(6, 5)}<Text>EX-SRV01</Text></Shape>
+    <Shape ID="7">${box(0, 8)}<Text>0012</Text></Shape>
     <Shape ID="3" Type="Group">${box(0, 0, 3, 2)}<Shapes><Shape ID="4">${cells({ PinX: 1, PinY: 1, Width: 1, Height: 1 })}<Text>Example <cp IX="0"/>Firewall</Text></Shape></Shapes></Shape>
     <Shape ID="5">${cells({ PinX: 4, PinY: 5.5, Width: 2, Height: 0, BeginX: 2, BeginY: 5.5, EndX: 6, EndY: 5.5 })}</Shape>
     <Shape ID="6">${cells({ PinX: 3, PinY: 1, Width: 3, Height: 0, BeginX: 3, BeginY: 1, EndX: 6.1, EndY: 5.4 })}</Shape>
@@ -33,9 +34,10 @@ const sw = m.nodes.find((n) => n.id === "1")!;
 t("master name as title", sw.title === "Switch");
 t("shape data", JSON.stringify(sw.data) === JSON.stringify({ "Network Name": "EX-SW01" }));
 const grp = m.nodes.find((n) => n.id === "3")!;
-t("group text rolled up", grp.label.includes("Firewall") && grp.label.includes("Example"), JSON.stringify(grp.label));
+t("group text rolled up", grp.label === "Example Firewall", JSON.stringify(grp.label));
 t("glued connector", m.links.some((l) => l.a === "1" && l.b === "2"));
 t("unglued connector near a shape", m.links.some((l) => l.a === "3" && l.b === "2"), JSON.stringify(m.links));
+t("numeric-looking text kept", m.nodes.find((n) => n.id === "7")?.label === "0012");
 t("two links only", m.links.length === 2);
 let err = "";
 try { await parseVsdx(new TextEncoder().encode("hello"), "x.vsdx"); } catch (e) { err = (e as Error).message; }

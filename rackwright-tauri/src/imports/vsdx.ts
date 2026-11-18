@@ -7,7 +7,7 @@ type X = any; // parsed XML node
 
 const ARRAYS = new Set(["Shape", "Shapes", "Cell", "Section", "Row", "Connect", "Master", "Page"]);
 const parser = new XMLParser({
-  ignoreAttributes: false, attributeNamePrefix: "@_", removeNSPrefix: true, textNodeName: "#text",
+  ignoreAttributes: false, attributeNamePrefix: "@_", removeNSPrefix: true, textNodeName: "#text", parseTagValue: false, trimValues: false,
   isArray: (name) => ARRAYS.has(name),
 });
 const parseXml = (s: string): X => parser.parse(s);
