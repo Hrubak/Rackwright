@@ -129,5 +129,41 @@ for (const grow of [false, true]) {
   planImport(pdoc(), sp, { ...popts, newRackU: 2, rackId: null, growRack: grow });
   eq("planImport leaves spec alone " + grow, JSON.stringify(sp), before);
 }
+import { applyImport } from "../src/imports/apply";
+const adoc = (u = 42): Doc => ({ v: 1, nid: 100, racks: [{ id: 1, name: "EX-R1", u, x: 0, y: 0 }], cables: [], devices: [] });
+const aopts = { rackId: 1, newRackName: "New", newRackU: 42, growRack: false };
+{
+  const d = adoc(), sp = parseLayout("HPE ProLiant DL380 Gen10\nEX-SW01 switch\n");
+  const lg = applyImport(d, planImport(d, sp, aopts), aopts);
+  const dl = d.devices.find((x) => x.name.includes("DL380"))!;
+  eq("layout apply top", [lg.added, dl.rack, dl.u + dl.u_size - 1], [2, 1, 42]);
+  const p2 = planImport(d, parseLayout("HPE ProLiant DL380 Gen10\nEX-SW01 switch\n"), aopts);
+  eq("reimport is all same", p2.rows.map((r) => r.action), ["same", "same"]);
+  const l2 = applyImport(d, p2, aopts);
+  eq("reapply adds nothing", [l2.added, l2.moved, l2.changed, d.devices.length], [0, 0, 0, 2]);
+}
+{
+  const d = adoc(); d.devices.push(mk(50, "EX-BLOCK", { u: 41, u_size: 2 }));
+  const sp = parseLayout("EX-NAS01\n"); sp.devices[0].u = 41; sp.devices[0].height = 1;
+  const pl2 = planImport(d, sp, aopts); pl2.rows[0].dev.u = 41;
+  const lg = applyImport(d, pl2, aopts);
+  const n = d.devices.find((x) => x.name === "EX-NAS01")!;
+  eq("U taken", [lg.warnings, n.u], [[`EX-NAS01: U41 in EX-R1 is taken — placed at U40 instead.`], 40]);
+}
+for (const grow of [true, false]) {
+  const d = adoc(2), o = { ...aopts, growRack: grow }, sp = parseLayout("EX-A\nEX-B\nEX-C\n");
+  const lg = applyImport(d, planImport(d, sp, o), o);
+  eq("layout taller than rack " + grow, [d.racks[0].u, d.devices.filter((x) => x.rack == null).length, lg.warnings.length], grow ? [3, 0, 0] : [2, 1, 1]);
+  if (!grow) eq("overflow warning", lg.warnings[0], "EX-C: no free space in EX-R1 — placed off-rack.");
+}
+{
+  const d = adoc(), o = { rackId: null, newRackName: "New", newRackU: 42, growRack: false };
+  const sp = parseRackmapText("RACK EX-R2 24U\nU10 switch EX-SW01\nU5 server EX-HV01\nLINK EX-SW01:1 -> EX-HV01:NIC1 cable=Cat6\n");
+  const lg = applyImport(d, planImport(d, sp, o), o);
+  eq("rackmap apply", [d.racks.map((r) => r.name), d.racks[1].u, lg.cables, d.cables.length, lg.racksAdded], [["EX-R1", "EX-R2"], 24, 1, 1, 1]);
+  const l2 = applyImport(d, planImport(d, sp, o), o);
+  eq("rackmap reapply", [l2.added, l2.cables, d.cables.length, d.devices.length], [0, 0, 1, 2]);
+}
+
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

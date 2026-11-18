@@ -265,6 +265,14 @@ export function resizeRack(doc: Doc, r: Rack, u: number): string {
   return "";
 }
 
+/** Take a device out of its rack and stand it below the other off-rack devices (does not add it to the doc). */
+export function setOffRack(doc: Doc, d: Device) {
+  const offs = doc.devices.filter((x) => x.rack == null && x.id !== d.id);
+  d.rack = null;
+  d.fx = Math.min(...doc.racks.map((x) => x.x)) - RW - 160;
+  d.fy = offs.reduce((s, x) => s + devDims({ ...x, rack: null }).h + 20, 0);
+}
+
 /** Put a new device in the first free slot of `rackId` (or any rack), else off-rack. */
 export function placeNew(doc: Doc, d: Device, face: string, rackId?: number | null): string {
   if (!doc.racks.length) addRack(doc);
@@ -275,10 +283,7 @@ export function placeNew(doc: Doc, d: Device, face: string, rackId?: number | nu
     const s = findFree(doc, r, d);
     if (s) { d.rack = r.id; d.u = s[0]; d.side = s[1]; doc.devices.push(d); return ""; }
   }
-  const offs = doc.devices.filter((x) => x.rack == null);
-  d.rack = null;
-  d.fx = Math.min(...doc.racks.map((x) => x.x)) - RW - 160;
-  d.fy = offs.reduce((s, x) => s + devDims({ ...x, rack: null }).h + 20, 0);
+  setOffRack(doc, d);
   doc.devices.push(d);
   return off ? "Placed off-rack" : "No free slot - placed off-rack";
 }

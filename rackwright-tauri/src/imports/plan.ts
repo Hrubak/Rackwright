@@ -2,13 +2,13 @@
 import { normMac } from "../auvik/parse";
 import type { Device, Doc, Rack } from "../types";
 import { placeLayout } from "./layout";
-import type { ImportDevice, ImportLink, ImportSpec } from "./spec";
+import type { ImportDevice, ImportLink, ImportRack, ImportSpec } from "./spec";
 
 export interface ImportOpts { rackId: number | null; newRackName: string; newRackU: number; growRack: boolean }
 export type Action = "add" | "move" | "change" | "same";
 export interface FieldDiff { field: string; from: string; to: string; kept: boolean }
 export interface Row { id: string; dev: ImportDevice; match: Device | null; action: Action; diffs: FieldDiff[]; on: boolean; reason?: string }
-export interface ImportPlan { rows: Row[]; notInImport: Device[]; links: ImportLink[]; needU: number; rackU: number }
+export interface ImportPlan { rows: Row[]; notInImport: Device[]; links: ImportLink[]; racks: ImportRack[]; needU: number; rackU: number }
 
 export const POSSIBLE_REASON = "Possible match — check before importing";
 const low = (s: unknown) => String(s ?? "").trim().toLowerCase();
@@ -98,7 +98,7 @@ export function planImport(doc: Doc, input: ImportSpec, opts: ImportOpts): Impor
     if (r.id === null || m.rack !== r.id) return true;
     if (d.u != null && d.u !== m.u) return true;
     if (d.side != null && d.side !== (m.side ?? 0)) return true;
-    return d.face != null && d.face !== (m.face || "front");
+    return d.face != null && d.face !== (m.face || "front") && !(d.face === "front" && m.face === "both"); // a faceplate device is stored as "both"
   };
 
   const finish = (row: Row): Row => {
@@ -114,7 +114,7 @@ export function planImport(doc: Doc, input: ImportSpec, opts: ImportOpts): Impor
     if (d.kind === "empty") return;
     const id = "r" + i;
     if (d.kind === "note") {
-      const notes = (rackFor(d.rack)?.rack as unknown as { notes?: string } | undefined)?.notes || "";
+      const notes = rackFor(d.rack)?.rack?.notes || "";
       const same = notes.split(/\r?\n/).some((l) => l.trim() === d.name.trim());
       rows.push({ id, dev: d, match: null, action: same ? "same" : "add", diffs: [], on: !same });
       return;
@@ -161,5 +161,5 @@ export function planImport(doc: Doc, input: ImportSpec, opts: ImportOpts): Impor
   if (target.id != null) racks.add(target.id);
   for (const r of named.values()) if (r.id != null) racks.add(r.id);
   const notInImport = devs.filter((x) => x.rack != null && racks.has(x.rack) && !claimed.has(x.id));
-  return { rows, notInImport, links: spec.links, needU, rackU };
+  return { rows, notInImport, links: spec.links, racks: spec.racks.map((r) => ({ ...r })), needU, rackU };
 }

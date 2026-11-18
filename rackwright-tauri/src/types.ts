@@ -19,7 +19,7 @@ export interface Service { name: string; port: string; proto: string; status: st
 export interface Rack {
   id: number; name: string; u: number; x: number; y: number;
   kind?: string; model?: string; model_name?: string; width_mm?: number; depth_mm?: number;
-  last_verified?: string; circuit?: string; volts?: 120 | 208;
+  last_verified?: string; circuit?: string; volts?: 120 | 208; notes?: string;
 }
 export interface Cable { id: number; a: number; b: number; color: string; type?: string; style?: string; label?: string; length?: number; unit?: string }
 export interface AuvikMeta { site: string; imported: string; unplaced: { name: string; type: string; model: string; ip: string; mac: string; status: string; reason: string }[]; virtual: string[] }
