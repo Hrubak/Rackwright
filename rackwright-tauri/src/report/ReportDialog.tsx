@@ -104,7 +104,7 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
         {notes && <div style={{ marginTop: 10 }}>Saved.{notes.map((n, i) => <div key={i} style={{ color: v("text-muted"), fontSize: 12 }}>{n}</div>)}</div>}
         {noTemplate && <div style={{ marginTop: 10, fontSize: 11, color: v("text-muted") }}>No Word template is uploaded, so this uses plain Word styles. An admin can upload one in Settings › Company.</div>}
         <div style={{ marginTop: 12, textAlign: "right" }}>
-          <button style={btn} disabled={busy} onClick={onClose}>Cancel</button>
+          <button style={btn} disabled={busy} onClick={onClose}>{notes ? "Close" : "Cancel"}</button>
           <button style={btn} disabled={busy || !client || !sites.length} onClick={() => go("word")}>Export Word</button>
           <button style={btn} disabled={busy || !client || !sites.length} onClick={() => go("pdf")}>Export PDF</button>
         </div>

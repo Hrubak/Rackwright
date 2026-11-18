@@ -310,6 +310,7 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
     }
   } finally {
     (host as HTMLElement | null)?.remove();
+    clearRackData();
   }
 
   // ---- Page furniture, every page except the cover ----

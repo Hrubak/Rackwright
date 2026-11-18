@@ -3,11 +3,12 @@
 import JSZip from "jszip";
 import { XMLValidator } from "fast-xml-parser";
 import type { ReportModel } from "./model";
-import { markerValues, replaceMarkers, scanMarkers } from "./docxMarkers";
+import { markerValues, replaceMarkers, scanMarkers, xmlText } from "./docxMarkers";
 import { buildBodyXml, pageBox, styleIds, type BodyPic, type PageBox } from "./docxBody";
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const NOT_WORD = "This file isn't a Word document.";
+const NOT_DOTX = "Save the template as a Word document (.docx) and upload that.";
 const NOTE_SHARED = "The {{RACKWRIGHT}} marker shared a paragraph with other text. That paragraph was replaced by the report.";
 const NOTE_MISSING = "The template has no {{RACKWRIGHT}} marker, so the report was added at the end.";
 const REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
@@ -32,7 +33,13 @@ export async function checkDocxTemplate(bytes: Uint8Array): Promise<string | nul
   const z = await open(bytes);
   const f = z?.file("word/document.xml");
   if (!z || !f) return NOT_WORD;
-  try { return XMLValidator.validate(await f.async("string")) === true ? null : NOT_WORD; } catch { return NOT_WORD; }
+  try { if (XMLValidator.validate(await f.async("string")) !== true) return NOT_WORD; } catch { return NOT_WORD; }
+  const ct = await z.file("[Content_Types].xml")?.async("string");
+  const ov = ct && [...ct.matchAll(/<Override\b[^>]*>/g)].map((m) => m[0]).find((t) => /\bPartName="\/word\/document\.xml"/.test(t));
+  const type = ov && /\bContentType="([^"]*)"/.exec(ov)?.[1];
+  if (!type) return NOT_WORD;
+  if (type.includes("macroEnabled") || type.endsWith("template.main+xml")) return NOT_DOTX;
+  return type === `${DOCX_MIME}.main+xml` ? null : NOT_WORD;
 }
 
 /** Minimal valid .docx with the report markers and a few styles. */
@@ -78,7 +85,7 @@ function addNamespaces(xml: string): string {
   return xml.slice(0, m.index) + tag + xml.slice(m.index + m[0].length);
 }
 
-export async function buildDocx(input: { template: Uint8Array; model: ReportModel; pictures: DocxPicture[] }): Promise<{ bytes: Uint8Array; notes: string[] }> {
+export async function buildDocx(input: { template: Uint8Array; model: ReportModel; pictures: DocxPicture[]; skip?: string[] }): Promise<{ bytes: Uint8Array; notes: string[] }> {
   const { model, pictures } = input;
   const zip = await JSZip.loadAsync(input.template);
   const docXml = await zip.file("word/document.xml")?.async("string");
@@ -121,7 +128,7 @@ export async function buildDocx(input: { template: Uint8Array; model: ReportMode
   }
   if (relXml.length) {
     const add = relXml.join("");
-    rels = hadRels ? rels!.replace(/<\/Relationships>\s*$/, `${add}</Relationships>`) : `${RELS_HEAD}${add}</Relationships>`;
+    rels = hadRels ? rels!.replace(/<Relationships\b([^>]*?)\/>\s*$/, "<Relationships$1></Relationships>").replace(/<\/Relationships>\s*$/, `${add}</Relationships>`) : `${RELS_HEAD}${add}</Relationships>`;
     put(zip, relsPath, rels!);
     const ct = await zip.file("[Content_Types].xml")?.async("string");
     if (ct !== undefined && !/<Default\b[^>]*\bExtension="png"/i.test(ct)) {
@@ -129,7 +136,7 @@ export async function buildDocx(input: { template: Uint8Array; model: ReportMode
     }
   }
 
-  const body = buildBodyXml(model, pics, { styles, skipSummary: found.has("SUMMARY"), skipRecommendations: found.has("RECOMMENDATIONS") });
+  const body = buildBodyXml(model, pics, { styles, skipSummary: found.has("SUMMARY"), skipRecommendations: found.has("RECOMMENDATIONS"), skip: input.skip ? new Set(input.skip) : undefined });
   const values = markerValues(model);
   const res = replaceMarkers(docXml, values, body);
   if (res.rackwright === "shared") notes.push(NOTE_SHARED);
@@ -140,6 +147,15 @@ export async function buildDocx(input: { template: Uint8Array; model: ReportMode
     if (!/^word\/(header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(name)) continue;
     const xml = await zip.file(name)!.async("string");
     const out = replaceMarkers(xml, values).xml;
+    if (out !== xml) put(zip, name, out);
+  }
+
+  const flat = (v: string) => xmlText(v.replace(/\r\n|\r|\n/g, " "));
+  const plain = (xml: string) => xml.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k: string) => (k === "RACKWRIGHT" ? "" : flat((values as Record<string, string>)[k] ?? "")));
+  for (const name of Object.keys(zip.files)) {
+    if (!/^(docProps\/(core|app)\.xml|customXml\/item[^/]*\.xml)$/.test(name)) continue;
+    const xml = await zip.file(name)!.async("string");
+    const out = plain(xml);
     if (out !== xml) put(zip, name, out);
   }
 

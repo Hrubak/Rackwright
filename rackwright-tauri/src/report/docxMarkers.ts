@@ -30,13 +30,14 @@ export function markerValues(model: ReportModel): MarkerValues {
 }
 
 interface TEl { open: number; textStart: number; textEnd: number; close: number; attrs: string }
-interface Para { start: number; end: number; ts: TEl[]; nested: number; fallback: boolean }
+interface Para { start: number; end: number; ts: TEl[]; nested: number; fallback: boolean; plain: boolean }
 interface Scan { paras: Para[]; bodySect: number; bodyClose: number }
 
 function scan(xml: string): Scan {
   const paras: Para[] = [];
   const stack: string[] = [];
   const pstack: Para[] = [];
+  const sdts: boolean[] = [];
   let bodySect = -1, bodyClose = -1;
   let openT: { open: number; textStart: number; attrs: string; para: Para } | null = null;
   for (const m of xml.matchAll(/<[^>]+>/g)) {
@@ -47,16 +48,19 @@ function scan(xml: string): Scan {
       if (name === "w:t" && openT) { openT.para.ts.push({ open: openT.open, textStart: openT.textStart, textEnd: at, close: end, attrs: openT.attrs }); openT = null; }
       if (name === "w:p") { const q = pstack.pop(); if (q) q.end = end; }
       if (name === "w:body") bodyClose = at;
+      if (name === "w:sdt") sdts.pop();
       stack.pop();
       continue;
     }
     const nm = /^<([^\s/>]+)([^>]*?)(\/?)>$/.exec(tag);
     if (!nm) continue;
     const [, name, attrs, selfClose] = nm;
+    if (name === "w:text" && stack[stack.length - 1] === "w:sdtPr" && sdts.length) sdts[sdts.length - 1] = true;
     if (selfClose) continue;
+    if (name === "w:sdt") sdts.push(false);
     if (name === "w:sectPr" && stack[stack.length - 1] === "w:body") bodySect = at;
     if (name === "w:p") {
-      const q: Para = { start: at, end, ts: [], nested: 0, fallback: stack.includes("mc:Fallback") };
+      const q: Para = { start: at, end, ts: [], nested: 0, fallback: stack.includes("mc:Fallback"), plain: sdts.some(Boolean) };
       if (pstack.length) pstack[pstack.length - 1].nested++;
       paras.push(q); pstack.push(q);
     }
@@ -108,7 +112,7 @@ export function replaceMarkers(xml: string, values: MarkerValues, body?: string)
     // RACKWRIGHT: the first one wins; it replaces its whole paragraph.
     const rw = ms.find((m) => m.name === "RACKWRIGHT");
     let rwHere = false;
-    if (rw && !q.fallback && !seen) {
+    if (rw && !q.fallback && !q.plain && !seen) {
       seen = true;
       if (body !== undefined) { rwHere = true; result = trimmed === "{{RACKWRIGHT}}" ? "alone" : "shared"; 
         // Keep a section break held in the paragraph's own properties: an empty paragraph after the body.
@@ -123,7 +127,9 @@ export function replaceMarkers(xml: string, values: MarkerValues, body?: string)
     if (block && !q.nested && values[block[1] as keyof MarkerValues]) {
       const pPr = /^<w:p(?:\s[^>]*)?>(<w:pPr>[\s\S]*?<\/w:pPr>|<w:pPr\/>)?/.exec(whole)?.[1] ?? "";
       const rPr = /<w:r(?:\s[^>]*)?>\s*(<w:rPr>[\s\S]*?<\/w:rPr>)?/.exec(whole)?.[1] ?? "";
-      const paras2 = lines(values[block[1] as keyof MarkerValues]).map((l) => `<w:p>${pPr}<w:r>${rPr}${l ? wt("", xmlText(l)) : ""}</w:r></w:p>`);
+      const ls = lines(values[block[1] as keyof MarkerValues]);
+      const pPrMid = pPr.replace(/<w:sectPr\b[\s\S]*?<\/w:sectPr>/, "");
+      const paras2 = ls.map((l, i) => `<w:p>${i === ls.length - 1 ? pPr : pPrMid}<w:r>${rPr}${l ? wt("", xmlText(l)) : ""}</w:r></w:p>`);
       edits.push({ start: q.start, end: q.end, text: paras2.join("") });
       continue;
     }

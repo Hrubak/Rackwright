@@ -56,6 +56,7 @@ Rules:
 - If `{{SUMMARY}}` or `{{RECOMMENDATIONS}}` appear in the template, the report body leaves those sections out, so they are not printed twice.
 - A marker that is unknown (anything else in double braces) or has nothing to put in is removed.
 - Markers still work when Word has split them into pieces while you typed.
+- Markers in Word's cover-page fields (Title, Company, Date) work too.
 
 ## Desktop app (Windows)
 `Rackwright.exe` is the Tauri desktop app with the same screens as the web version (no sign-in; racks are saved as `.rack.json` files). Download the newest one from the repository's Releases page (`desktop-v...`) or use `Rackwright.exe` in this folder. It needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 already have. GitHub Actions rebuilds both whenever the desktop version changes.

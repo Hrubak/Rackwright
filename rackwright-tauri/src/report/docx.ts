@@ -50,10 +50,11 @@ export async function exportClientWord(clientKey: string, options: ReportOptions
   host.style.cssText = "position:fixed;left:-100000px;top:0;width:1600px;height:1200px;overflow:hidden;pointer-events:none";
   document.body.appendChild(host);
   const pictures: DocxPicture[] = [];
+  const skip: string[] = [];
   const add = async (key: string, draw: () => Promise<{ svg: SVGSVGElement; w: number; h: number } | null>) => {
     try {
       const d = await draw();
-      if (d) pictures.push(await rasterise(d, key, maxW, maxH));
+      if (d) pictures.push(await rasterise(d, key, maxW, maxH)); else skip.push(key);
     } catch { /* the body prints the fallback line */ }
   };
   clearRackData();
@@ -68,7 +69,7 @@ export async function exportClientWord(clientKey: string, options: ReportOptions
       }
     }
   } finally { host.remove(); clearRackData(); }
-  const { bytes, notes } = await buildDocx({ template, model, pictures });
+  const { bytes, notes } = await buildDocx({ template, model, pictures, skip });
   const saved = await backend.saveBytes(`${safeName(model.client.name)} network review ${options.date}.docx`, DOCX_MIME, bytes);
   return { saved, notes };
 }

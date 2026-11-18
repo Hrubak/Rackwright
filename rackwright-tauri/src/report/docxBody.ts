@@ -8,7 +8,7 @@ import { xmlText } from "./docxMarkers";
 export interface BodyStyles { h1?: string; h2?: string; title?: string; table?: string }
 export interface PageBox { textWidthEmu: number; textHeightEmu: number }
 export interface BodyPic { relId: string; docPrId: number; wEmu: number; hEmu: number; name: string }
-export interface BodyOptions { styles: BodyStyles; skipSummary: boolean; skipRecommendations: boolean }
+export interface BodyOptions { styles: BodyStyles; skipSummary: boolean; skipRecommendations: boolean; skip?: Set<string> }
 
 export const picKey = {
   links: "links",
@@ -62,8 +62,9 @@ const paras = (text: string, o: { bold?: boolean; color?: string } = {}) =>
   text.replace(/\r/g, "").split("\n").map((l) => (l.trim() ? `<w:p>${run(l, o)}</w:p>` : "<w:p/>")).join("");
 const PAGE_BREAK = `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
 
-function picture(pics: Map<string, BodyPic>, key: string): string {
+function picture(pics: Map<string, BodyPic>, key: string, skip?: Set<string>): string {
   const b = pics.get(key);
+  if (!b && skip?.has(key)) return "";
   if (!b) return paras(NO_DIAGRAM, { color: GREY });
   const cx = Math.round(b.wEmu), cy = Math.round(b.hEmu), nm = xmlText(b.name);
   return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${b.docPrId}" name="${nm}"/>` +
@@ -113,7 +114,7 @@ export function buildBodyXml(model: ReportModel, pics: Map<string, BodyPic>, opt
     out.push(rows.length ? table([{ head: "Level", w: 1 }, { head: "Where", w: 2.4 }, { head: "Issue", w: 4 }], rows) : paras("Nothing needs attention."));
   }
 
-  if (model.links.length) out.push(heading(1, "Site links"), picture(pics, picKey.links));
+  if (model.links.length) out.push(heading(1, "Site links"), picture(pics, picKey.links, opt.skip));
 
   const detailed = model.level === "detailed";
   const siteBlock = (s: SiteSection) => {
@@ -125,13 +126,13 @@ export function buildBodyXml(model: ReportModel, pics: Map<string, BodyPic>, opt
       out.push(heading(2, "Infrastructure"));
       for (const r of infra) {
         if (infra.length > 1) out.push(paras(r.name, { bold: true, color: GREY }));
-        out.push(picture(pics, picKey.infra(r.key)));
+        out.push(picture(pics, picKey.infra(r.key), opt.skip));
       }
     }
     for (const r of s.racks) {
       if (!r.doc) { out.push(paras(`Could not load ${r.name}.`)); continue; }
       for (const face of detailed ? (["front", "rear"] as const) : (["front"] as const)) {
-        out.push(heading(2, `${r.name} - ${face} view`), picture(pics, picKey.face(r.key, face)));
+        out.push(heading(2, `${r.name} - ${face} view`), picture(pics, picKey.face(r.key, face), opt.skip));
       }
     }
   };

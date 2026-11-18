@@ -25,6 +25,7 @@ const V: MarkerValues = {
 const doc = (b: string) => `<w:document xmlns:w="w" xmlns:mc="mc"><w:body>${b}<w:sectPr><w:pgSz/></w:sectPr></w:body></w:document>`;
 const p = (t: string) => `<w:p><w:r><w:t>${t}</w:t></w:r></w:p>`;
 const texts = (xml: string) => [...xml.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("");
+const count0 = (s: string, sub: string) => s.split(sub).length - 1;
 const count = (s: string, sub: string) => s.split(sub).length - 1;
 const BODY = `<w:p><w:r><w:t>BODY</w:t></w:r></w:p>`;
 
@@ -165,11 +166,30 @@ eq("pageBox fallback", pageBox("<w:document><w:body/></w:document>"), { textWidt
   ok("skipRecommendations", !texts(buildBodyXml(mk("overview"), pics, { styles: st, ...base, skipRecommendations: true })).includes("Recommendations"));
   ok("empty recommendations", !texts(buildBodyXml(mk("overview", client, ""), pics, { styles: st, ...base })).includes("Recommendations"));
   ok("missing picture", texts(buildBodyXml(mk("overview"), new Map(), { styles: st, ...base })).includes("This diagram could not be drawn."));
+  { const nd = (o: object) => texts(buildBodyXml(mk("overview"), new Map(), { styles: st, ...base, ...o })).split("could not be drawn").length - 1; ok("skip key prints nothing", nd({ skip: new Set([picKey.links]) }) === nd({}) - 1, String(nd({}))); }
   const fb = buildBodyXml(mk("overview"), pics, { styles: {}, ...base });
   ok("heading fallback", fb.includes("<w:b/>") && fb.includes('<w:sz w:val="32"/>') && !fb.includes("pStyle"));
   const esc = buildBodyXml(mk("overview", { ...client, sites: [{ ...client.sites[0], name: "A & B <x>" }] }), pics, { styles: st, ...base });
   ok("escaped", esc.includes("A &amp; B &lt;x&gt;"));
   eq("escaped valid xml", XMLValidator.validate(wrap(esc)), true);
+}
+
+// ---- review fixes ----
+{
+  const pPr = `<w:pPr><w:sectPr><w:pgSz w:w="1"/></w:sectPr></w:pPr>`;
+  const o = replaceMarkers(doc(`<w:p>${pPr}<w:r><w:t>{{SUMMARY}}</w:t></w:r></w:p>`), { ...V, SUMMARY: "a\nb\nc" }).xml;
+  const ps = [...o.matchAll(/<w:p>[\s\S]*?<\/w:p>/g)].map((m) => m[0]);
+  eq("sectPr once", count(o, "<w:sectPr>") - 1, 1);
+  ok("sectPr on last line", ps.length === 3 && ps[2].includes("<w:sectPr") && !ps[0].includes("<w:sectPr") && !ps[1].includes("<w:sectPr"), o);
+}
+{
+  const sdt = (pr: string) => `<w:sdt><w:sdtPr>${pr}</w:sdtPr><w:sdtContent>${p("{{RACKWRIGHT}}")}</w:sdtContent></w:sdt>`;
+  for (const pr of ["<w:text/>", '<w:text w:multiLine="1"/>']) {
+    const r = replaceMarkers(doc(sdt(pr)), V, BODY);
+    ok("plain-text sdt missing " + pr, r.rackwright === "missing" && !r.xml.includes("{{") && r.xml.includes(`${BODY}<w:sectPr>`), r.xml);
+  }
+  const r = replaceMarkers(doc(sdt("<w:richText/>")), V, BODY);
+  eq("rich sdt alone", r.rackwright, "alone");
 }
 
 // ---- package ----
@@ -275,6 +295,31 @@ await (async () => {
   eq("check xlsx", await checkDocxTemplate(await zipOf({ "xl/workbook.xml": "<workbook/>" })), MSG);
   eq("check malformed", await checkDocxTemplate(await zipOf({ "word/document.xml": "<w:document><w:body></w:document>" })), MSG);
   eq("templatePage", (await templatePage(await exampleTemplate({ pngDefault: true, marker: "alone" }))).textWidthEmu, 5943600);
+
+  // review fixes: package
+  {
+    const swap = async (fn: (z: JSZip) => Promise<void> | void) => { const z = await JSZip.loadAsync(await exampleTemplate({ pngDefault: true, marker: "alone" })); await fn(z); return z.generateAsync({ type: "uint8array" }); };
+    const CT = "[Content_Types].xml";
+    const DOTX = "Save the template as a Word document (.docx) and upload that.";
+    const main = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    const ctWith = (t: string) => swap(async (z) => z.file(CT, (await text(z, CT)).replace(main, t)));
+    eq("check dotx", await checkDocxTemplate(await ctWith("application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml")), DOTX);
+    eq("check macro", await checkDocxTemplate(await ctWith("application/vnd.ms-word.document.macroEnabled.main+xml")), DOTX);
+    eq("check no content types", await checkDocxTemplate(await swap((z) => { z.remove(CT); })), MSG);
+    eq("check no override", await checkDocxTemplate(await swap(async (z) => z.file(CT, (await text(z, CT)).replace(/<Override PartName="\/word\/document.xml"[^>]*>/, "")))), MSG);
+    // core.xml markers
+    const withCore = await swap((z) => { z.file("docProps/core.xml", `<cp:coreProperties xmlns:cp="c" xmlns:dc="d"><dc:title>{{REPORT_TITLE}}</dc:title></cp:coreProperties>`); z.file("docProps/app.xml", `<Properties><Company>x</Company></Properties>`); });
+    const rc = await buildDocx({ template: withCore, model: mk("overview"), pictures: [] });
+    const zc = await JSZip.loadAsync(rc.bytes);
+    const core = await text(zc, "docProps/core.xml");
+    ok("core.xml filled", core.includes("<dc:title>Network review") && !core.includes("{{"), core);
+    eq("app.xml untouched", await text(zc, "docProps/app.xml"), `<Properties><Company>x</Company></Properties>`);
+    // self-closing rels
+    const selfRels = await swap((z) => { z.file("word/_rels/document.xml.rels", `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`); });
+    const rs = await buildDocx({ template: selfRels, model: mk("overview"), pictures: allPics });
+    const zs = await validate("self-closing rels", rs.bytes);
+    ok("self-closing rels images", count0(await text(zs, "word/_rels/document.xml.rels"), "relationships/image") === 4);
+  }
   eq("mime", DOCX_MIME, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 })();
 
