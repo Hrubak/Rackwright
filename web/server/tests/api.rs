@@ -817,6 +817,27 @@ async fn report_settings_and_assets() {
     let (s, _, _) = admin.raw(Method::PUT, "/api/assets/header_art", Some("image/png"), png.clone()).await;
     assert_eq!(s, StatusCode::OK);
 
+    // the Word template must be a zip (PK signature) and at most 10 MB
+    let mut docx = b"PK".to_vec();
+    docx.extend_from_slice(&[0u8; 64]);
+    let (s, _, b) = admin
+        .raw(Method::PUT, "/api/assets/word_template", Some("application/octet-stream"), docx.clone())
+        .await;
+    assert_eq!(s, StatusCode::OK, "{}", String::from_utf8_lossy(&b));
+    let (s, _, _) = admin
+        .raw(Method::PUT, "/api/assets/word_template", Some("application/octet-stream"), b"%PDF-1.7".to_vec())
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let mut big = b"PK".to_vec();
+    big.resize(11 * 1024 * 1024, 0u8);
+    let (s, _, _) = admin
+        .raw(Method::PUT, "/api/assets/word_template", Some("application/octet-stream"), big)
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, b) = user.raw(Method::GET, "/api/assets/word_template", None, Vec::new()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b, docx);
+
     // a member can read an asset but not write one
     let (s, _, b) = user.raw(Method::GET, "/api/assets/font_regular", None, Vec::new()).await;
     assert_eq!(s, StatusCode::OK);

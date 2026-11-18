@@ -18,6 +18,11 @@ const LOGO_TYPES: &[&str] = &["image/png", "image/svg+xml", "image/jpeg", "image
 const LOGO_MAX: usize = 2 * 1024 * 1024;
 const ART_MAX: usize = 5 * 1024 * 1024;
 const FONT_MAX: usize = 5 * 1024 * 1024;
+const DOCX_MAX: usize = 10 * 1024 * 1024;
+const DOCX_TYPES: &[&str] = &[
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/octet-stream",
+];
 const FONT_TYPES: &[&str] = &[
     "font/ttf",
     "font/otf",
@@ -236,12 +241,13 @@ pub(crate) async fn put_settings(State(st): State<Shared>, headers: HeaderMap, b
 
 // ---------------------------------------------------------------- assets
 
-/// Allowed types, size limit and whether the asset is a font, or None for an unknown name.
-fn asset_rule(name: &str) -> Option<(&'static [&'static str], usize, bool)> {
+/// Allowed types, size limit and the kind of file ("image", "font" or "docx"), or None for an unknown name.
+fn asset_rule(name: &str) -> Option<(&'static [&'static str], usize, &'static str)> {
     match name {
-        "logo" => Some((LOGO_TYPES, LOGO_MAX, false)),
-        "cover_art" | "header_art" | "footer_art" => Some((LOGO_TYPES, ART_MAX, false)),
-        "font_regular" | "font_bold" => Some((FONT_TYPES, FONT_MAX, true)),
+        "logo" => Some((LOGO_TYPES, LOGO_MAX, "image")),
+        "cover_art" | "header_art" | "footer_art" => Some((LOGO_TYPES, ART_MAX, "image")),
+        "font_regular" | "font_bold" => Some((FONT_TYPES, FONT_MAX, "font")),
+        "word_template" => Some((DOCX_TYPES, DOCX_MAX, "docx")),
         _ => None,
     }
 }
@@ -261,31 +267,33 @@ pub(crate) async fn put_asset(
     body: Bytes,
 ) -> ApiResult {
     auth_admin(&st, &headers)?;
-    let (types, max, is_font) = asset_rule(&name).ok_or_else(asset_not_found)?;
+    let (types, max, kind) = asset_rule(&name).ok_or_else(asset_not_found)?;
     let mime = headers
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.split(';').next().unwrap_or("").trim().to_lowercase())
         .unwrap_or_default();
     if !types.iter().any(|t| *t == mime.as_str()) {
-        return Err(ApiError::bad(if is_font {
-            "Upload a TTF or OTF font file."
-        } else {
-            "Upload a PNG, JPG, SVG or WebP image."
+        return Err(ApiError::bad(match kind {
+            "font" => "Upload a TTF or OTF font file.",
+            "docx" => "Upload a Word document (.docx).",
+            _ => "Upload a PNG, JPG, SVG or WebP image.",
         }));
     }
     if body.is_empty() {
         return Err(ApiError::bad("The file is empty"));
     }
     if body.len() > max {
-        return Err(ApiError::bad(if max == LOGO_MAX {
-            "That file is too large (2 MB at most)."
-        } else {
-            "That file is too large (5 MB at most)."
-        }));
+        return Err(ApiError::bad(format!(
+            "That file is too large ({} MB at most).",
+            max / (1024 * 1024)
+        )));
     }
-    if is_font && !has_font_magic(&body) {
+    if kind == "font" && !has_font_magic(&body) {
         return Err(ApiError::bad("Upload a TTF or OTF font file."));
+    }
+    if kind == "docx" && !body.starts_with(b"PK") {
+        return Err(ApiError::bad("Upload a Word document (.docx)."));
     }
     let now = now_rfc3339();
     st.db().execute(

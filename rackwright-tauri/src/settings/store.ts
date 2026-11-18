@@ -19,6 +19,14 @@ const MB = 1024 * 1024;
 const isFont = (n: AssetName) => n === "font_regular" || n === "font_bold";
 
 async function checkAsset(name: AssetName, file: File) {
+  if (name === "word_template") {
+    if (/\.dotx$/i.test(file.name)) throw new Error("Save the template as a Word document (.docx) and upload that.");
+    if (file.size > 10 * MB) throw new Error("That file is too large (10 MB at most).");
+    const { checkDocxTemplate } = await import("../report/docxPackage");
+    const bad = await checkDocxTemplate(new Uint8Array(await file.arrayBuffer()));
+    if (bad) throw new Error(bad);
+    return;
+  }
   if (isFont(name)) {
     const h = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     const m = String.fromCharCode(...h);
@@ -70,7 +78,12 @@ const webStore: SettingsStore = {
   },
   getAsset: (name) => api.getAsset(name),
   async setAsset(name, file) {
-    if (file) await api.putAsset(name, file); else await api.deleteAsset(name);
+    if (!file) { await api.deleteAsset(name); return; }
+    await checkAsset(name, file);
+    if (name === "word_template") {
+      const { DOCX_MIME } = await import("../report/docxPackage");
+      await api.putAsset(name, new File([file], file.name, { type: DOCX_MIME }));
+    } else await api.putAsset(name, file);
   },
 };
 
@@ -98,7 +111,10 @@ const localStore: SettingsStore = {
   async setAsset(name, file) {
     if (!file) { await idbDelete(name); return; }
     await checkAsset(name, file);
-    await idbPut(name, file);
+    if (name === "word_template") {
+      const { DOCX_MIME } = await import("../report/docxPackage");
+      await idbPut(name, new Blob([file], { type: DOCX_MIME }));
+    } else await idbPut(name, file);
   },
 };
 

@@ -184,6 +184,26 @@ function FontRow({ name, label }: { name: AssetName; label: string }) {
   );
 }
 
+const DOCX_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function TemplateRow() {
+  const { setAsset } = useSettings();
+  const st = useStatus();
+  const { blob } = useAsset("word_template");
+  const [fileName, setFileName] = useState("");
+  const file = useRef<HTMLInputElement>(null);
+  return (
+    <div style={lbl}>Word master template: <span style={{ opacity: 0.7 }}>{blob ? fileName || "Uploaded" : "Not set"}</span><br />
+      <input ref={file} type="file" accept={DOCX_ACCEPT} style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) st.run(async () => { await setAsset("word_template", f); setFileName(f.name); }); }} />
+      <button style={btn} onClick={() => file.current?.click()}>Upload…</button>
+      <button style={btn} onClick={() => st.run(async () => { await setAsset("word_template", null); setFileName(""); })} disabled={!blob}>Remove</button>
+      <div style={help}>Type markers such as {"{{CLIENT}}"} and {"{{RACKWRIGHT}}"} where the report should fill in. See the README.</div>
+      {st.view}
+    </div>
+  );
+}
+
 function Reports() {
   const { system, saveSystem } = useSettings();
   const st = useStatus();
@@ -208,6 +228,7 @@ function Reports() {
       <label style={lbl}>Font name<br /><input style={{ ...inp, width: 280 }} maxLength={100} value={font} onChange={(e) => setFont(e.target.value)} /></label>
       <div style={help}>Without a font, reports use Noto Sans.</div>
       {ART.map(([n, l]) => <ArtRow key={n} name={n} label={l} />)}
+      <TemplateRow />
       <button style={btn} disabled={!valid} onClick={() => st.run(() => saveSystem({ report_secondary: sec, address_line: addr.trim(), report_font_name: font.trim() }))}>Save</button>
       {st.view}
     </>

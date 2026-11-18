@@ -32,6 +32,31 @@ Imports match by model (e.g. "SonicWall NSa 2700", "Catalyst 9300-48P", "ICX7150
 - Multi-select: Shift/Ctrl-click or drag a marquee, then drag to move the group.
 - Modern dark UI theme.
 
+## Client report in Word
+Besides the PDF, the Client report dialog has **Export Word**. It builds the same Overview or Detailed report into your own Word master template, so the cover, headers, footers, fonts and colours stay as your designer made them.
+
+**Upload the template** in Settings > Reports (the Word master template row). On the web only an admin can upload it and everyone shares it; on the desktop it is kept on this PC. It must be a Word document (.docx), not a template file (.dotx): in Word use Save As and pick "Word Document". A file that is not a Word document is refused with a message when you upload it. With no template, the report uses plain Word styles.
+
+**Markers.** Type these anywhere in the template (body, tables, text boxes, cover, headers and footers):
+
+| Marker | Becomes |
+|---|---|
+| `{{CLIENT}}` | The client company's name as saved in Clients |
+| `{{PREPARED_FOR}}` | The "Prepared for" field in the dialog (the client name if left blank) |
+| `{{SITE}}` | The names of the chosen sites, joined with ", " |
+| `{{DATE}}` | The report date, written out ("November 18, 2026") |
+| `{{REPORT_TITLE}}` | "Network review - Example IT", the same title as the PDF |
+| `{{PREPARED_BY}}` | The company name from Branding (empty if none) |
+| `{{SUMMARY}}` | The executive summary text |
+| `{{RECOMMENDATIONS}}` | The recommendations text |
+| `{{RACKWRIGHT}}` | The generated report body |
+
+Rules:
+- Put `{{RACKWRIGHT}}` on a line of its own. If the template does not have it, the report is added at the end of the document.
+- If `{{SUMMARY}}` or `{{RECOMMENDATIONS}}` appear in the template, the report body leaves those sections out, so they are not printed twice.
+- A marker that is unknown (anything else in double braces) or has nothing to put in is removed.
+- Markers still work when Word has split them into pieces while you typed.
+
 ## Desktop app (Windows)
 `Rackwright.exe` is the Tauri desktop app with the same screens as the web version (no sign-in; racks are saved as `.rack.json` files). Download the newest one from the repository's Releases page (`desktop-v...`) or use `Rackwright.exe` in this folder. It needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 already have. GitHub Actions rebuilds both whenever the desktop version changes.
 
