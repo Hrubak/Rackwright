@@ -62,5 +62,15 @@ t("every device on Logical page", missing.length === 0, missing.map((d) => d.nam
 // The export draws cables as open polylines (no BeginX/EndX, no Connect glue), so they read as plain shapes, not links.
 t("export cables are not links (known limit)", logical.links.length === 0);
 
+{
+  const pc = `<PageContents xmlns="http://schemas.microsoft.com/office/visio/2012/main"><Shapes><Shape ID="1">${box(0, 0)}<Text>EX-SW01</Text></Shape></Shapes></PageContents>`;
+  const zipOf = async (n: number, pad = "") => { const z = new JSZip(); for (let i = 1; i <= n; i++) z.file(`visio/pages/page${i}.xml`, pc + pad); return z.generateAsync({ type: "uint8array", compression: "DEFLATE" }); };
+  const lim = { part: 1000, total: 1500, pages: 3 };
+  const msg = async (b: Uint8Array) => { try { await parseVsdx(b, "x.vsdx", lim); return "ok"; } catch (e) { return (e as Error).message; } };
+  t("big part refused", await msg(await zipOf(1, " ".repeat(5000))) === "the drawing is too big");
+  t("total over limit refused", await msg(await zipOf(3, " ".repeat(400))) === "the drawing is too big");
+  t("too many pages refused", await msg(await zipOf(4)) === "the drawing is too big");
+  t("small drawing within limits", await msg(await zipOf(2)) === "ok");
+}
 console.log(fails ? `${fails} FAILED` : "all passed");
 process.exit(fails ? 1 : 0);

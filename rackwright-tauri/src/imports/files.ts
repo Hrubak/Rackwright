@@ -88,6 +88,8 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
   const models: DiagramModel[] = [];
   const textSpecs: ImportSpec[] = [];
   let readable = 0, unknown = 0;
+  let otherFails = 0; // files that could not be read for any other reason
+  const readerFails: string[] = []; // warnings of files whose reader would not load
   const readerWarn = (name: string, what: string) =>
     `${name}: the ${what} couldn't load. ${opts.web ? "Try again." : "Check the internet connection and try again."}`;
 
@@ -95,10 +97,10 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
     const name = pathOf(f);
     const kind = kindOf(f.name);
     try {
-      if (!kind) { if (++unknown <= MAX_SKIP_WARNINGS) warnings.push(`${name}: this kind of file can't be read — skipped.`); continue; }
-      if (kind === "Visio (old)") { warnings.push(`${name}: old Visio file — open it in Visio and save it as .vsdx first.`); continue; }
-      if (f.size > MAX_FILE_BYTES) { warnings.push(`${name}: the file is over 50 MB — skipped.`); continue; }
-      if (kind === "Text" && f.size > MAX_TEXT_BYTES) { warnings.push(`${name}: the file is over 5 MB — skipped.`); continue; }
+      if (!kind) { otherFails++; if (++unknown <= MAX_SKIP_WARNINGS) warnings.push(`${name}: this kind of file can't be read — skipped.`); continue; }
+      if (kind === "Visio (old)") { warnings.push(`${name}: old Visio file — open it in Visio and save it as .vsdx first.`); otherFails++; continue; }
+      if (f.size > MAX_FILE_BYTES) { warnings.push(`${name}: the file is over 50 MB — skipped.`); otherFails++; continue; }
+      if (kind === "Text" && f.size > MAX_TEXT_BYTES) { warnings.push(`${name}: the file is over 5 MB — skipped.`); otherFails++; continue; }
 
       say(`Reading ${name}…`);
       if (kind === "Visio") {
@@ -129,12 +131,13 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
         textSpecs.push(s); readable++;
       }
     } catch (e) {
-      if (isReaderError(e)) warnings.push(readerWarn(name, kind === "PDF" ? "PDF reader" : "picture reader"));
-      else warnings.push(`${name}: couldn't be read (${e instanceof Error ? e.message : String(e)}) — skipped.`);
+      if (isReaderError(e)) { const w = readerWarn(name, kind === "PDF" ? "PDF reader" : "picture reader"); warnings.push(w); readerFails.push(w); }
+      else { otherFails++; warnings.push(`${name}: couldn't be read (${e instanceof Error ? e.message : String(e)}) — skipped.`); }
     }
   }
 
   if (unknown > MAX_SKIP_WARNINGS) warnings.push(`${unknown - MAX_SKIP_WARNINGS} other ${unknown - MAX_SKIP_WARNINGS === 1 ? "file was" : "files were"} skipped.`);
+  if (!readable && readerFails.length && !otherFails) throw new ImportFilesError(readerFails[0], warnings);
   if (!readable) throw new ImportFilesError("None of these files can be read — add a .vsdx, .svg, .pdf or picture file.", warnings);
 
   const specs: ImportSpec[] = [];
@@ -145,7 +148,7 @@ export async function readDiagramFiles(files: FileLike[], opts: DiagramOpts): Pr
     out = specs[0];
     for (const s of specs.slice(1)) mergeSpecs(out, s);
     // each source numbers its devices from 1: one running counter keeps "Same device as line N" pointing at the right row
-    if (specs.length > 1) out.devices.forEach((d, i) => { d.line = i + 1; });
+    if (specs.length > 1 || models.length) out.devices.forEach((d, i) => { d.line = i + 1; });
   }
   if (models.length) out.kind = "diagram";
   out.warnings = [...warnings, ...out.warnings];

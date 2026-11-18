@@ -24,4 +24,12 @@ t("data href", !/data:/.test(sanitizeSvgText('<image href="data:image/png;base64
 t("local href kept 2", sanitizeSvgText('<use href="#local"/>').includes('href="#local"'));
 const up = sanitizeSvgText('<SCRIPT>x()</SCRIPT><rect ONLOAD="x()"/>');
 t("uppercase script/onload", !/script|onload/i.test(up), up);
+t("escaped @import style removed", !/import|evil/i.test(sanitizeSvgText('<svg><style>@\\69mport "https://evil.example/x.css"</style><text>A</text></svg>')));
+t("escaped url style attr removed", !/evil/.test(sanitizeSvgText('<rect style="background:\\75rl(https://evil.example/a)"/>')));
+t("external url attr removed", !/evil/.test(sanitizeSvgText('<rect fill="url(https://evil.example/a)"/>')));
+t("quoted external url attr removed", !/evil/.test(sanitizeSvgText("<rect fill='url(\"https://evil.example/a\")'/>")));
+t("image-set removed", !/evil/.test(sanitizeSvgText('<rect style="background:image-set(\'https://evil.example/a\' 1x)"/>')));
+t("local url kept", sanitizeSvgText('<rect fill="url(#grad)"/>').includes('fill="url(#grad)"'));
+t("quoted local url kept", sanitizeSvgText('<rect fill="url(\'#grad\')"/>').includes("url('#grad')"));
+t("plain style kept", sanitizeSvgText('<rect style="fill:red"/>').includes('style="fill:red"'));
 if (fails) process.exit(1);

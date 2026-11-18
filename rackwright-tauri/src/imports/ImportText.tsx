@@ -43,7 +43,9 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   const [showLeft, setShowLeft] = useState(false);
   const [picked, setPicked] = useState<File[]>([]); // several files or a folder: read together by readDiagramFiles
   const [endUsers, setEndUsers] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  const busyRef = useRef(false); // read by drops and folder walks that finish while a read is running
+  const setBusy = (b: boolean) => { busyRef.current = b; setBusyState(b); };
   const [status, setStatus] = useState("");
 
   const newUn = Math.max(1, parseInt(newU) || 42);
@@ -64,7 +66,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   };
   /** One text file fills the box as before; anything else becomes a list read together. */
   const addFiles = (list: File[]) => {
-    if (busy) return; // the list must not change under a running read
+    if (busyRef.current) return; // the list must not change under a running read
     if (fileRef.current) fileRef.current.value = ""; // so the same file can be picked again
     if (dirRef.current) dirRef.current.value = "";
     if (!list.length) return;
@@ -103,7 +105,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
   const rackName = rackSel === "new" ? "the new rack" : sel?.name ?? "";
   const isLayout = spec?.kind === "layout";
   const tooShort = !!plan && isLayout && plan.needU > baseU;
-  const showTarget = mode === "layout" || mode === "auto";
+  const showTarget = mode === "layout" || mode === "auto" || mode === "diagram";
 
   const doImport = () => {
     if (!plan) return;
@@ -133,7 +135,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
 
         {!plan && <div style={{ overflow: "auto" }}>
           <div {...(IS_WEB ? { onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDrag(true); }, onDragLeave: () => setDrag(false),
-              onDrop: (e: React.DragEvent) => { e.preventDefault(); setDrag(false); if (busy) return; dropped(e.dataTransfer).then(addFiles); } } : {})}
+              onDrop: (e: React.DragEvent) => { e.preventDefault(); setDrag(false); if (busyRef.current) return; dropped(e.dataTransfer).then(addFiles); } } : {})}
             style={{ border: `1px dashed ${drag ? v("focus") : v("border")}`, borderRadius: 4, padding: 8, marginBottom: 8 }}>
             {IS_WEB ? "Drop files or a folder here, or choose some: " : "Choose files: "}<input ref={fileRef} type="file" multiple disabled={busy} accept={DIAGRAM_ACCEPT} onChange={(e) => addFiles(Array.from(e.target.files ?? []))} />
             {" "}<button style={btn} disabled={busy} onClick={() => dirRef.current?.click()}>Choose a folder…</button>
@@ -143,7 +145,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
           </div>
           {picked.length > 0 ? <div style={{ border: `1px solid ${v("border-subtle")}`, borderRadius: 4, maxHeight: 240, overflow: "auto" }}>
             <div style={{ padding: "4px 6px", display: "flex" }}><span style={{ flex: 1 }}>{picked.length} {picked.length === 1 ? "file" : "files"} chosen</span>
-              <button style={{ ...btn, marginRight: 0, padding: "0 8px" }} disabled={busy} onClick={() => setPicked([])}>Clear</button></div>
+              <button style={{ ...btn, marginRight: 0, padding: "0 8px" }} disabled={busy} onClick={() => { setPicked([]); setErr(""); setErrNotes([]); }}>Clear</button></div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
               {picked.map((f, i) => <tr key={i} style={{ borderTop: `1px solid ${v("border-subtle")}` }}>
                 <td style={{ padding: "2px 6px", width: 90 }}>{kindOf(f.name) ?? "—"}</td>

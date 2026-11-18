@@ -22,6 +22,12 @@ export function readerBase(web: boolean = webProduction()): ReaderBase {
   };
 }
 
+/** SHA-384 (base64) of the two files that run in the main window, from the pinned npm packages (jsDelivr and /readers/ serve them byte for byte). */
+export const READER_SHA384 = {
+  pdf: "+0ti2moQlmLN7WZHE2RHIf5lV8hHxhxEalN0il3YZceG26fUPyOkR0hp9daxk1i7", // pdfjs-dist@4.10.38 build/pdf.min.mjs
+  tess: "2BQ3U3OdKOb0Uczxqr41I9UvZkzr4V9Hv8uSzMMZAlmhsFClvdZX5wi5fDCzG+tM", // tesseract.js@7.0.0 dist/tesseract.min.js
+};
+
 /** The error every reader failure ends in; the dialog turns it into the "couldn't load" warning. */
 export const readerError = (why = ""): Error => new Error("reader" + (why ? ": " + why : ""));
 export const isReaderError = (e: unknown): boolean => e instanceof Error && /^reader\b/.test(e.message);
@@ -60,6 +66,21 @@ export async function probeReader(url: string, fetchFn: (u: string) => Promise<R
   checkReaderResponse(res);
 }
 
+export async function sha384b64(bytes: ArrayBuffer): Promise<string> {
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-384", bytes));
+  let bin = ""; h.forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+/** Fetches a file and rejects (as a reader failure) unless its SHA-384 is the expected one. */
+export async function fetchVerified(url: string, sha384: string, fetchFn: (u: string) => Promise<{ ok: boolean; status: number; arrayBuffer(): Promise<ArrayBuffer> }> = (u) => fetch(u)): Promise<ArrayBuffer> {
+  let res;
+  try { res = await fetchFn(url); } catch (e) { throw readerError(String((e as Error)?.message || e)); }
+  if (!res.ok) throw readerError("HTTP " + res.status);
+  const buf = await res.arrayBuffer();
+  if ((await sha384b64(buf)) !== sha384) throw readerError("the file is not the expected one");
+  return buf;
+}
+
 // ---- minimal types for the two libraries ----
 export interface PdfTextItem { str: string; transform: number[] }
 export interface PdfPage { getTextContent(): Promise<{ items: PdfTextItem[] }> }
@@ -81,7 +102,10 @@ export const loadPdfJs = retrying<PdfJs>(async () => {
   try {
     return await withTimeout((async () => {
       if (webProduction()) { await probeReader(b.pdf); await probeReader(b.pdfWorker); }
-      const lib = (await import(/* @vite-ignore */ b.pdf)) as PdfJs;
+      const code = await fetchVerified(b.pdf, READER_SHA384.pdf);
+      const blobUrl = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+      let lib: PdfJs;
+      try { lib = (await import(/* @vite-ignore */ blobUrl)) as PdfJs; } finally { URL.revokeObjectURL(blobUrl); }
       if (!lib || !lib.getDocument) throw readerError("unusable");
       lib.GlobalWorkerOptions.workerSrc = b.pdfWorker;
       return lib;
@@ -89,10 +113,10 @@ export const loadPdfJs = retrying<PdfJs>(async () => {
   } catch (e) { throw isReaderError(e) ? e : readerError(String((e as Error)?.message || e)); }
 });
 
-function addScript(src: string): Promise<void> {
+function addScript(src: string, integrity: string): Promise<void> {
   return new Promise((res, rej) => {
     const s = document.createElement("script");
-    s.src = src; s.async = true;
+    s.src = src; s.async = true; s.integrity = "sha384-" + integrity; s.crossOrigin = "anonymous";
     s.onload = () => res();
     s.onerror = () => { s.remove(); rej(readerError("script")); };
     document.head.appendChild(s);
@@ -105,7 +129,7 @@ export const loadTesseract = retrying<TessWorker>(async () => {
     return await withTimeout((async () => {
       if (webProduction()) { await probeReader(b.tess); await probeReader(b.tessWorker); }
       const g = window as unknown as { Tesseract?: { createWorker(lang: string, oem: number, o: Record<string, unknown>): Promise<TessWorker> } };
-      if (!g.Tesseract) await addScript(b.tess);
+      if (!g.Tesseract) await addScript(b.tess, READER_SHA384.tess);
       if (!g.Tesseract) throw readerError("unusable");
       const w = await g.Tesseract.createWorker("eng", 1, { workerPath: b.tessWorker, corePath: b.tessCore, langPath: b.lang, gzip: true });
       try { await w.setParameters({ tessedit_pageseg_mode: "11" }); } // sparse text, as RackMap used

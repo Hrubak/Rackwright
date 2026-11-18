@@ -1,4 +1,5 @@
-import { parseTsv, wordsToLabels, WIRE_NOTE_RE } from "../src/imports/picture";
+import { isReaderError } from "../src/imports/readers";
+import { recognizeWords, parseTsv, wordsToLabels, WIRE_NOTE_RE } from "../src/imports/picture";
 
 let fails = 0;
 const t = (name: string, ok: boolean, extra = "") => { if (!ok) fails++; console.log((ok ? "PASS " : "FAIL ") + name + (extra ? "  " + extra : "")); };
@@ -31,6 +32,20 @@ t("far word stays separate", labels.some((l) => l.text === "EX-SRV01") && labels
 t("line height is the median", lh === 14);
 
 t("wire notes", WIRE_NOTE_RE.test("Gi1/0/1") && WIRE_NOTE_RE.test("VLAN 20") && WIRE_NOTE_RE.test("10G") && !WIRE_NOTE_RE.test("EX-SW01"));
+
+{
+  const mkW = (rec: () => Promise<{ data: { tsv?: string | null } }>) => { const w = { terminated: 0, setParameters: async () => ({}), recognize: rec, terminate: async () => { w.terminated++; } }; return w; };
+  const blob = new Blob(["x"]);
+  let forgot = 0;
+  const ok = mkW(async () => ({ data: { tsv } }));
+  t("recognize ok", (await recognizeWords(ok, blob, 2, 1000, () => { forgot++; })).length === 2 && !ok.terminated && !forgot);
+  const hang = mkW(() => new Promise(() => {}));
+  let e1: unknown = null; try { await recognizeWords(hang, blob, 2, 20, () => { forgot++; }); } catch (e) { e1 = e; }
+  t("hang times out, worker shut down and forgotten", isReaderError(e1) && hang.terminated === 1 && forgot === 1);
+  const boom = mkW(async () => { throw new Error("bad image data"); });
+  let e2: unknown = null; try { await recognizeWords(boom, blob, 2, 1000, () => { forgot++; }); } catch (e) { e2 = e; }
+  t("recognize failure is a plain error, worker forgotten", e2 instanceof Error && !isReaderError(e2) && e2.message === "bad image data" && boom.terminated === 1 && forgot === 2);
+}
 
 console.log(fails ? `picture: ${fails} failed` : "picture: all passed");
 if (fails) process.exit(1);

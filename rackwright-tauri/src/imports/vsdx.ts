@@ -26,10 +26,27 @@ function textOf(v: X): string {
 
 interface VShape { id: string; master: string; nameU: string; text: string; data: Record<string, string>; x: number; y: number; w: number; h: number; begin: Pt | null; end: Pt | null; is1D: boolean; parent: string | null }
 
-export async function parseVsdx(data: ArrayBuffer | Uint8Array, fileName: string): Promise<DiagramModel[]> {
+export interface VsdxLimits { part: number; total: number; pages: number }
+export const VSDX_LIMITS: VsdxLimits = { part: 50 * 1024 * 1024, total: 200 * 1024 * 1024, pages: 200 };
+const TOO_BIG = "the drawing is too big";
+
+export async function parseVsdx(data: ArrayBuffer | Uint8Array, fileName: string, limits: VsdxLimits = VSDX_LIMITS): Promise<DiagramModel[]> {
   let zip: JSZip;
   try { zip = await JSZip.loadAsync(data); } catch { throw new Error("not a .vsdx file"); }
-  const read = async (p: string) => { const f = zip.file(p); return f ? f.async("string") : null; };
+  let total = 0;
+  const read = async (p: string) => {
+    const f = zip.file(p); if (!f) return null;
+    const size = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+    if (typeof size === "number") { // the zip says how big it will be: refuse before inflating
+      if (size > limits.part || total + size > limits.total) throw new Error(TOO_BIG);
+      total += size;
+      return f.async("string");
+    }
+    const s = await f.async("string"); // size unknown: count what came out
+    if (s.length > limits.part || total + s.length > limits.total) throw new Error(TOO_BIG);
+    total += s.length;
+    return s;
+  };
   const masters = new Map<string, string>(), pageNames = new Map<number, string>();
   const mx = await read("visio/masters/masters.xml");
   if (mx) {
@@ -41,6 +58,7 @@ export async function parseVsdx(data: ArrayBuffer | Uint8Array, fileName: string
   const num = (k: string) => parseInt(k.match(/(\d+)\.xml/)![1]);
   const pages = Object.keys(zip.files).filter((k) => /^visio\/pages\/page\d+\.xml$/i.test(k)).sort((a, b) => num(a) - num(b));
   if (!pages.length) throw new Error("no drawing pages found");
+  if (pages.length > limits.pages) throw new Error(TOO_BIG);
   const models: DiagramModel[] = [];
   for (const pk of pages) {
     const no = num(pk);

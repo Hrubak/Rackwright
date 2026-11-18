@@ -2,7 +2,8 @@
 // Port of RackMap parseImage and its helpers.
 import { guessType } from "./spec";
 import type { DiagramLink, DiagramModel, DiagramNode } from "./diagram";
-import { loadTesseract, readerError, isReaderError } from "./readers";
+import { loadTesseract, readerError, isReaderError, withTimeout, TESS_TIMEOUT_MS } from "./readers";
+import type { TessWorker } from "./readers";
 
 export interface Word { k: string; x: number; y: number; w: number; h: number; text: string; conf: number }
 interface Line { words: Word[]; x: number; y: number; w: number; h: number; text: string }
@@ -248,9 +249,23 @@ function drawTo(img: HTMLImageElement, scale: number): HTMLCanvasElement {
 }
 const canvasBlob = (cv: HTMLCanvasElement): Promise<Blob> => new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error("not a readable picture"))), "image/png"));
 
+export const MAX_PICTURE_PIXELS = 50_000_000;
+
+/** One recognize() call. A hang or any failure shuts the worker down and forgets it. Only a timeout is a reader failure; anything else is a problem with this picture. */
+export async function recognizeWords(worker: TessWorker, blob: Blob, scale: number, ms: number = TESS_TIMEOUT_MS, forget: () => void = () => loadTesseract.reset()): Promise<Word[]> {
+  try {
+    const r = await withTimeout(worker.recognize(blob as unknown as HTMLCanvasElement, {}, { tsv: true }), ms);
+    return parseTsv(r.data.tsv || "", scale);
+  } catch (e) { // a dead or stuck worker must not stay cached
+    worker.terminate().catch(() => {}); forget();
+    throw isReaderError(e) ? e : new Error(String((e as Error)?.message || e));
+  }
+}
+
 export async function parsePicture(file: Blob, name: string): Promise<DiagramModel> {
   const img = await loadImageFile(file); const W0 = img.naturalWidth, H0 = img.naturalHeight;
   if (!W0 || !H0) throw new Error("empty picture");
+  if (W0 * H0 > MAX_PICTURE_PIXELS) throw new Error("the picture is too big");
   const worker = await loadTesseract();
   const s1 = Math.min(3, 2400 / Math.max(W0, H0)); // enlarge small exports so text is readable; scale big screenshots down
   // read as drawn (text crossed by lines), then with line art erased (text inside boxes); keep the best of each word.
@@ -260,13 +275,7 @@ export async function parsePicture(file: Blob, name: string): Promise<DiagramMod
     try {
       if (mode && !eraseLineArt(cv, mode === "color")) return null;
       const blob = await canvasBlob(cv);
-      try {
-        const r = await worker.recognize(blob, {}, { tsv: true });
-        return parseTsv(r.data.tsv || "", s1);
-      } catch (e) { // a dead worker must not stay cached
-        worker.terminate().catch(() => {}); loadTesseract.reset();
-        throw isReaderError(e) ? e : readerError(String((e as Error)?.message || e));
-      }
+      return await recognizeWords(worker, blob, s1);
     } finally { cv.width = cv.height = 0; }
   };
   const a = (await pass(null)) || [];

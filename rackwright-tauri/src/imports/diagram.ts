@@ -115,5 +115,6 @@ export function diagramToSpec(input: DiagramModel[], opts: { endUsers: boolean }
   const warnings: string[] = [];
   if (skippedUsers) warnings.push(`Left out ${skippedUsers} end-user device(s) (PCs, printers, phones…). Tick “Include end-user devices” to bring them in.`);
   if (skippedOther) warnings.push(`Ignored ${skippedOther} shape(s) that look like labels, titles, clouds or decoration.`);
+  devices.forEach((d, i) => { d.line = i + 1; }); // one running number across every model: no gaps, no restarts
   return { kind: "diagram", racks, devices, links, notes: [], warnings };
 }

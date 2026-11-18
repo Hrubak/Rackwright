@@ -106,6 +106,19 @@ async function makeVsdx(): Promise<Uint8Array> {
     const g = await readDiagramFiles([fake("a.vsdx", vs), ...junk], o);
     t("skipped warnings grouped", g.warnings.filter((x) => /can't be read — skipped/.test(x)).length === 10 && g.warnings.includes("3 other files were skipped."), g.warnings.length + "");
   }
+  {
+    const msgOf = async (web: boolean) => { try { await readDiagramFiles([fake("a.png", "x")], { ...o, web, readers: bad }); } catch (e) { return (e as Error).message; } return ""; };
+    t("reader failure headline desktop", (await msgOf(false)) === "a.png: the picture reader couldn't load. Check the internet connection and try again.", await msgOf(false));
+    t("reader failure headline web", (await msgOf(true)) === "a.png: the picture reader couldn't load. Try again.");
+    let er2 = ""; try { await readDiagramFiles([fake("a.png", "x"), fake("b.dat", "x")], { ...o, readers: bad }); } catch (e) { er2 = (e as Error).message; }
+    t("mixed failures keep the generic headline", /^None of these files/.test(er2), er2);
+  }
+  {
+    const mk = (n: string, t: string, l: string, x: number) => ({ id: n, title: t, label: l, data: {}, x, y: 0, w: 5, h: 5 });
+    const two = { svg: async (_t: string, n: string) => ({ source: n, nodes: [mk("c", "Cloud", "Internet", 0), mk("a", "Switch", n === "a.svg" ? "EX-SW11" : "EX-SW12", 100), mk("b", "Server", n === "a.svg" ? "EX-SRV11" : "EX-SRV12", 120)], links: [], yUp: false }) };
+    const ln = await readDiagramFiles([fake("a.svg", "<svg/>"), fake("b.svg", "<svg/>")], { ...o, readers: two });
+    t("lines 1..n across two svg files", ln.devices.length === 4 && ln.devices.every((d, i) => d.line === i + 1), ln.devices.map((d) => d.line).join(","));
+  }
   console.log(fails ? `${fails} failed` : "0 failed");
   if (fails) process.exit(1);
 })();

@@ -88,6 +88,15 @@ const opts = { rackId: 1, newRackName: "New", newRackU: 42, growRack: false };
   const a = d.devices.find((x) => x.name === "EX-SW01")!, n = d.devices.find((x) => x.name === "EX-NEW")!;
   eq("matched device not moved, new off-rack", [a.rack, a.u, n.rack], [1, 20, null]);
 }
+{
+  const d = adoc();
+  const sp = diagramToSpec([model([RACK, inRack, outside], [{ a: "s", b: "o", text: "" }])], E);
+  applyImport(d, planImport(d, sp, opts), opts);
+  const ports = d.devices.reduce((n, x) => n + x.ports.length, 0);
+  const p2 = planImport(d, sp, opts);
+  const lg2 = applyImport(d, p2, opts);
+  eq("port-less link imported twice", [d.cables.length, d.devices.reduce((n, x) => n + x.ports.length, 0), lg2.cables, lg2.ports], [1, ports, 0, 0]);
+}
 
 if (fail) { console.log(`diagram: ${fail} failed`); process.exit(1); }
 console.log("diagram: all passed");

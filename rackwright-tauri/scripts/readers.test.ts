@@ -1,4 +1,5 @@
-import { readerBase, retrying, withTimeout, probeReader, checkReaderResponse, isReaderError } from "../src/imports/readers";
+import { readFileSync } from "node:fs";
+import { READER_SHA384, sha384b64, fetchVerified, readerBase, retrying, withTimeout, probeReader, checkReaderResponse, isReaderError } from "../src/imports/readers";
 import { itemsToLines } from "../src/imports/pdf";
 
 let fails = 0;
@@ -52,6 +53,15 @@ t("web paths", w.pdf === "/readers/pdfjs/pdf.min.mjs" && w.pdfWorker === "/reade
   try { await withTimeout(new Promise<number>((r) => setTimeout(() => r(7), 80)), 10, (v) => { late = v; }); } catch (e) { to = e; }
   await new Promise((r) => setTimeout(r, 120));
   t("timeout rejects as reader error and hands over the late value", isReaderError(to) && late === 7);
+
+  // pinned hashes match the npm files they were taken from
+  const file = (p: string) => { const b = readFileSync(new URL("../node_modules/" + p, import.meta.url)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
+  t("pdf.min.mjs hash is current", (await sha384b64(file("pdfjs-dist/build/pdf.min.mjs"))) === READER_SHA384.pdf);
+  t("tesseract.min.js hash is current", (await sha384b64(file("tesseract.js/dist/tesseract.min.js"))) === READER_SHA384.tess);
+  const serve = (buf: ArrayBuffer) => async () => ({ ok: true, status: 200, arrayBuffer: async () => buf });
+  t("right body accepted", (await fetchVerified("u", READER_SHA384.pdf, serve(file("pdfjs-dist/build/pdf.min.mjs")))).byteLength > 1000);
+  let bad: unknown = null; try { await fetchVerified("u", READER_SHA384.pdf, serve(new TextEncoder().encode("alert(1)").buffer as ArrayBuffer)); } catch (e) { bad = e; }
+  t("wrong body rejected as reader error", isReaderError(bad));
 
   // pdf text lines
   const it = (str: string, x: number, y: number) => ({ str, transform: [1, 0, 0, 1, x, y] });

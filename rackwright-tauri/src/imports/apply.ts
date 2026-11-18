@@ -158,6 +158,11 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
   const link = (l: ImportLink) => {
     const A = findDev(l.a), B = findDev(l.b);
     if (!A || !B || A === B) { log.warnings.push(`${l.a} ↔ ${l.b}: ${A && A === B ? "same device" : "device not found"} — skipped.`); return; }
+    if (!l.ap.trim() && !l.bp.trim()) { // no port names: one cable between the two devices is enough, however often it is imported
+      const ids = (d: Device) => new Set(d.ports.map((x) => x.id));
+      const ia = ids(A), ib = ids(B);
+      if (doc.cables.some((c) => (ia.has(c.a) && ib.has(c.b)) || (ib.has(c.a) && ia.has(c.b)))) return;
+    }
     const pa = pick(A, l.ap), pb = pick(B, l.bp);
     if (doc.cables.some((c) => (c.a === pa.id && c.b === pb.id) || (c.a === pb.id && c.b === pa.id))) return; // already there
     const label = `${A.name} ${pa.name} ↔ ${B.name} ${pb.name}`;

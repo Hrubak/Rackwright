@@ -6,6 +6,11 @@ const VNS = "http://schemas.microsoft.com/visio/2003/SVGExtensions/";
 
 const hrefOk = (v: string) => v.replace(/[\u0000-\u0020]/g, "").startsWith("#");
 
+// CSS that can fetch something or hide what it fetches (escapes, url(), @import, image functions)
+const BAD_CSS = /\\|url\(|@import|image-set\(|image\(|src\(/i;
+/** True when every url( in the value points at a local #id (quoted or not). */
+const urlsOk = (v: string) => !/url\(/i.test(v) || (v.match(/url\([^)]*\)?/gi) || []).every((u) => /^url\(\s*(["']?)#[^)]*\1\s*\)$/i.test(u.trim()));
+
 /** String-level clean-up that works without a DOM. Pre-filter only; the DOM pass is the real one. */
 export function sanitizeSvgText(svg: string): string {
   const once = (x: string) => x
@@ -15,6 +20,11 @@ export function sanitizeSvgText(svg: string): string {
     .replace(/<foreignObject\b[^>]*>/gi, "")
     .replace(/<iframe\b[\s\S]*?<\/iframe\s*>/gi, "")
     .replace(/<iframe\b[^>]*>/gi, "")
+    .replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, (m, css) => (BAD_CSS.test(css) ? "" : m))
+    .replace(/\sstyle\s*=\s*"([^"]*)"/gi, (m, v) => (BAD_CSS.test(v) ? "" : m))
+    .replace(/\sstyle\s*=\s*'([^']*)'/gi, (m, v) => (BAD_CSS.test(v) ? "" : m))
+    .replace(/\s[\w:.-]+\s*=\s*"([^"]*)"/g, (m, v) => (urlsOk(v) ? m : ""))
+    .replace(/\s[\w:.-]+\s*=\s*'([^']*)'/g, (m, v) => (urlsOk(v) ? m : ""))
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
     .replace(/\s(?:xlink:)?href\s*=\s*"([^"]*)"/gi, (m, v) => (hrefOk(v) ? m : ""))
@@ -27,21 +37,16 @@ export function sanitizeSvgText(svg: string): string {
 const BAD_ELEMENTS = new Set(["script", "foreignobject", "iframe", "object", "embed", "link", "animate", "animatemotion", "animatetransform", "set", "feimage"]);
 
 function sanitizeSvgDom(root: Element): void {
-  Array.from(root.querySelectorAll("*")).forEach((e) => {
+  [root, ...Array.from(root.querySelectorAll("*"))].forEach((e) => {
     const ln = e.localName.toLowerCase();
-    if (BAD_ELEMENTS.has(ln)) { e.remove(); return; }
-    if (ln === "style" && /url\(|@import/i.test(e.textContent || "")) { e.remove(); return; }
+    if (e !== root && BAD_ELEMENTS.has(ln)) { e.remove(); return; }
+    if (ln === "style" && BAD_CSS.test(e.textContent || "")) { e.remove(); return; }
     Array.from(e.attributes).forEach((a) => {
       const n = a.name.toLowerCase(), local = (a.localName || n).toLowerCase();
       if (/^on/.test(local) || /^on/.test(n)) e.removeAttribute(a.name);
       else if (local === "href" && !hrefOk(a.value)) e.removeAttribute(a.name);
-      else if (local === "style" && /url\(|@import|expression\(/i.test(a.value)) e.removeAttribute(a.name);
-    });
-  });
-  [root.localName.toLowerCase() === "svg" ? root : null].forEach((r) => {
-    if (r) Array.from(r.attributes).forEach((a) => {
-      const l = (a.localName || a.name).toLowerCase();
-      if (/^on/.test(l) || (l === "href" && !hrefOk(a.value)) || (l === "style" && /url\(|@import|expression\(/i.test(a.value))) r.removeAttribute(a.name);
+      else if (local === "style" && (BAD_CSS.test(a.value) || /expression\(/i.test(a.value))) e.removeAttribute(a.name);
+      else if (!urlsOk(a.value)) e.removeAttribute(a.name);
     });
   });
 }
@@ -149,8 +154,7 @@ function svgModel(svg: SVGSVGElement, source: string): DiagramModel {
     let i = 0;
     boxes.forEach((b) => {
       const label = b.lines.join("\n"); if (!label) return;
-      const title = b.el && b.el.localName === "image" ? "" : "";
-      nodes.push({ id: "s" + i++, title, label, data: {}, ...b.r, el: b.el });
+      nodes.push({ id: "s" + i++, title: "", label, data: {}, ...b.r, el: b.el });
     });
     const inNode = (el: Element) => nodes.some((n) => n.el && n.el !== el && n.el.contains(el));
     svg.querySelectorAll("line,polyline,path").forEach((el) => {

@@ -1,5 +1,5 @@
 // PDF text for the import dialog: the first pages, top to bottom, left to right. Port of RackMap parsePdf (text only).
-import { loadPdfJs, type PdfTextItem } from "./readers";
+import { loadPdfJs, withTimeout, PDF_TIMEOUT_MS, type PdfTextItem } from "./readers";
 
 /** Items → text lines: sorted top-to-bottom then left-to-right; items within 3 units of height share a line. */
 export function itemsToLines(items: PdfTextItem[]): string[] {
@@ -13,11 +13,11 @@ export async function pdfText(data: ArrayBuffer): Promise<string> {
   const lib = await loadPdfJs();
   const task = lib.getDocument({ data: new Uint8Array(data), isEvalSupported: false });
   try {
-    const doc = await task.promise;
+    const doc = await withTimeout(task.promise, PDF_TIMEOUT_MS);
     const out: string[] = [];
     for (let i = 1; i <= Math.min(doc.numPages, 6); i++) {
       const page = await doc.getPage(i);
-      out.push(...itemsToLines((await page.getTextContent()).items));
+      out.push(...itemsToLines((await withTimeout(page.getTextContent(), PDF_TIMEOUT_MS)).items));
     }
     return out.join("\n");
   } finally { task.destroy?.().catch(() => {}); }
