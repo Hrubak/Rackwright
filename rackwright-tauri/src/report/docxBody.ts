@@ -17,6 +17,7 @@ export const picKey = {
 };
 
 const NO_DIAGRAM = "This diagram could not be drawn.";
+const GREY = "666666"; // theme-ok (Word report text colour)
 const attr = (tag: string, name: string) => new RegExp(`\\b${name}="(-?\\d+)"`).exec(tag)?.[1];
 
 /** Ids of the paragraph styles named "heading 1", "heading 2", "Title" and the table style named "Table Grid". */
@@ -63,7 +64,7 @@ const PAGE_BREAK = `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
 
 function picture(pics: Map<string, BodyPic>, key: string): string {
   const b = pics.get(key);
-  if (!b) return paras(NO_DIAGRAM, { color: "666666" });
+  if (!b) return paras(NO_DIAGRAM, { color: GREY });
   const cx = Math.round(b.wEmu), cy = Math.round(b.hEmu), nm = xmlText(b.name);
   return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${b.docPrId}" name="${nm}"/>` +
     `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${b.docPrId}" name="${nm}"/><pic:cNvPicPr/></pic:nvPicPr>` +
@@ -117,13 +118,13 @@ export function buildBodyXml(model: ReportModel, pics: Map<string, BodyPic>, opt
   const detailed = model.level === "detailed";
   const siteBlock = (s: SiteSection) => {
     out.push(PAGE_BREAK, heading(1, s.name || "Site"));
-    if (s.address) out.push(paras(s.address, { color: "666666" }));
+    if (s.address) out.push(paras(s.address, { color: GREY }));
     if (!s.racks.length) { out.push(paras("No racks in this site.")); return; }
     const infra = s.racks.filter((r) => r.doc && r.doc.devices.length > 0);
     if (infra.length) {
       out.push(heading(2, "Infrastructure"));
       for (const r of infra) {
-        if (infra.length > 1) out.push(paras(r.name, { bold: true, color: "666666" }));
+        if (infra.length > 1) out.push(paras(r.name, { bold: true, color: GREY }));
         out.push(picture(pics, picKey.infra(r.key)));
       }
     }
