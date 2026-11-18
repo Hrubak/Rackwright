@@ -1,11 +1,11 @@
 // CSV / TSV / semicolon reader. Ported from RackMap parseDelimited, looksDelimited and csvToSpec.
-import { devFrom, nk } from "./spec";
+import { FIELD_KEYS, devFrom, nk } from "./spec";
 import type { ImportLink, ImportSpec } from "./spec";
 
 const stripBom = (s: string) => String(s).replace(/^﻿/, "");
 
 interface Row { cells: string[]; line: number }
-function readRows(text: string): Row[] {
+function readRows(text: string): { rows: Row[]; unterminated: boolean } {
   const s = stripBom(text);
   const first = s.split(/\r?\n/).find((l) => l.trim()) || "";
   const n = (re: RegExp) => (first.match(re) || []).length;
@@ -22,7 +22,7 @@ function readRows(text: string): Row[] {
     if (q) {
       if (ch === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else q = false; }
       else { if (ch === "\n") line++; cell += ch; }
-    } else if (ch === '"') q = true;
+    } else if (ch === '"' && cell.length === 0) q = true;
     else if (ch === delim) { row.push(cell); cell = ""; }
     else if (ch === "\n" || ch === "\r") {
       if (ch === "\r" && s[i + 1] === "\n") i++;
@@ -30,11 +30,11 @@ function readRows(text: string): Row[] {
     } else cell += ch;
   }
   endRow();
-  return rows;
+  return { rows, unterminated: q };
 }
 
 export function parseDelimited(text: string): string[][] {
-  return readRows(text).map((r) => r.cells);
+  return readRows(text).rows.map((r) => r.cells);
 }
 
 export function looksDelimited(text: string): boolean {
@@ -48,8 +48,9 @@ export function looksDelimited(text: string): boolean {
 }
 
 export function csvToSpec(text: string): ImportSpec {
-  const rows = readRows(text);
+  const { rows, unterminated } = readRows(text);
   const spec: ImportSpec = { kind: "inventory", racks: [], devices: [], links: [], notes: [], warnings: [] };
+  if (unterminated) spec.warnings.push("The file ends inside a quoted cell.");
   if (rows.length < 2) { spec.warnings.push("The file has no data rows."); return spec; }
   const H = rows[0].cells.map((h) => h.trim()), K = H.map(nk);
   const col = (...names: string[]) => { for (const n of names) { const i = K.indexOf(n); if (i >= 0) return i; } return -1; };
@@ -78,9 +79,10 @@ export function csvToSpec(text: string): ImportSpec {
   if (nameI < 0) { spec.warnings.push("Couldn’t find a Name / Device / Hostname column."); return spec; }
   const rackI = col("rack", "rackname", "cabinet"), conI = col("connectedto", "connections");
   for (const { cells: r, line } of data) {
-    const pairs = H.map((h, i) => [h, r[i]] as [string, string]).filter((_, i) => i !== conI && K[i] !== "room");
-    // make sure the chosen name column wins over other name-ish columns
-    pairs.sort((x, y) => (nk(x[0]) === K[nameI] ? -1 : 0) - (nk(y[0]) === K[nameI] ? -1 : 0));
+    const pairs: [string, string][] = [[ "name", r[nameI] ]]; // the chosen name column always supplies the name
+    // keep the value in its own field too when the header maps to one (Hostname, Asset)
+    if (FIELD_KEYS[K[nameI]] !== "name") pairs.push([H[nameI], r[nameI]]);
+    H.forEach((h, i) => { if (i !== nameI && i !== conI && K[i] !== "room") pairs.push([h, r[i]]); });
     const d = devFrom(pairs, { line });
     if (!d.name) continue;
     if (rackI >= 0) { const rv = (r[rackI] || "").trim(); d.rack = /^unracked$/i.test(rv) || !rv ? null : rv; }

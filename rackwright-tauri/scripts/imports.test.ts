@@ -34,5 +34,19 @@ eq("csv tab", parseDelimited("a\tb\n1\t2"), [["a", "b"], ["1", "2"]]);
 eq("looksDelimited csv", looksDelimited("Name,Type,Rack,U,Model,IP\nEX-SW01,Switch,EX-R1,40,ICX7150,10.0.0.2\nEX-NAS01,NAS,EX-R1,10,DS920,10.0.0.9\n"), true);
 eq("looksDelimited layout", looksDelimited("EX-SW01\nEX-HV01\n(empty)\nEX-NAS01\n"), false);
 
+
+const hn = csvToSpec("Hostname,Model\nex-a,x\nex-b,y\n");
+eq("csv hostname-only", hn.devices.map((d) => [d.name, d.fields.hostname, d.fields.model]), [["ex-a", "ex-a", "x"], ["ex-b", "ex-b", "y"]]);
+const as = csvToSpec("Asset,Model\nex-a,x\n");
+eq("csv asset-only", as.devices.map((d) => [d.name, d.fields.asset_tag]), [["ex-a", "ex-a"]]);
+const ut = csvToSpec("Name,Type\nEX-A,Widget\n");
+eq("csv unknown type", ut.devices.map((d) => [d.type, d.specs.type]), [[null, "Widget"]]);
+const gt = csvToSpec("Name,Type,Model\nEX-A,Widget,ICX7150\n");
+eq("csv unknown type guessed", [gt.devices[0].type, gt.devices[0].specs.type], ["Switch", "Widget"]);
+const mq = csvToSpec('Name,Notes\nEX,19" rack\nEX2,x\n');
+eq("csv mid-cell quote", [mq.devices.map((d) => [d.name, d.fields.notes]), mq.warnings], [[["EX", '19" rack'], ["EX2", "x"]], []]);
+const uq = csvToSpec('Name,Notes\nEX,"open\nEX2,x\n');
+eq("csv unterminated quote", uq.warnings, ["The file ends inside a quoted cell."]);
+
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -130,7 +130,7 @@ export function devFrom(pairs: [string, string][], base: Partial<ImportDevice>):
     if (v === "") continue;
     const key = nk(k), f = FIELD_KEYS[key];
     if (f === "name") { if (!d.name) d.name = v; else d.fields.hostname = d.fields.hostname || v; }
-    else if (f === "type") { if (!d.type) d.type = typeWord(v) || v; }
+    else if (f === "type") { if (!d.type) { d.type = typeWord(v); if (!d.type) d.specs.type = v; } }
     else if (f === "rack") d.rack = v;
     else if (f === "u") {
       const sp = parseUSpan(v);
