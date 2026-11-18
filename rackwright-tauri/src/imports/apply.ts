@@ -1,6 +1,7 @@
 // Carries out the checked rows of an ImportPlan on a Doc: racks, devices, fields, positions, notes and cables.
 import { addRack, catalogFind, checkPlace, findFree, fromTpl, newCable, nid, resizeRack, setOffRack, smartTemplate } from "../edit";
 import type { Tpl } from "../edit";
+import { setSource } from "../source";
 import { guessHeight } from "./layout";
 import type { Device, Doc, Port, Rack } from "../types";
 import type { ImportLink } from "./spec";
@@ -62,10 +63,11 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
     if (!t) return;
     if (k === "power_w") { const n = Number(t); if (Number.isFinite(n)) d.power_w = n; return; }
     (d as unknown as Record<string, unknown>)[k] = t;
+    setSource(d, k, "csv");
   };
   const mergeExtras = (d: Device, row: Row) => {
     const { specs, services } = row.dev;
-    if (Object.keys(specs).length) d.specs = { ...(d.specs || {}), ...specs };
+    if (Object.keys(specs).length) { d.specs = { ...(d.specs || {}), ...specs }; for (const k of Object.keys(specs)) setSource(d, "specs." + k, "csv"); }
     for (const s of services) {
       d.services = d.services || [];
       if (!d.services.some((x) => low(x.name) === low(s.name) && String(x.port) === String(s.port))) d.services.push({ ...s });
@@ -77,7 +79,7 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
     if (x.type && tpl.type !== x.type && !catalogFind(label)) tpl = smartTemplate(x.type + " " + x.name, h);
     const d = fromTpl(doc, tpl);
     if (x.type) d.type = x.type;
-    d.name = x.name;
+    d.name = x.name; setSource(d, "name", "csv");
     if (x.cols && x.cols > 1) { d.half = true; if (x.cols > 2) d.cols = x.cols; else delete d.cols; }
     for (const [k, v] of Object.entries(x.fields)) setField(d, k, v);
     mergeExtras(d, row);

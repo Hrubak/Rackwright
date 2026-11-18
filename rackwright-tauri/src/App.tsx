@@ -14,6 +14,7 @@ import { DropButton, MenuBar, MenuItem, SEP } from "./Menu";
 import { SHORTCUTS, commandFor } from "./shortcuts";
 import { ShortcutsDialog, WhatsNewDialog } from "./HelpDialogs";
 import { Device, Doc, PortPos, RouteResult } from "./types";
+import { markManual } from "./source";
 import { LiveRouter, provisionalDoc, targetKey } from "./liveRoute";
 import type { Target } from "./edit";
 import InfraView from "./views/InfraView";
@@ -486,7 +487,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       const x = d.devices.find((y) => y.id === dv.id)! as any;
       if (x[k] === v) return;
       x[k] = v;
-      if (x.auvik_id && !(x.locked ?? []).includes(k)) x.locked = [...(x.locked ?? []), k];
+      markManual(x, k);
     }, `dev${dv.id}${k}`);
   const legendCables = useMemo(() => { const v = visibleCables(doc, cableOpts, sel, null); return doc.cables.filter((c) => v.has(c.id)); }, [doc, cableOpts, sel]);
   const dragDev = pdrag && pdrag.active ? { ...PROTOS[pdrag.i], face: CATALOG[pdrag.i].plate ? "both" : face } : null;

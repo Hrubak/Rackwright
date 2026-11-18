@@ -4,6 +4,7 @@ import { Device, Doc, Rack, RW } from "../types";
 import { RACK_MODELS, RackSpec, modelById, specOf } from "../racks";
 import { ImportPlan, PlanGroup, PlanItem, PlanUnit, PortRef, groupTemplate, locatePort, summarize } from "./plan";
 import type { AuvikDevice } from "./parse";
+import { setSource } from "../source";
 import { Ep, X, computeDiff, defaultSelection, deviceFields, findMissing, orderUnits } from "./diff";
 export { findMissing };
 
@@ -151,10 +152,10 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     const a = u.item.dev;
     for (const f of deviceFields(d, u)) {
       if (!on(`fld:${u.key}:${f.field}`)) continue;
-      (d as any)[f.field] = f.to; unlock(d, f.field);
+      (d as any)[f.field] = f.to; unlock(d, f.field); setSource(d, f.field, "auvik");
     }
     if (!d.model) d.model = tplModel;
-    d.notes = mergeNotes(d.notes, noteLine(a));
+    d.notes = mergeNotes(d.notes, noteLine(a)); setSource(d, "notes", "auvik");
     d.auvik_id = u.key; d.auvik_name = u.name; d.auvik_macs = a.macs; d.auvik_model = a.model;
   };
 
@@ -176,8 +177,9 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
     } else {
       const a = u.item.dev;
       fill(d, u, u.tpl.model || "");
-      d.name = u.name; d.ip = a.ips[0] || d.ip || ""; if (a.serial) d.serial = a.serial;
-      if (a.model) d.model = a.model;
+      d.name = u.name; setSource(d, "name", "auvik"); d.ip = a.ips[0] || d.ip || ""; if (a.ips[0]) setSource(d, "ip", "auvik");
+      if (a.serial) { d.serial = a.serial; setSource(d, "serial", "auvik"); }
+      if (a.model) { d.model = a.model; setSource(d, "model", "auvik"); }
     }
     devOf.set(u.key, d);
     if (u.mode === "off") { d.face = d.plate ? "both" : "front"; putOff(d); }
@@ -334,7 +336,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   }
 
   // --- document-level info
-  (doc as any).auvik = { site: plan.site, imported: new Date().toISOString().slice(0, 10), unplaced: plan.unplaced, virtual: plan.virtual };
+  (doc as any).auvik = { site: plan.site, imported: new Date().toISOString().slice(0, 10), unplaced: plan.unplaced, virtual: plan.virtual, source: "xlsx" };
   res.message = `Imported from Auvik: ${res.added} added, ${res.updated} updated, ${res.groups} endpoint group(s), ${res.vmBoxes} VM box(es), ${res.cablesAdded} cable(s)` +
     (res.managers ? `, ${res.managers} cable manager(s)` : "") +
     (res.missing.length ? `, ${res.missing.length} missing from this export` : "");

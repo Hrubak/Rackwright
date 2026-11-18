@@ -1,3 +1,4 @@
+import type { FieldSource } from "./source";
 export interface Port { id: number; name: string; type: string; label: string }
 export interface Device {
   id: number; name: string; type: string; u_size: number; rack: number | null; u: number; side: number;
@@ -5,6 +6,7 @@ export interface Device {
   auvik_id?: string; auvik_name?: string; auvik_macs?: string[]; auvik_model?: string;
   endpoints?: { name: string; type: string; model: string; ip: string; mac: string; port: string; status: string; kind?: "pc" | "phone" | "iot" | "printer" | "vm" | "other"; key?: string; locked?: string[]; manual?: boolean }[];
   mac?: string;
+  source?: Record<string, FieldSource>; // where each field came from (name, ip, serial, ..., specs.<key>)
   locked?: string[]; // fields edited by hand (name, type, model, ip, serial, notes, mac); an Auvik import leaves them alone
   oobm?: { name: string; ip: string; mac: string; key: string; portId?: number }; // iDRAC / iLO / BMC shown on this server's rear port
   vm_host?: number; // "Virtual machines" box: id of the device the VMs run on
@@ -22,7 +24,7 @@ export interface Rack {
   last_verified?: string; circuit?: string; volts?: 120 | 208; notes?: string;
 }
 export interface Cable { id: number; a: number; b: number; color: string; type?: string; style?: string; label?: string; length?: number; unit?: string }
-export interface AuvikMeta { site: string; imported: string; unplaced: { name: string; type: string; model: string; ip: string; mac: string; status: string; reason: string }[]; virtual: string[] }
+export interface AuvikMeta { site: string; tenant?: string; source?: "api" | "xlsx"; imported: string; unplaced: { name: string; type: string; model: string; ip: string; mac: string; status: string; reason: string }[]; virtual: string[] }
 export interface Doc { v: number; nid: number; racks: Rack[]; devices: Device[]; cables: Cable[]; auvik?: AuvikMeta }
 export interface Route { cable: number; pts: [number, number][]; mode: string; dir_a: number; dir_b: number }
 export interface Hint { cable: number; device: number; msg: string }

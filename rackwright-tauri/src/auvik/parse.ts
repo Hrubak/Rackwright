@@ -10,6 +10,7 @@ export interface AuvikDevice {
   macs: string[]; ips: string[]; networks: string;
   neighbors: Neighbor[]; // "<name> through <interface of that neighbour>"
   software: string; serial: string; firmware: string; description: string;
+  apiId?: string; hostname?: string;
   rows: number;          // export rows merged into this device
 }
 export interface ParsedAuvik { site: string; devices: AuvikDevice[]; warnings: string[] }
