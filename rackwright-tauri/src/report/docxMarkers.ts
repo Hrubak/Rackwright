@@ -110,7 +110,11 @@ export function replaceMarkers(xml: string, values: MarkerValues, body?: string)
     let rwHere = false;
     if (rw && !q.fallback && !seen) {
       seen = true;
-      if (body !== undefined) { rwHere = true; result = trimmed === "{{RACKWRIGHT}}" ? "alone" : "shared"; edits.push({ start: q.start, end: q.end, text: body }); }
+      if (body !== undefined) { rwHere = true; result = trimmed === "{{RACKWRIGHT}}" ? "alone" : "shared"; 
+        // Keep a section break held in the paragraph's own properties: an empty paragraph after the body.
+        const pPr = /^<w:p(?:\s[^>]*)?>(<w:pPr>[\s\S]*?<\/w:pPr>)/.exec(whole)?.[1] ?? "";
+        edits.push({ start: q.start, end: q.end, text: body + (pPr.includes("<w:sectPr") ? `<w:p>${pPr}</w:p>` : "") });
+      }
     }
     if (rwHere) continue;
 

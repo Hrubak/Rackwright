@@ -86,6 +86,11 @@ eq("xmlText", xmlText(`a&b<c>"d"'e'\u0001\uD800\tz🙂`), "a&amp;b&lt;c&gt;&quot
   const only = replaceMarkers(doc(`<mc:Fallback>${p("{{RACKWRIGHT}}")}</mc:Fallback>`), V, BODY);
   eq("fallback-only is missing", only.rackwright, "missing");
 }
+for (const [label, inner] of [["alone", "{{RACKWRIGHT}}"], ["shared", "Intro {{RACKWRIGHT}}"]]) {
+  const pPr = `<w:pPr><w:pStyle w:val="Cover"/><w:sectPr><w:pgSz w:w="1"/></w:sectPr></w:pPr>`;
+  const r = replaceMarkers(doc(`<w:p>${pPr}<w:r><w:t>${inner}</w:t></w:r></w:p>` + p("After")), V, BODY);
+  ok(`rackwright paragraph keeps its section break (${label})`, r.xml.includes(`${BODY}<w:p>${pPr}</w:p><w:p><w:r><w:t>After`) && !r.xml.includes("Intro"), r.xml);
+}
 eq("scan split runs", [...scanMarkers(doc(`<w:p><w:r><w:t>{{CLI</w:t></w:r><w:r><w:t>ENT}} {{DATE}}</w:t></w:r></w:p>`))].sort(), ["CLIENT", "DATE"]);
 {
   const x = `<w:hdr xmlns:w="w">${p("{{RACKWRIGHT}}")}</w:hdr>`;
