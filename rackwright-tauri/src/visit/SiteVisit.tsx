@@ -11,7 +11,7 @@ const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("bor
 
 type Counts = { confirmed: number; corrected: number; missing: number; skipped: number };
 type Result = "confirmed" | "corrected" | "missing" | "skipped";
-type Drafts = Record<VisitField, string>;
+type Drafts = { id: number; values: Record<VisitField, string> };
 
 const ZERO: Counts = { confirmed: 0, corrected: 0, missing: 0, skipped: 0 };
 
@@ -46,13 +46,24 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
   useEffect(() => {
     const d = curId == null ? null : doc.devices.find((x) => x.id === curId);
     if (!d) { setDrafts(null); return; }
-    setDrafts({
+    setDrafts({ id: d.id, values: {
       name: d.name ?? "", status: statusOf(d), manufacturer: d.manufacturer ?? "", model: d.model ?? "",
       serial: d.serial ?? "", asset_tag: d.asset_tag ?? "", ip: d.ip ?? "",
-    });
+    } });
     matchRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curId]);
+
+  // Stamp the rack once when the finish screen is reached, so how it is closed does not matter.
+  const stamped = useRef(false);
+  const worked = counts.confirmed + counts.corrected + counts.missing > 0;
+  useEffect(() => {
+    if (!done) { stamped.current = false; return; }
+    if (list.length === 0 || !worked || stamped.current) return;
+    stamped.current = true;
+    edit((d) => { finishVisit(d, rackId, counts, today); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, worked]);
 
   const push = (res: Result) => {
     setHistory((h) => [...h, { i: idx, res }]);
@@ -60,9 +71,9 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
     setI(idx + 1);
   };
   const act = (action: "ok" | "missing") => {
-    if (curId == null || !drafts) return;
+    if (curId == null || !drafts || drafts.id !== curId) return;
     let res: ReturnType<typeof applyStep> = "gone";
-    const ok = edit((d) => { res = applyStep(d, curId, action, drafts, today); });
+    const ok = edit((d) => { res = applyStep(d, curId, action, drafts.values, today); });
     if (!ok) return;
     if (res === "gone") { setI(idx + 1); return; } // nothing counted
     if (res === "missing") setMarkedMissing((m) => [...m, curId]);
@@ -76,14 +87,9 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
     setCounts((c) => ({ ...c, [last.res]: c[last.res] - 1 }));
     setI(last.i);
   };
-  const finish = () => {
-    if (counts.confirmed + counts.corrected + counts.missing > 0) {
-      if (!edit((d) => { finishVisit(d, rackId, counts, today); })) return;
-    }
-    onClose();
-  };
 
   const onKey = (e: React.KeyboardEvent) => {
+    e.stopPropagation(); // keep Ctrl+Z, Delete etc. from reaching the app behind the dialog
     if (e.key === "Escape") { onClose(); return; }
     if (e.key !== "Enter" || done || e.defaultPrevented) return;
     const tag = (e.target as HTMLElement).tagName;
@@ -124,11 +130,11 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
           </div>
           <div style={{ textAlign: "right" }}>
             {canBack && <button style={btn} onClick={back}>Back</button>}
-            <button style={{ ...primary, marginRight: 0 }} autoFocus onClick={finish}>Close</button>
+            <button style={{ ...primary, marginRight: 0 }} autoFocus onClick={onClose}>Close</button>
           </div>
         </>}
 
-        {list.length > 0 && !done && dev && drafts && <>
+        {list.length > 0 && !done && dev && drafts && drafts.id === curId && <>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
             <span>{stepNo} of {total}</span>
             <span style={{ opacity: 0.8 }}>{counter}</span>
@@ -142,10 +148,10 @@ export default function SiteVisit({ doc, rackId, edit, today, onClose }: {
             {VISIT_FIELDS.map((f) => <label key={f.key} style={{ display: "contents" }}>
               <span>{f.label}</span>
               {f.key === "status"
-                ? <select style={inp} value={drafts.status} onChange={(e) => setDrafts({ ...drafts, status: e.target.value })}>
+                ? <select style={inp} value={drafts.values.status} onChange={(e) => setDrafts({ ...drafts, values: { ...drafts.values, status: e.target.value } })}>
                     {STATUSES.map((s) => <option key={s.v} value={s.v}>{s.label}</option>)}
                   </select>
-                : <input style={inp} value={drafts[f.key]} onChange={(e) => setDrafts({ ...drafts, [f.key]: e.target.value })} />}
+                : <input style={inp} value={drafts.values[f.key]} onChange={(e) => setDrafts({ ...drafts, values: { ...drafts.values, [f.key]: e.target.value } })} />}
             </label>)}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
