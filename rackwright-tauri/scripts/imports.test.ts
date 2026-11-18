@@ -1,5 +1,6 @@
 // npx tsx scripts/imports.test.ts — RackMap text and CSV readers (synthetic data only)
 import { parseRackmapText } from "../src/imports/rackmap";
+import { parseLayout, placeLayout, guessHeight } from "../src/imports/layout";
 import { csvToSpec, looksDelimited, parseDelimited } from "../src/imports/csv";
 
 let fail = 0;
@@ -47,6 +48,29 @@ const mq = csvToSpec('Name,Notes\nEX,19" rack\nEX2,x\n');
 eq("csv mid-cell quote", [mq.devices.map((d) => [d.name, d.fields.notes]), mq.warnings], [[["EX", '19" rack'], ["EX2", "x"]], []]);
 const uq = csvToSpec('Name,Notes\nEX,"open\nEX2,x\n');
 eq("csv unterminated quote", uq.warnings, ["The file ends inside a quoted cell."]);
+
+const lay = parseLayout([
+  "[Front of the rack full-width]", "HP ProLiant DL380 Gen10 (VM HOST) esxi.example.com", "[Back of Rack]", "1 U RACK EMPTY SPACE", "(EX-MDF-STACK)",
+  "48Port Ruckus POE", "48Port Ruckus POE", "Carrier equipment connected via crossover cable from the router to the phone switch.", "KVM Switch",
+  "EX-FW01 | Phone Switch (should be decommissioned)", "[Front of the Rack]", "APC Smart-UPS X 3000", "APC Battery Pack",
+].join("\n"));
+const kinds = (k: string) => lay.devices.filter((d) => (d.kind || "device") === k);
+eq("layout counts", [kinds("device").length, kinds("empty").length, kinds("note").length, lay.notes.length], [8, 1, 1, 0]);
+eq("layout kind", lay.kind, "layout");
+eq("layout dl380", [lay.devices[0].face, lay.devices[0].rack, lay.devices[0].height], ["both", undefined, 2]);
+const emp = kinds("empty")[0], stack = lay.devices.filter((d) => d.name === "48Port Ruckus POE" && d.group === "EX-MDF-STACK");
+eq("layout rear", [emp.face, emp.height, stack.map((d) => d.face)], ["rear", 1, ["rear", "rear"]]);
+const ph = lay.devices.find((d) => d.name === "Phone Switch")!;
+eq("layout phone switch", [ph.fields.notes, ph.cols, ph.side, ph.line === lay.devices.find((d) => d.name === "EX-FW01")!.line], ["should be decommissioned", 2, 1, true]);
+const ups = lay.devices.find((d) => d.name === "APC Smart-UPS X 3000")!;
+eq("layout ups", [ups.face, ups.type, ups.height], ["front", "UPS", 2]);
+eq("guessHeight", [guessHeight("Mystery box").guessed, guessHeight("Mystery box").height], [true, 1]);
+const used = placeLayout(lay, 42);
+eq("layout place", [lay.devices[0].u! + lay.devices[0].height! - 1, used > 0], [42, true]);
+eq("layout place note", kinds("note")[0].u, null);
+const old = parseLayout("Rack1\n- Panel A - (2U)\n- Open - (12U)\n");
+placeLayout(old, 14);
+eq("old list syntax", [old.racks[0].name, old.devices.map((d) => [d.kind, d.name, d.u, d.height])], ["Rack1", [["device", "Panel A", 13, 2], ["empty", "Empty", 1, 12]]]);
 
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

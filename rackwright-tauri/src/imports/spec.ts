@@ -2,6 +2,7 @@
 export type ImpFace = "front" | "rear" | "both";
 export type ImportFieldKey = "model" | "ip" | "serial" | "mac" | "hostname" | "manufacturer" | "asset_tag" | "os" | "role" | "owner" | "status" | "warranty_exp" | "purchase_date" | "last_verified" | "notes";
 export interface ImportDevice {
+  kind?: "device" | "empty" | "note"; // absent = device; layout lists also emit empty slots and note lines
   line: number; // 1-based source line (CSV: file line, header is line 1)
   name: string;
   type: string | null; // Rackwright type ("Server", "Switch", "Patch panel", ...); null = not known

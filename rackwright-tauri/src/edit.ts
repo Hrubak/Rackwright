@@ -343,13 +343,16 @@ const mkPorts = (prefix: string, n: number, type: string, start = 1) =>
 const pwr = () => mkPorts("Power", 1, "Power", 0);
 
 /** Catalog lookup (ported from the Python app): Dell/UniFi/Synology rules, then vendor model names. */
-export function catalogMatch(name: string, u: number): Tpl | null {
+export function catalogMatch(name: string, u: number): Tpl | null { return catalogLookup(name, u); }
+/** Same lookup as catalogMatch, but the template keeps its own u_size. */
+export function catalogFind(name: string): Tpl | null { return catalogLookup(name, null); }
+function catalogLookup(name: string, u: number | null): Tpl | null {
   const n = name.toLowerCase();
   const pool = CATALOG.filter((t) => t.plate);
   const sized = (t: Tpl | undefined | null): Tpl | null => {
     if (!t) return null;
     const c = clone(t);
-    if (!c.half && !["ups", "bp"].includes(c.plate?.style)) c.u_size = u;
+    if (u != null && !c.half && !["ups", "bp"].includes(c.plate?.style)) c.u_size = u;
     return c;
   };
   const byShort = (sh: string) => pool.find((t) => t.short === sh);
