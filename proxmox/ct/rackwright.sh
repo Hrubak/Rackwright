@@ -140,6 +140,8 @@ update_script() {
   # shellcheck source=/dev/null
   source /opt/rackwright/proxmox/install/rackwright-install.sh --functions-only
   build_app
+  # Older containers have no Auvik settings file yet. Never overwrites an existing one.
+  ensure_auvik_env
 
   msg_info "Restarting ${APP}"
   systemctl daemon-reload

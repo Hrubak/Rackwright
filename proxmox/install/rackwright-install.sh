@@ -46,6 +46,38 @@ build_app() {
   msg_ok "Built the server"
 }
 
+# Auvik API settings for the server (web only). Safe to run again: it never overwrites an
+# existing env file or drop-in and never changes the permissions of an existing env file.
+# Used by install and by `update`. The env file holds the Auvik key, so it is root-only (600).
+ensure_auvik_env() {
+  local env_dir="/etc/rackwright"
+  local env_file="${env_dir}/auvik.env"
+  local dropin_dir="/etc/systemd/system/rackwright.service.d"
+  local dropin="${dropin_dir}/auvik.conf"
+
+  install -d -m 755 "$env_dir"
+  if [[ ! -e "$env_file" ]]; then
+    # Created empty with mode 600 first, then filled, so it is never readable by others.
+    install -m 600 -o root -g root /dev/null "$env_file"
+    cat >"$env_file" <<'EOF'
+# Auvik API settings for Rackwright. Remove the # at the start of each line and fill them in.
+# Then run: systemctl restart rackwright
+# AUVIK_USERNAME=
+# AUVIK_REGION=us1
+# AUVIK_API_KEY=
+EOF
+  fi
+
+  install -d -m 755 "$dropin_dir"
+  if [[ ! -e "$dropin" ]]; then
+    cat >"$dropin" <<'EOF'
+[Service]
+EnvironmentFile=-/etc/rackwright/auvik.env
+EOF
+  fi
+  systemctl daemon-reload
+}
+
 if [[ "${1:-}" == "--functions-only" ]]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -152,7 +184,7 @@ ExecStart=${APP_DIR}/web/server/target/release/rackwright-server
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
+ensure_auvik_env
 systemctl enable -q --now rackwright
 msg_ok "Created Service"
 

@@ -83,6 +83,32 @@ That pulls the `web` branch, rebuilds, and restarts `rackwright.service`. Data s
 
 Keep it on the LAN (or Tailscale). Do not publish this URL.
 
+### Connect Auvik (web)
+
+To import devices from Auvik, tell the server how to sign in to Auvik. Do this once, in the LXC console:
+
+```bash
+nano /etc/rackwright/auvik.env
+```
+
+The file has three lines that start with `#`. Remove the `#` from each line and fill them in:
+
+```
+AUVIK_USERNAME=your-auvik-user@example.com
+AUVIK_REGION=us1
+AUVIK_API_KEY=your-api-key
+```
+
+Save (Ctrl+O, Enter, Ctrl+X), then restart the server:
+
+```bash
+systemctl restart rackwright
+```
+
+Open a client in the web app, choose **Import from Auvik**, and press **Test connection**. If it says the connection works, you can import.
+
+The key stays on the server. The app never shows it, and the browser never receives it. Only root can read the file. Installing or updating creates the file if it is missing and never overwrites one you have filled in.
+
 ### Run on this PC
 
 Needs Rust and Node. From this folder:
