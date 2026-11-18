@@ -91,7 +91,7 @@ To import devices from Auvik, tell the server how to sign in to Auvik. Do this o
 nano /etc/rackwright/auvik.env
 ```
 
-The file has three lines that start with `#`. Remove the `#` from each line and fill them in:
+The file has three `AUVIK_` lines that start with `#`. Remove the `#` from those three lines and fill them in:
 
 ```
 AUVIK_USERNAME=your-auvik-user@example.com

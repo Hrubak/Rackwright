@@ -60,7 +60,7 @@ ensure_auvik_env() {
     # Created empty with mode 600 first, then filled, so it is never readable by others.
     install -m 600 -o root -g root /dev/null "$env_file"
     cat >"$env_file" <<'EOF'
-# Auvik API settings for Rackwright. Remove the # at the start of each line and fill them in.
+# Auvik API settings for Rackwright. Remove the # only from the three AUVIK_ lines and fill them in.
 # Then run: systemctl restart rackwright
 # AUVIK_USERNAME=
 # AUVIK_REGION=us1
@@ -79,6 +79,11 @@ EOF
 }
 
 if [[ "${1:-}" == "--functions-only" ]]; then
+  # An old copy of `update` is already running when it sources this new file, so the old
+  # update_script never calls ensure_auvik_env. Do it here. Only as root on a systemd host.
+  if [[ "$(id -u)" == "0" ]] && command -v systemctl >/dev/null 2>&1; then
+    ensure_auvik_env
+  fi
   return 0 2>/dev/null || exit 0
 fi
 
