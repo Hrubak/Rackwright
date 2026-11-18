@@ -132,3 +132,14 @@ export function placeLayout(spec: ImportSpec, rackU: number): number {
   }
   return most;
 }
+
+/** Change a layout row's kind: a new Device gets a name and a height of at least 1 U; an Empty keeps its height; a Note has none. */
+export function switchKind(d: ImportDevice, kind: "device" | "empty" | "note"): ImportDevice {
+  const was = d.kind ?? "device";
+  if (was === kind) return d;
+  if (kind === "note") return { ...d, kind, height: 0, heightGuessed: undefined };
+  const height = Math.max(1, d.height ?? 1);
+  if (kind === "empty") return { ...d, kind, height };
+  const name = was === "note" ? d.name : !d.name || d.name === "Empty" ? "New device" : d.name;
+  return { ...d, kind, name: name || "New device", height };
+}

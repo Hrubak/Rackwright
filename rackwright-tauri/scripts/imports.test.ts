@@ -2,7 +2,7 @@
 import { parseRackmapText } from "../src/imports/rackmap";
 import { buildFromText } from "../src/edit";
 import type { Doc } from "../src/types";
-import { parseLayout, placeLayout, guessHeight } from "../src/imports/layout";
+import { parseLayout, placeLayout, guessHeight, switchKind } from "../src/imports/layout";
 import { readImport } from "../src/imports/read";
 import { csvToSpec, looksDelimited, parseDelimited } from "../src/imports/csv";
 
@@ -228,6 +228,13 @@ eq("matched row takes the device's size", [rp.rows[0].dev.height, rp.rows[0].dev
 const dry = applyImport(JSON.parse(JSON.stringify(rdoc)), rp, o);
 eq("dry run leaves the real doc alone", JSON.stringify(rdoc), before);
 eq("no warnings when a slot is freed by a move", dry.warnings, []);
+}
+{
+  const e = parseLayout("Empty (3U)" + String.fromCharCode(10) + "Some long note text goes here for the rack today." + String.fromCharCode(10) + "EX-X (2U)").devices;
+  eq("empty to device", [switchKind(e[0], "device").name, switchKind(e[0], "device").height, switchKind(e[0], "device").kind], ["New device", 3, "device"]);
+  eq("note to device keeps text", [switchKind(e[1], "device").name, switchKind(e[1], "device").height], [e[1].name, 1]);
+  eq("device to empty keeps height", [switchKind(e[2], "empty").height, switchKind(e[2], "empty").kind], [2, "empty"]);
+  eq("device to note", [switchKind(e[2], "note").height, switchKind(e[2], "note").kind], [0, "note"]);
 }
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);
