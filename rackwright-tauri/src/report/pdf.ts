@@ -4,6 +4,7 @@ import { fmtW } from "../power/model";
 import type { ReportModel, SiteSection } from "./model";
 import type { Doc } from "../types";
 import { LIGHT } from "../theme";
+import { clearRackData, infraSvg, linksSvg, rackFaceSvg } from "./diagrams";
 
 export interface ReportBrand {
   primary: string; secondary: string; address: string; company: string;
@@ -178,16 +179,7 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
   };
   const noDiagram = () => paragraph(NO_DIAGRAM, 10, grey);
 
-  type Routes = Awaited<ReturnType<typeof import("../export/index")["gatherData"]>>;
-  const rackData = new Map<string, Routes | Error>();
-  const dataFor = async (key: string, doc: Doc) => {
-    let d = rackData.get(key);
-    if (!d) {
-      try { const { gatherData } = await import("../export/index"); d = await gatherData(doc); } catch (e) { d = e instanceof Error ? e : new Error(String(e)); }
-      rackData.set(key, d);
-    }
-    return d;
-  };
+  clearRackData();
 
   try {
     // ---- Cover ----
@@ -232,9 +224,8 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
     if (model.links.length) {
       h1("Site links");
       try {
-                const [{ createElement }, { default: LinksDiagram, W, H }, { withRendered, svgOf }] = await Promise.all([import("react"), import("../clients/LinksDiagram"), import("../export/svg")]);
-        const r = await withRendered(createElement(LinksDiagram, { client: model.client, docs: model.docs }), getHost(), (live) => svgOf(live, { l: 0, t: 0, r: W, b: H }, 0));
-        await place(r.svg, r.w, r.h);
+        const r = await linksSvg(model, getHost());
+        if (r) await place(r.svg, r.w, r.h);
       } catch { noDiagram(); }
     }
 
@@ -249,12 +240,8 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
         for (const r of infraDocs) {
           if (infraDocs.length > 1) { setText(9.5, true, grey); ensure(16); pdf.text(r.name, M, y + 9); y += 14; }
           try {
-            const [{ createElement }, { default: InfraView }, { infraLayout }, { withRendered, svgOf }] = await Promise.all([import("react"), import("../views/InfraView"), import("../views/infra"), import("../export/svg")]);
-            const lay = infraLayout(r.doc!);
-            const nodes = [...lay.nodes, ...lay.extras];
-            if (!nodes.length) continue;
-            const b = { l: Math.min(...nodes.map((n) => n.x)), t: Math.min(...nodes.map((n) => n.y)), r: Math.max(...nodes.map((n) => n.x + n.w)), b: Math.max(...nodes.map((n) => n.y + n.h)) + 50 };
-            const res = await withRendered(createElement(InfraView, { doc: r.doc!, selected: null, onSelect: () => {} }), getHost(), (live) => svgOf(live, b, 12));
+            const res = await infraSvg(r.doc!, getHost());
+            if (!res) continue;
             await place(res.svg, res.w, res.h, 200);
           } catch { noDiagram(); }
         }
@@ -265,10 +252,7 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
           newPage();
           h2(`${r.name} - ${face} view`);
           try {
-            const data = await dataFor(r.key, r.doc);
-            if (data instanceof Error) throw data;
-            const { faceSvg } = await import("../export/svg");
-            const f = await faceSvg(r.doc, data, face, getHost());
+            const f = await rackFaceSvg(r.key, r.doc, face, getHost());
             await place(f.svg, f.w, f.h);
           } catch { noDiagram(); }
         }

@@ -4,6 +4,7 @@ import { v } from "../theme";
 import { clientStore, type ClientItem, type ClientListItem } from "../clients/store";
 import { useSettings } from "../settings/context";
 import { exportClientReport } from "./index";
+import { settingsStore } from "../settings/store";
 import type { ReportOptions } from "./types";
 
 const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 6px", fontSize: 12, boxSizing: "border-box" } as const;
@@ -26,7 +27,10 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
   const [recs, setRecs] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [noTemplate, setNoTemplate] = useState(false);
+  const [notes, setNotes] = useState<string[] | null>(null);
 
+  useEffect(() => { settingsStore().getAsset("word_template").then((a) => setNoTemplate(!a), () => setNoTemplate(true)); }, []);
   useEffect(() => { store.list().then(setList, (e) => setErr(errOf(e))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!key) { setClient(null); return; }
@@ -48,16 +52,20 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
     return () => { live = false; };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const go = async () => {
+  const go = async (kind: "pdf" | "word") => {
     if (!client) return;
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setNotes(null);
     try {
       const o: ReportOptions = {
         level, sites: sites.length === client.sites.length ? "all" : sites, summary, recommendations: recs,
         date: date || today(), prepared_for: prepared.trim() || client.name,
       };
       await store.setReport(client.key, o);
-      if (await exportClientReport(client.key, o, system)) onClose();
+      if (kind === "pdf") { if (await exportClientReport(client.key, o, system)) onClose(); return; }
+      const { exportClientWord } = await import("./docx");
+      const r = await exportClientWord(client.key, o, system);
+      if (!r.saved) return;
+      if (r.notes.length) setNotes(r.notes); else onClose();
     } catch (e) { setErr(errOf(e)); } finally { setBusy(false); }
   };
 
@@ -93,9 +101,12 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
         </>}
         {busy && <div style={{ marginTop: 10 }}>Building the report…</div>}
         {err && <div style={{ marginTop: 10, color: v("danger") }}>{err}</div>}
+        {notes && <div style={{ marginTop: 10 }}>Saved.{notes.map((n, i) => <div key={i} style={{ color: v("text-muted"), fontSize: 12 }}>{n}</div>)}</div>}
+        {noTemplate && <div style={{ marginTop: 10, fontSize: 11, color: v("text-muted") }}>No Word template is uploaded, so this uses plain Word styles. An admin can upload one in Settings › Company.</div>}
         <div style={{ marginTop: 12, textAlign: "right" }}>
           <button style={btn} disabled={busy} onClick={onClose}>Cancel</button>
-          <button style={btn} disabled={busy || !client || !sites.length} onClick={go}>Export PDF</button>
+          <button style={btn} disabled={busy || !client || !sites.length} onClick={() => go("word")}>Export Word</button>
+          <button style={btn} disabled={busy || !client || !sites.length} onClick={() => go("pdf")}>Export PDF</button>
         </div>
       </div>
     </div>
