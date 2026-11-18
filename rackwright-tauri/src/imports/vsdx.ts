@@ -1,7 +1,8 @@
 // Visio .vsdx reader. Port of RackMap parseVsdx/vsdxPage, using jszip + fast-xml-parser so it also runs under Node.
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
-import type { DiagramLink, DiagramModel, DiagramNode } from "./diagram";
+import type { DiagramLink, DiagramModel, DiagramNode, Pt } from "./diagram";
+import { nearestNode } from "./diagram";
 
 type X = any; // parsed XML node
 
@@ -23,7 +24,6 @@ function textOf(v: X): string {
   return out;
 }
 
-interface Pt { x: number; y: number }
 interface VShape { id: string; master: string; nameU: string; text: string; data: Record<string, string>; x: number; y: number; w: number; h: number; begin: Pt | null; end: Pt | null; is1D: boolean; parent: string | null }
 
 export async function parseVsdx(data: ArrayBuffer | Uint8Array, fileName: string): Promise<DiagramModel[]> {
@@ -111,14 +111,4 @@ function vsdxPage(doc: X, masters: Map<string, string>, source: string): Diagram
     if (a && b && a !== b) links.push({ a, b, text: s.text });
   });
   return { source, nodes, links, yUp: true };
-}
-
-function distToBox(p: Pt, n: DiagramNode): number {
-  const dx = Math.max(n.x - p.x, 0, p.x - (n.x + n.w)), dy = Math.max(n.y - p.y, 0, p.y - (n.y + n.h));
-  return Math.hypot(dx, dy);
-}
-function nearestNode(nodes: DiagramNode[], p: Pt, tol: number): string | null {
-  let best: string | null = null, bd = Infinity;
-  nodes.forEach((n) => { const d = distToBox(p, n); if (d < bd && d <= tol) { bd = d; best = n.id; } });
-  return best;
 }

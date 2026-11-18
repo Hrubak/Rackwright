@@ -4,6 +4,16 @@ import { devFrom, guessType, nk } from "./spec";
 
 export interface DiagramNode { id: string; title: string; label: string; data: Record<string, string>; x: number; y: number; w: number; h: number }
 export interface DiagramLink { a: string; b: string; text: string }
+export interface Pt { x: number; y: number }
+export function distToBox(p: Pt, n: DiagramNode): number {
+  const dx = Math.max(n.x - p.x, 0, p.x - (n.x + n.w)), dy = Math.max(n.y - p.y, 0, p.y - (n.y + n.h));
+  return Math.hypot(dx, dy);
+}
+export function nearestNode(nodes: DiagramNode[], p: Pt, tol: number): string | null {
+  let best: string | null = null, bd = Infinity;
+  nodes.forEach((n) => { const d = distToBox(p, n); if (d < bd && d <= tol) { bd = d; best = n.id; } });
+  return best;
+}
 export interface DiagramModel { source: string; nodes: DiagramNode[]; links: DiagramLink[]; yUp: boolean; words?: number }
 
 const RACK_RE = /\b(rack|cabinet|enclosure)\b/i;
