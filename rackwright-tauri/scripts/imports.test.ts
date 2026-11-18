@@ -60,6 +60,7 @@ eq("layout kind", lay.kind, "layout");
 eq("layout dl380", [lay.devices[0].face, lay.devices[0].rack, lay.devices[0].height], ["both", undefined, 2]);
 const emp = kinds("empty")[0], stack = lay.devices.filter((d) => d.name === "48Port Ruckus POE" && d.group === "EX-MDF-STACK");
 eq("layout rear", [emp.face, emp.height, stack.map((d) => d.face)], ["rear", 1, ["rear", "rear"]]);
+eq("layout group ends at note", lay.devices.filter((d) => d.group).map((d) => d.name), ["48Port Ruckus POE", "48Port Ruckus POE"]);
 const ph = lay.devices.find((d) => d.name === "Phone Switch")!;
 eq("layout phone switch", [ph.fields.notes, ph.cols, ph.side, ph.line === lay.devices.find((d) => d.name === "EX-FW01")!.line], ["should be decommissioned", 2, 1, true]);
 const ups = lay.devices.find((d) => d.name === "APC Smart-UPS X 3000")!;
