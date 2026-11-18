@@ -165,5 +165,28 @@ for (const grow of [true, false]) {
   eq("rackmap reapply", [l2.added, l2.cables, d.cables.length, d.devices.length], [0, 0, 1, 2]);
 }
 
+{
+  const d = adoc(); d.devices.push(mk(60, "EX-PLATE", { u: 10, face: "both" }));
+  const sp = parseRackmapText("RACK EX-R1 42U\nU20 server EX-PLATE\n");
+  const lg = applyImport(d, planImport(d, sp, aopts), aopts);
+  eq("faceplate keeps both when moved", [lg.moved, d.devices[0].u, d.devices[0].face], [1, 20, "both"]);
+}
+{
+  const d = adoc(1); d.racks.push({ id: 2, name: "EX-R2", u: 42, x: 200, y: 0 }); d.devices.push(mk(61, "EX-FULL", { u: 1 }));
+  const sp = csvToSpec("Name,Type\nEX-NEW,Switch\n");
+  const lg = applyImport(d, planImport(d, sp, aopts), aopts);
+  const n = d.devices.find((x) => x.name === "EX-NEW")!;
+  eq("no U stays in target rack", [n.rack, lg.warnings], [null, ["EX-NEW: no free space in EX-R1 — placed off-rack."]]);
+}
+{
+  const d = adoc(), sp = csvToSpec("Name,Type\nEX-HV01,Server\n");
+  applyImport(d, planImport(d, sp, aopts), aopts);
+  eq("csv height guessed", d.devices[0].u_size, 2);
+}
+{
+  const d = adoc(), sp = csvToSpec("Name,Type,Power\nEX-HV01,Server,abc\nEX-HV02,Server,350\n");
+  applyImport(d, planImport(d, sp, aopts), aopts);
+  eq("power_w skips NaN", [d.devices[0].power_w, d.devices[1].power_w], [undefined, 350]);
+}
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);

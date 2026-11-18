@@ -1,6 +1,7 @@
 // Carries out the checked rows of an ImportPlan on a Doc: racks, devices, fields, positions, notes and cables.
-import { addRack, catalogFind, checkPlace, findFree, fromTpl, newCable, nid, placeNew, resizeRack, setOffRack, smartTemplate } from "../edit";
+import { addRack, catalogFind, checkPlace, findFree, fromTpl, newCable, nid, resizeRack, setOffRack, smartTemplate } from "../edit";
 import type { Tpl } from "../edit";
+import { guessHeight } from "./layout";
 import type { Device, Doc, Port, Rack } from "../types";
 import type { ImportLink } from "./spec";
 import { nk } from "./spec";
@@ -59,7 +60,8 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
   const setField = (d: Device, k: string, v: unknown) => {
     const t = String(v ?? "").trim();
     if (!t) return;
-    (d as unknown as Record<string, unknown>)[k] = k === "power_w" ? Number(t) : t;
+    if (k === "power_w") { const n = Number(t); if (Number.isFinite(n)) d.power_w = n; return; }
+    (d as unknown as Record<string, unknown>)[k] = t;
   };
   const mergeExtras = (d: Device, row: Row) => {
     const { specs, services } = row.dev;
@@ -70,7 +72,7 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
     }
   };
   const makeDevice = (row: Row): Device => {
-    const x = row.dev, h = x.height ?? 1, label = (x.name + " " + (x.fields.model || "")).trim();
+    const x = row.dev, label = (x.name + " " + (x.fields.model || "")).trim(), h = x.height ?? guessHeight(label).height;
     let tpl: Tpl = smartTemplate(label, h);
     if (x.type && tpl.type !== x.type && !catalogFind(label)) tpl = smartTemplate(x.type + " " + x.name, h);
     const d = fromTpl(doc, tpl);
@@ -118,7 +120,7 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
   const noRoom = (j: Job) => { log.warnings.push(`${j.d.name}: no free space in ${j.r!.name} — placed off-rack.`); off(j); };
   const prepare = (j: Job) => {
     const x = j.row.dev;
-    if (!j.fresh && x.face) j.d.face = x.face;
+    if (!j.fresh && x.face && !(x.face === "front" && j.d.face === "both") && x.face !== j.d.face) j.d.face = x.face;
     if (x.side != null) j.d.side = x.side;
   };
   for (const j of jobs.filter((k) => k.r && k.u != null).sort((a, b) => top(b) - top(a))) {
@@ -133,10 +135,6 @@ export function applyImport(doc: Doc, plan: ImportPlan, opts: ImportOpts): Apply
   }
   for (const j of jobs.filter((k) => k.r && k.u == null)) {
     prepare(j);
-    if (j.fresh) {
-      if (placeNew(doc, j.d, j.d.face, j.r!.id)) log.warnings.push(`${j.d.name}: no free space in ${j.r!.name} — placed off-rack.`);
-      continue;
-    }
     const s = findFree(doc, j.r!, j.d);
     if (s) put(j, s[0], s[1]); else noRoom(j);
   }
