@@ -41,6 +41,16 @@ async function main() {
   t("fixture sets source.serial on EX-CORE", core?.source?.serial === "auvik", JSON.stringify(core?.source));
   t("doc.auvik.source is xlsx", doc.auvik?.source === "xlsx");
 
+  // --- re-import must not retag unchanged or hand-edited notes
+  const again = (d: Doc) => { const it = buildItems(p, hostCtxOf(d)); const pl = resolvePlan(p, it); const df = computeDiff(d, pl, it); applyInPlace(d, pl, { target: "current" }, it, new Set(df.changes.map((c) => c.id))); };
+  const c1 = doc.devices.find((d) => d.name === "EX-CORE")!;
+  c1.source!.notes = "csv";
+  again(doc);
+  t("re-import with unchanged notes keeps source", c1.source?.notes === "csv", String(c1.source?.notes));
+  c1.source!.notes = "manual"; c1.notes = "my own note";
+  again(doc);
+  t("re-import keeps manual notes source", c1.source?.notes === "manual", String(c1.source?.notes));
+
   console.log(fails ? `${fails} FAILED` : "all passed");
   process.exit(fails ? 1 : 0);
 }

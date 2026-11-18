@@ -155,7 +155,9 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
       (d as any)[f.field] = f.to; unlock(d, f.field); setSource(d, f.field, "auvik");
     }
     if (!d.model) d.model = tplModel;
-    d.notes = mergeNotes(d.notes, noteLine(a)); setSource(d, "notes", "auvik");
+    const oldNotes = d.notes;
+    d.notes = mergeNotes(d.notes, noteLine(a));
+    if (d.notes !== oldNotes && d.source?.notes !== "manual") setSource(d, "notes", "auvik");
     d.auvik_id = u.key; d.auvik_name = u.name; d.auvik_macs = a.macs; d.auvik_model = a.model;
   };
 
