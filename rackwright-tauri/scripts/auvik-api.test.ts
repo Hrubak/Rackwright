@@ -8,6 +8,9 @@ import { computeDiff, matchUnits } from "../src/auvik/diff";
 import { applyInPlace } from "../src/auvik/apply";
 import { makeXlsx, devices } from "./fixtures/auvikFixture";
 import type { Device, Doc } from "../src/types";
+import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, type AuvikApiDevice } from "../src/auvik/api/map";
+import { classify } from "../src/auvik/plan";
+import { setOffColumn } from "../src/edit";
 
 let fails = 0;
 const t = (name: string, ok: boolean, extra = "") => { if (!ok) fails++; console.log((ok ? "PASS " : "FAIL ") + name + (extra ? "  " + extra : "")); };
@@ -125,6 +128,52 @@ async function main() {
         t(`locked name stays off (${fill})`, !!n && n.defaultOn === false, JSON.stringify(n));
       }
     }
+  }
+
+  // --- Task 7: mapping and placement
+  {
+    const inv = JSON.parse(readFileSync(new URL("../../web/server/tests/fixtures/auvik/expected-inventory-main.json", import.meta.url), "utf8")) as { devices: AuvikApiDevice[] };
+    const { items } = apiItems(inv.devices, "EX Main Office");
+    const want: Record<string, string> = { "EX-SW01": "switch", "EX-SW02": "switch", "EX-FW01": "firewall", "EX-AP01": "ap", "EX-SRV01": "server", "EX-NAS01": "storage", "EX-UPS01": "ups", "EX-PRN01": "endpoint", "EX-RTR01": "router", "EX-PDU01": "pdu" };
+    for (const [n, k] of Object.entries(want)) {
+      const it = items.find((i) => i.dev.name === n);
+      t(`api map ${n} -> ${k}`, it?.kind === k && classify(it.dev) === k, `${it?.kind}`);
+      if (it && it.kind !== "endpoint" && it.kind !== "ap") t(`api map ${n} is a To place kind`, TO_PLACE_KINDS.includes(it.kind));
+    }
+    t("api map: no item has mode rack", items.every((i) => i.mode !== "rack"));
+    t("api map: To place kinds are off", items.filter((i) => TO_PLACE_KINDS.includes(i.kind)).every((i) => i.mode === "off"));
+    const ups = items.find((i) => i.dev.name === "EX-UPS01");
+    t("EX-UPS01 without model gets the generic UPS template", !!ups && ups.generic === true && ups.dev.model === "", `${ups?.tplName} ${ups?.generic}`);
+    const dv = toAuvikDevice(inv.devices[0], "EX Main Office");
+    t("toAuvikDevice fields", dv.apiId === inv.devices[0].id && dv.neighbors.length === 0 && dv.rows === 1 && dv.networks === "" && dv.description === (inv.devices[0].discovery ? "discovery " + inv.devices[0].discovery : ""));
+    t("unknown type maps to Unknown", toAuvikDevice({ ...inv.devices[0], type: "nonsense" }, "o").type === "Unknown");
+    const c = (type: string, name: string) => ({ type, name, detail: "ok" });
+    const sp = specsOf([c("cpu", "Xeon A"), c("cpu", "Xeon A"), c("memory", "DIMM1"), c("memory", "DIMM2"), c("disk", "Disk 1"), c("disk", "Disk 2"), c("powerSupply", "PSU1"), c("fan", "Fan1")]);
+    t("specsOf strings", sp["CPU"] === "2 × Xeon A" && sp["Memory"] === "2 modules" && sp["Disks"] === "2: Disk 1, Disk 2" && sp["Power supplies"] === "1" && Object.keys(sp).length === 4, JSON.stringify(sp));
+    const sp1 = specsOf([c("cpu", "Xeon A"), c("memory", "DIMM1")]);
+    t("specsOf single", sp1["CPU"] === "Xeon A" && sp1["Memory"] === "DIMM1" && !("Disks" in sp1));
+    t("specsOf empty", Object.keys(specsOf([])).length === 0);
+    const srv = items.find((i) => i.dev.name === "EX-SRV01") as any;
+    t("apiItems attaches specs", !!srv?.specs && Object.keys(srv.specs).length > 0, JSON.stringify(srv?.specs));
+  }
+  {
+    const mk = (id: string, name: string, type: string, makeModel: string): AuvikApiDevice => ({ id, name, type, makeModel, vendor: "", serial: "", firmware: "", software: "", ips: [], macs: [], status: "online", discovery: "", components: [] });
+    const { items } = apiItems([mk("1", "EX-ESXI01", "server", "VMware ESXi host"), mk("2", "EX-VM01", "virtualMachine", "VMware virtual machine")], "EX");
+    const vm = items.find((i) => i.dev.name === "EX-VM01");
+    t("VM gets a guessed host", vm?.mode === "vm" && vm.host === items.find((i) => i.dev.name === "EX-ESXI01")?.key && vm.hostGuessed === true, `${vm?.mode} ${vm?.host} ${vm?.hostGuessed}`);
+  }
+  {
+    const base = { type: "Switch", u: 1, u_size: 1, side: 0, face: "front" } as any;
+    const doc: Doc = { v: 1, nid: 10, racks: [{ id: 1, name: "R", x: 400, y: 0, u: 42 } as any], devices: [], cables: [] };
+    const old = { ...base, id: 5, name: "old", rack: null, fx: 0, fy: 123 } as Device;
+    doc.devices.push(old);
+    const n0 = { ...base, id: 6, name: "n0", rack: 1 } as Device, n1 = { ...base, id: 7, name: "n1", rack: 1 } as Device, n2 = { ...base, id: 8, name: "n2", rack: 1 } as Device;
+    setOffColumn(doc, n0, 0); doc.devices.push(n0);
+    old.fx = n0.fx;
+    setOffColumn(doc, n2, 0); doc.devices.push(n2);
+    setOffColumn(doc, n1, 1); doc.devices.push(n1);
+    t("setOffColumn leaves existing devices alone", old.fx === n0.fx && old.fy === 123 && n2.fy > 123 && old.rack === null);
+    t("setOffColumn columns and stacking", n0.rack === null && n0.fx === n2.fx && n1.fx < n0.fx && n2.fy > n0.fy && n1.fy === 0 && n0.fy === 0, `${n0.fx} ${n1.fx} ${n2.fy}`);
   }
 
   console.log(fails ? `${fails} FAILED` : "all passed");

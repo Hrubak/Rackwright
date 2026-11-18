@@ -273,6 +273,16 @@ export function setOffRack(doc: Doc, d: Device) {
   d.fy = offs.reduce((s, x) => s + devDims({ ...x, rack: null }).h + 20, 0);
 }
 
+/** Stand a device in off-rack column 0 ("To place") or 1 ("Inventory", further left). Stacks below the lowest device already in that column. Never moves existing devices. */
+export function setOffColumn(doc: Doc, d: Device, col: 0 | 1): void {
+  const x0 = doc.racks.length ? Math.min(...doc.racks.map((r) => r.x)) : 0;
+  const fx = x0 - RW - 160 - col * (RW + 80);
+  const inCol = doc.devices.filter((x) => x.rack == null && x.id !== d.id && x.fx === fx);
+  d.rack = null;
+  d.fx = fx;
+  d.fy = inCol.reduce((m, x) => Math.max(m, (x.fy ?? 0) + devDims({ ...x, rack: null }).h + 20), 0);
+}
+
 /** Put a new device in the first free slot of `rackId` (or any rack), else off-rack. */
 export function placeNew(doc: Doc, d: Device, face: string, rackId?: number | null): string {
   if (!doc.racks.length) addRack(doc);

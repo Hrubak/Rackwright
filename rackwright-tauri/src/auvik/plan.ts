@@ -24,6 +24,7 @@ export interface PlanItem {
   desktop: boolean;       // desktop-size firewall (does not fit a 19" rack by itself)
   mount: Mount;           // desktop firewalls: "kit" = 1U rack-mount kit with front ports, "shelf" = on a shelf
   kitName: string;        // template used for the mount kit
+  hostGuessed?: boolean;  // VM rows from the API import: host came from guessHost (names), so the preview asks to check it
 }
 
 export const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
