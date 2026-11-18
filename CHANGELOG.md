@@ -10,7 +10,7 @@ Web only; the desktop app is unchanged. Update the LXC as usual. The update adds
 - **Your edits are kept.** Importing again only fills empty fields, unless you tick Overwrite existing values. Values you changed by hand are never overwritten. Every device field now remembers where it came from (Auvik, CSV or you), and devices that are no longer in Auvik are listed but never removed.
 - Cables from Auvik come in 3.20.0.
 - A site first imported from an Auvik spreadsheet may show its endpoints twice after its first API import: once in the old groups (shown as missing) and once in the new Endpoints boxes. Delete the old groups once.
-- The first LXC update after this release builds without a pinned dependency list. If the build fails on an old Rust version, run `rustup update stable` in the LXC and update again.
+- The server's dependency list (`web/server/Cargo.lock`) is pinned again for the new HTTPS client, so the LXC builds exactly what CI tested. Wait for this before you update the LXC to 3.19.0.
 
 ## 3.18.0 — 2026-11-18
 Web and desktop. Update the LXC as usual. The server now accepts one more upload, the Word master template; nothing else changes.
