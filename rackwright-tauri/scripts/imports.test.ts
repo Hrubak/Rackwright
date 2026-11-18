@@ -3,6 +3,7 @@ import { parseRackmapText } from "../src/imports/rackmap";
 import { buildFromText } from "../src/edit";
 import type { Doc } from "../src/types";
 import { parseLayout, placeLayout, guessHeight } from "../src/imports/layout";
+import { readImport } from "../src/imports/read";
 import { csvToSpec, looksDelimited, parseDelimited } from "../src/imports/csv";
 
 let fail = 0;
@@ -51,11 +52,12 @@ eq("csv mid-cell quote", [mq.devices.map((d) => [d.name, d.fields.notes]), mq.wa
 const uq = csvToSpec('Name,Notes\nEX,"open\nEX2,x\n');
 eq("csv unterminated quote", uq.warnings, ["The file ends inside a quoted cell."]);
 
-const lay = parseLayout([
+const layText = [
   "[Front of the rack full-width]", "HP ProLiant DL380 Gen10 (VM HOST) esxi.example.com", "[Back of Rack]", "1 U RACK EMPTY SPACE", "(EX-MDF-STACK)",
   "48Port Ruckus POE", "48Port Ruckus POE", "Carrier equipment connected via crossover cable from the router to the phone switch.", "KVM Switch",
   "EX-FW01 | Phone Switch (should be decommissioned)", "[Front of the Rack]", "APC Smart-UPS X 3000", "APC Battery Pack",
-].join("\n"));
+].join("\n");
+const lay = parseLayout(layText);
 const kinds = (k: string) => lay.devices.filter((d) => (d.kind || "device") === k);
 eq("layout counts", [kinds("device").length, kinds("empty").length, kinds("note").length, lay.notes.length], [8, 1, 1, 0]);
 eq("layout kind", lay.kind, "layout");
@@ -90,5 +92,12 @@ eq("old two racks", old2.devices.filter((d) => d.kind === "device").map((d) => [
 eq("empty strict", ["Spare UPS battery", "Open vSwitch host", "1U Switch (free ports on 5-8)", "Free space above is reserved for the new firewall."].map((s) => nm1(s)[0]), ["device", "device", "device", "note"]);
 eq("empty yes", ["1 U RACK EMPTY SPACE", "Empty (3U)", "Open"].map((s) => nm1(s).slice(0, 1).concat(parseLayout(s).devices[0].height as number)), [["empty", 1], ["empty", 3], ["empty", 1]]);
 eq("unknown synology guessed", [guessHeight("Synology RS9999").guessed], [true]);
+const rmText = "RACK EX-R1 42U\nU40 switch EX-SW01 ip=10.0.0.2 model=ICX7150\nU30-31 server EX-HV01\nLINK EX-SW01:1 -> EX-HV01:NIC1 cable=Cat6\nUNRACKED ap EX-AP01\n";
+eq("auto csv", readImport("Name,Type,Rack,U,Model,IP\nEX-SW01,Switch,EX-R1,40,ICX7150,10.0.0.2\nEX-NAS01,NAS,EX-R1,10,DS920,10.0.0.9\n", "auto").kind, "inventory");
+eq("auto rackmap", readImport(rmText, "auto").kind, "rackmap");
+eq("auto layout", readImport(layText, "auto").kind, "layout");
+eq("forced rackmap on layout", readImport(layText, "rackmap").warnings.slice(-1), ["Nothing in the RackMap text format was found."]);
+eq("forced layout on empty", readImport("", "layout").warnings, ["No devices were found in the list."]);
+eq("forced csv keeps warnings", readImport("Foo,Bar\n1,2\n", "csv").warnings.slice(-1), ["Couldn't find a Name, Device or Hostname column."]);
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);
