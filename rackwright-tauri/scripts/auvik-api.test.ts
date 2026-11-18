@@ -234,6 +234,28 @@ async function main() {
     t("endpoints: printer is a member of one printers box in column 1, unplaced empty", pb.length === 1 && pb[0].type === "Endpoints" && /printer/i.test(pb[0].name) && pb[0].fx === byName(doc1, "EX-AP01").fx && pb[0].rack === null && (doc1.auvik?.unplaced ?? []).length === 0, JSON.stringify(pb.map((x) => [x.name, x.fx])));
     t("endpoints: re-import adds no second box or member", prn(r2.auvikDoc).length === 1 && r2.auvikDoc.devices.filter((x) => x.type === "Endpoints").length === doc2.devices.filter((x) => x.type === "Endpoints").length && prn(r2.auvikDoc)[0].endpoints!.filter((e) => e.name === "EX-PRN01").length === 1 && (r2.auvikDoc.auvik?.unplaced ?? []).length === 0);
 
+    // a site first imported from the .xlsx export: its endpoint group (keyed by the switch's serial) keeps its members
+    const leg = copy(doc1);
+    leg.devices = leg.devices.filter((x: any) => !x.auvik_epbox);
+    const grp = { ...copy(byName(doc1, "EX-AP01")), id: 9999, name: "EX-SW01 endpoints", type: "Endpoints", rack: null, ports: [],
+      endpoints: [{ name: "EX-PRN01", type: "Printer", model: "", ip: "198.51.100.61", mac: "00:00:5E:00:53:0A", port: "", status: "online", kind: "printer", key: "EXSN0010" }] } as any;
+    grp.auvik_id = "g:EXSN0001"; delete grp.source;
+    leg.devices.push(grp);
+    leg.auvik = { source: "xlsx", unplaced: [] } as any;
+    const lp0 = planSite(inv, tenant, mkDocs([{ id: 3, name: "EX Main Office (Auvik)", doc: leg }]), defaults, "empty");
+    t("legacy xlsx site: found as the Auvik doc", lp0.target.docId === 3);
+    t("legacy xlsx site: old endpoint group is not listed as missing", !lp0.diff!.changes.some((c) => c.id === "rmdev:9999"), JSON.stringify(lp0.diff!.changes.filter((c) => c.cat === "missingDev").map((c) => c.title)));
+    const lr = applySite(lp0, new Set(lp0.diff!.changes.filter((c) => c.defaultOn).map((c) => c.id))).auvikDoc;
+    const lprn = lr.devices.flatMap((x) => (x.endpoints ?? []).filter((e) => e.name === "EX-PRN01").map((e) => ({ box: x.name, key: e.key })));
+    t("legacy xlsx site: printer stays in the old group, once, with its Auvik id", lprn.length === 1 && lprn[0].box === "EX-SW01 endpoints" && lprn[0].key === "api:d-1001-10", JSON.stringify(lprn));
+    t("legacy xlsx site: no empty Printers box", !lr.devices.some((x: any) => x.auvik_epbox === "printer"));
+    const lr2 = applySite(planSite(inv, tenant, mkDocs([{ id: 3, name: "EX Main Office (Auvik)", doc: lr }]), defaults, "empty"), null as any).auvikDoc;
+    t("legacy xlsx site: a second API import still adds no copy", lr2.devices.flatMap((x) => (x.endpoints ?? []).filter((e) => e.name === "EX-PRN01")).length === 1);
+    // an endpoint already in another rack document of the site is not added to (Auvik)
+    const lab2 = copy(leg); lab2.auvik = undefined as any; lab2.devices = [grp];
+    const op2 = planSite(inv, tenant, mkDocs([{ id: 9, name: "Lab", doc: lab2 }]), defaults, "empty");
+    t("endpoint held by another rack document: not added to (Auvik)", !applySite(op2, null as any).auvikDoc.devices.some((x) => x.endpoints?.some((e) => e.name === "EX-PRN01")));
+
     // overwrite ticks set values but not manual ones
     const doc3 = copy(doc1);
     const s3 = byName(doc3, "EX-SW01"); s3.ip = "10.0.0.9"; s3.source = { ip: "csv" } as any;

@@ -168,10 +168,17 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   const close = async () => { try { await onDone(); } finally { onClose(); } };
 
   const busy = stage === "reading" || stage === "saving";
+  // Escape closes the dialog wherever the focus is, but never while sites are being read or saved.
+  const onEsc = useRef(() => {});
+  onEsc.current = () => { if (!busy) void close(); };
+  useEffect(() => {
+    const kd = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented) onEsc.current(); };
+    window.addEventListener("keydown", kd);
+    return () => window.removeEventListener("keydown", kd);
+  }, []);
   const body = { overflow: "auto", flex: 1, minHeight: 0 } as const;
   return (
-    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
-      onKeyDown={(e) => e.key === "Escape" && !busy && close()}>
+    <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
       <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 1100, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 12 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>Import from Auvik</b>

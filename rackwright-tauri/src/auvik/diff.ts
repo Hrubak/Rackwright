@@ -42,7 +42,17 @@ export function findMissing(doc: Doc, items: PlanItem[]): Device[] {
   return doc.devices.filter((d: X) => {
     if (!d.auvik_id) return false;
     if (d.auvik_id.startsWith("vm:")) return false;   // VM boxes are rebuilt from the export, never "missing"
-    if (d.auvik_id.startsWith("g:")) { const base = d.auvik_id.slice(2).split("#")[0]; return !ids.some((i) => i.key === base); }
+    if (d.auvik_id.startsWith("g:")) {
+      const base = d.auvik_id.slice(2).split("#")[0];
+      if (ids.some((i) => i.key === base)) return false;
+      // An API import keys devices by Auvik id. An endpoint group from an older .xlsx import is still there when its
+      // switch has that old key (serial, MAC, name), or when one of its members is still in Auvik.
+      return !items.some((i) => {
+        if (!i.dev.apiId) return false;
+        const old = { key: i.dev.serial || i.dev.macs[0] || i.dev.name, mac: i.dev.macs[0] || "", name: i.dev.name };
+        return old.key === base || (d.endpoints ?? []).some((e) => e.key === "api:" + i.dev.apiId || findEp([e], old) === 0);
+      });
+    }
     return !ids.some((i) => matchesDevice(d, i) || d.auvik_id!.split("#")[0] === i.key);
   });
 }

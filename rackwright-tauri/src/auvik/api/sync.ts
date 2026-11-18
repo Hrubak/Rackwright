@@ -11,7 +11,7 @@ import { applyImport } from "../../imports/apply";
 import { planImport, type Row } from "../../imports/plan";
 import type { ImportSpec } from "../../imports/spec";
 import { applyInPlace } from "../apply";
-import { Diff, computeDiff, defaultSelection, deviceFields, orderUnits, type X } from "../diff";
+import { Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
 import { epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type ImportPlan } from "../plan";
 import { TO_PLACE_KINDS, apiItems, type ApiPlanItem } from "./map";
@@ -87,10 +87,33 @@ function fillSpecs(d: Device, specs: Record<string, string>) {
 
 const EP_WORD: Record<EpKind, string> = { pc: "PCs", phone: "Phones", iot: "IoT devices", printer: "Printers", vm: "VMs", other: "Other endpoints" };
 
-/** The API has no neighbours, so endpoints cannot hang off a switch. They go in one unattached box per kind in the Inventory column. */
-function fillEndpointBoxes(doc: Doc, items: SitePlan["items"]) {
+/** An endpoint the site already holds outside the Endpoints boxes: in an endpoint group or VM box from an older
+ *  .xlsx import, or in another rack document. Matched by Auvik id, then the .xlsx key (serial, MAC, name), MAC, name. */
+function heldElsewhere(it: SitePlan["items"][number], doc: Doc, others: Doc[]): { ep: Ep; mine: boolean } | null {
+  const a = it.dev, apiKey = "api:" + (a.apiId ?? it.key);
+  const look = (d: Doc, mine: boolean): { ep: Ep; mine: boolean } | null => {
+    for (const x of d.devices) {
+      if ((x as any).auvik_epbox || !x.endpoints?.length) continue;
+      const byId = x.endpoints.find((e) => e.key === apiKey);
+      if (byId) return { ep: byId, mine };
+      const i = findEp(x.endpoints, { key: a.serial || a.macs[0] || a.name, mac: a.macs[0] || "", name: a.name });
+      if (i >= 0) return { ep: x.endpoints[i], mine };
+    }
+    return null;
+  };
+  return look(doc, true) ?? others.reduce<{ ep: Ep; mine: boolean } | null>((hit, d) => hit ?? look(d, false), null);
+}
+
+/** The API has no neighbours, so endpoints cannot hang off a switch. They go in one unattached box per kind in the Inventory column.
+ *  An endpoint the site already holds somewhere else stays where it is (in this document its Auvik id is recorded); it is never added twice. */
+function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[]) {
   const byKind = new Map<EpKind, SitePlan["items"]>();
-  for (const it of items) if (isEndpointMode(it.mode)) { const k = epKindOf(it); byKind.set(k, [...(byKind.get(k) ?? []), it]); }
+  for (const it of items) {
+    if (!isEndpointMode(it.mode)) continue;
+    const held = heldElsewhere(it, doc, others);
+    if (held) { if (held.mine) { held.ep.key = "api:" + (it.dev.apiId ?? it.key); held.ep.status = it.dev.status; } continue; }
+    const k = epKindOf(it); byKind.set(k, [...(byKind.get(k) ?? []), it]);
+  }
   for (const [kind, list] of byKind) {
     let d = doc.devices.find((x) => (x as any).auvik_epbox === kind) as X | undefined;
     if (!d) {
@@ -137,7 +160,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
     setOffColumn(doc, d, it && specKinds.has(it.kind) ? 0 : 1);
   }
 
-  fillEndpointBoxes(doc, p.items);
+  fillEndpointBoxes(doc, p.items, p.siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc));
 
   let rows: Row[] = [];
   if (p.layout) {
