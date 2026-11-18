@@ -2,6 +2,13 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.18.0 — 2026-11-18
+Web and desktop. Update the LXC as usual. The server now accepts one more upload, the Word master template; nothing else changes.
+- **Word report.** The Client report dialog has a new Export Word button next to Export PDF. It makes the same Overview or Detailed report as the PDF, with the same summary, recommendations, sites and date, as a Word document you can edit before you send it.
+- **Your own Word template.** In Settings › Company, under Reports, upload your master template (.docx) in the new Word master template row. On the web an admin uploads it once for everyone; on the desktop it is kept on this PC. A file that isn't a Word document is refused when you upload it, with a message. A .dotx template must be saved as a .docx first.
+- **Markers.** Type markers such as {{CLIENT}}, {{PREPARED_FOR}}, {{DATE}}, {{SUMMARY}} and {{RACKWRIGHT}} anywhere in the template, including the cover, tables, text boxes, headers and footers, and the report fills them in. {{RACKWRIGHT}} is where the report itself goes. The README lists every marker.
+- Without a template, Export Word uses plain Word styles, and the dialog says so. If the template has no {{RACKWRIGHT}} marker, or the marker shares a line with other text, the report still saves and the dialog tells you what happened.
+
 ## 3.17.0 — 2026-11-18
 Web and desktop. Update the LXC as usual; nothing changes on the server. The web build is about 16 MB bigger because it now carries the PDF and picture readers.
 - **Import diagrams and pictures.** File › Import text, CSV or diagram… (was Import text or CSV…) now also reads Visio `.vsdx`, SVG, PDF and pictures (PNG, JPG and similar). Choose one or more files, choose or drop a whole folder, or pick "Diagram files (Visio, SVG, PDF, picture)". Every file goes through the same preview as text and CSV imports, and importing the same drawing again changes nothing.
