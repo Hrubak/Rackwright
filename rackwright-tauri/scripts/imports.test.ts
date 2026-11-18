@@ -97,8 +97,7 @@ eq("auto csv", readImport("Name,Type,Rack,U,Model,IP\nEX-SW01,Switch,EX-R1,40,IC
 eq("auto rackmap", readImport(rmText, "auto").kind, "rackmap");
 eq("auto layout", readImport(layText, "auto").kind, "layout");
 const frw = readImport(layText, "rackmap").warnings;
-eq("forced rackmap on layout", [frw.slice(0, -1).every((w) => /^Line \d+ not understood: /.test(w)), frw.filter((w) => !w.startsWith("Line ")), frw.length], [true, ["Nothing in the RackMap text format was found."], layText.split(/?
-/).filter((l) => l.trim()).length + 1]);
+eq("forced rackmap on layout", [frw.slice(0, -1).every((w) => /^Line \d+ not understood: /.test(w)), frw.filter((w) => !w.startsWith("Line ")), frw.length], [true, ["Nothing in the RackMap text format was found."], layText.split(/\r?\n/).filter((l) => l.trim()).length + 1]);
 eq("forced layout on empty", readImport("", "layout").warnings, ["No devices were found in the list."]);
 eq("forced csv keeps warnings", readImport("Foo,Bar\n1,2\n", "csv").warnings, ["Couldn't find a Name, Device or Hostname column."]);
 console.log(`${fail} failed`);
