@@ -65,7 +65,6 @@ export async function templatePage(template: Uint8Array): Promise<PageBox> {
 export interface DocxPicture { key: string; png: Uint8Array; wPx: number; hPx: number; dpi: number }
 
 const EMU_IN = 914400;
-const attrEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 function addNamespaces(xml: string): string {
   const m = /<w:document\b[^>]*>/.exec(xml);
