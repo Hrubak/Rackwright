@@ -101,5 +101,22 @@ eq("forced rackmap on layout", [frw.slice(0, -1).every((w) => /^Line \d+ not und
 eq("forced layout on empty", readImport("", "layout").warnings, ["No devices were found in the list."]);
 eq("forced csv keeps warnings", readImport("Foo,Bar\n1,2\n", "csv").warnings, ["Couldn't find a Name, Device or Hostname column."]);
 eq("forced csv no usable rows", readImport("Name,Model\n,x\n,y\n", "csv").warnings, ["No rows could be read."]);
+
+import { planImport } from "../src/imports/plan";
+const mk = (id: number, name: string, extra: Record<string, unknown> = {}) => ({ id, name, type: "Server", u_size: 1, rack: 1, u: 5, side: 0, half: false, rows: 1, fx: 0, fy: 0, face: "front", ports: [], ...extra }) as unknown as Doc["devices"][number];
+const pdoc = (): Doc => ({ v: 1, nid: 20, racks: [{ id: 1, name: "EX-R1", u: 42, x: 0, y: 0 }], cables: [], devices: [
+  mk(1, "EX-NAS01", { serial: "S1", u: 10 }), mk(2, "esxi.example.com", { u: 20 }), mk(3, "EX-MDF-STK01 Member 1", { type: "Switch", u: 30 }), mk(4, "EX-MDF-STK01 Member 2", { type: "Switch", u: 31 }),
+  mk(5, "Device@192.0.2.5", { type: "UPS", model: "APC", u: 1 }), mk(6, "EX-OLD", { u: 40 }), mk(7, "EX-DUP", { u: 41 }), mk(8, "EX-DUP", { u: 42 }) ] });
+const popts = { rackId: 1, newRackName: "New", newRackU: 42, growRack: false };
+const pl = planImport(pdoc(), parseLayout("Synology EX-NAS01\n(EX-MDF-STACK)\nStack switch A\nStack switch B\nAPC Smart-UPS 1500\nEX-DUP thing\n"), popts);
+eq("match by name inside line", [pl.rows[0].match?.name, pl.rows[0].action], ["EX-NAS01", "move"]);
+eq("match group members", [pl.rows[1].match?.name, pl.rows[2].match?.name], ["EX-MDF-STK01 Member 1", "EX-MDF-STK01 Member 2"]);
+eq("possible ups match", [pl.rows[3].match?.id, pl.rows[3].on, pl.rows[3].reason], [5, false, "Possible match — check before importing"]);
+eq("conflict", [pl.rows[4].on, pl.rows[4].reason?.startsWith("Matches more than one device")], [false, true]);
+eq("not in import", pl.notInImport.map((d) => d.name).includes("EX-OLD"), true);
+const ld = pdoc(); ld.devices[0].locked = ["ip"]; ld.devices[0].ip = "10.0.0.5";
+const lk = planImport(ld, csvToSpec("Name,Rack,U,IP\nEX-NAS01,EX-R1,10,10.0.0.9\n"), popts);
+eq("locked kept", [lk.rows[0].diffs, lk.rows[0].action], [[{ field: "ip", from: "10.0.0.5", to: "10.0.0.9", kept: true }], "same"]);
+
 console.log(`${fail} failed`);
 process.exit(fail ? 1 : 0);
