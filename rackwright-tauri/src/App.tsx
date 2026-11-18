@@ -508,7 +508,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       { label: "Save as…", shortcut: SHORTCUTS.saveAs, run: () => doSave(true) },
       SEP,
       ...(IS_WEB ? [{ label: "Import file…", run: doImportFile }] : []),
-      { label: "Import text or CSV…", run: () => setImportOpen(true) },
+      { label: "Import text, CSV or diagram…", run: () => setImportOpen(true) },
       { label: "Import Auvik…", run: () => setAuvikOpen(true) },
       SEP,
       { label: "Export", items: [

@@ -2,6 +2,13 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.17.0 — 2026-11-18
+Web and desktop. Update the LXC as usual; nothing changes on the server. The web build is about 16 MB bigger because it now carries the PDF and picture readers.
+- **Import diagrams and pictures.** File › Import text, CSV or diagram… (was Import text or CSV…) now also reads Visio `.vsdx`, SVG, PDF and pictures (PNG, JPG and similar). Choose one or more files, choose or drop a whole folder, or pick "Diagram files (Visio, SVG, PDF, picture)". Every file goes through the same preview as text and CSV imports, and importing the same drawing again changes nothing.
+- Devices drawn inside a rack shape go into that rack. Other devices go off-rack when they are new; devices you already have stay where they are. Lines between devices become cables. Tick "Include end-user devices (PCs, laptops, printers, phones)" to bring those in too.
+- **Pictures are read on your own computer.** The text in a picture or a PDF never leaves the device. The first time, the desktop app downloads the reader (about 10 MB for pictures), so it needs the internet once; the web app gets it from your own server. PDFs are read for their text, like a pasted list.
+- An old Visio `.vsd` file can't be read: open it in Visio and save it as `.vsdx` first. Files Rackwright can't read are skipped and listed under the preview.
+
 ## 3.16.0 — 2026-11-17
 Web and desktop. Update the LXC as usual; nothing changes on the server. (Site visit was planned as 3.14.0; it ships now, after 3.15.0.)
 - **Site visit.** Select a rack and press Site visit in the rack panel. Rackwright walks the rack from the top down, one device at a time. Check the device in that spot, fix its name, status, manufacturer, model, serial, asset tag or IP if they are wrong, and press Matches. If it isn't there, press Not in the rack: it moves off-rack and is set to Offline. Skip leaves a device alone, and Back goes to the previous one.

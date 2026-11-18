@@ -34,4 +34,4 @@ A colleague shared RackMap (CheddarBW/RackMap) to fold into Rackwright. Rackwrig
 - **Visio stencils as faceplates** (after 3.17.0): import vendor `.vss`/`.vssx` stencils as picture faceplates, converted on the server with libvisio and LibreOffice. Findings: `docs/superpowers/specs/2026-11-17-visio-stencil-findings.md`.
 - **Later:** device change history, cable trace through patch panels, label sheets and QR codes, restore an earlier save, multi-select bulk edit.
 
-Design: `docs/superpowers/specs/2026-11-17-rackmap-merge-design.md`. Releases: 3.11.0 layout (done), 3.12.0 rooms and floor plans (done), 3.13.0 needs attention, duplicate IPs and power (done), 3.15.0 text and CSV import (done), 3.16.0 site visit (done; planned as 3.14.0), 3.17.0 diagram and picture import, 3.18.0 Word report.
+Design: `docs/superpowers/specs/2026-11-17-rackmap-merge-design.md`. Releases: 3.11.0 layout (done), 3.12.0 rooms and floor plans (done), 3.13.0 needs attention, duplicate IPs and power (done), 3.15.0 text and CSV import (done), 3.16.0 site visit (done; planned as 3.14.0), 3.17.0 diagram and picture import (done), 3.18.0 Word report.

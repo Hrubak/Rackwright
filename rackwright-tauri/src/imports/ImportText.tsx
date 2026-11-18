@@ -129,7 +129,7 @@ export default function ImportText({ doc, rackId, onApply, onClose }: {
       onKeyDown={(e) => e.key === "Escape" && onClose()}>
       <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 1000, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 12 }}>
         <div style={{ display: "flex", marginBottom: 10 }}>
-          <b style={{ flex: 1, fontSize: 14 }}>Import text or CSV</b>
+          <b style={{ flex: 1, fontSize: 14 }}>Import text, CSV or diagram</b>
           <button style={{ ...btn, marginRight: 0, padding: "1px 8px" }} onClick={onClose}>x</button>
         </div>
 
