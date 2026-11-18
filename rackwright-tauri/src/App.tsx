@@ -48,6 +48,7 @@ import { useDesktopUpdates } from "./version/useDesktopUpdates";
 import { useWebUpdates } from "./version/useWebUpdates";
 import { Draft, LEAVE_TEXT, clearDraft, draftName, readDraft, useLeaveGuard, writeDraft } from "./unsaved";
 const ImportAuvik = lazy(() => import("./auvik/ImportAuvik"));
+const ImportText = lazy(() => import("./imports/ImportText"));
 const ReportDialog = lazy(() => import("./report/ReportDialog"));
 import {
   CATALOG, addRack, applySpec, resizeRack, buildFromText, checkPlace, clone, deleteDevice, deleteRack, duplicateDevice, fromTpl, newCable,
@@ -126,8 +127,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
   const [unplacedOpen, setUnplacedOpen] = useState(false);
   const [modelFor, setModelFor] = useState<number | null>(null);
   const [picker, setPicker] = useState<"new" | "add" | null>(null);
-  const [importText, setImportText] = useState("");
-  const [importH, setImportH] = useState("0");
   const resolveRef = useRef<Resolver>(() => ({ kind: "none" }));
   const lastKey = useRef<{ k: string; t: number }>({ k: "", t: 0 });
   const toastTimer = useRef<number>(0);
@@ -417,15 +416,6 @@ export default function App({ web }: { web?: WebProps } = {}) {
     return () => { window.removeEventListener("mousemove", mm); window.removeEventListener("mouseup", mu); window.removeEventListener("keydown", kd); };
   }, [dragging, dropPalette]);
 
-  const doImport = () => {
-    let n = 0;
-    const ok = edit((d) => {
-      n = buildFromText(d, importText, parseInt(importH) || 0);
-      return n ? `Imported ${n} rack(s)` : "!No rack lines found. Each line needs a size like (2U).";
-    });
-    if (ok) { setImportOpen(false); setFitTick((k) => k + 1); }
-  };
-
   const selDev = sel?.kind === "dev" ? doc.devices.find((d) => d.id === sel.id) : undefined;
   const selCable = sel?.kind === "cable" ? doc.cables.find((c) => c.id === sel.id) : undefined;
   const selRack = sel?.kind === "rack" ? doc.racks.find((r) => r.id === sel.id) : undefined;
@@ -515,7 +505,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
       { label: "Save as…", shortcut: SHORTCUTS.saveAs, run: () => doSave(true) },
       SEP,
       ...(IS_WEB ? [{ label: "Import file…", run: doImportFile }] : []),
-      { label: "Import list…", run: () => setImportOpen(true) },
+      { label: "Import text or CSV…", run: () => setImportOpen(true) },
       { label: "Import Auvik…", run: () => setAuvikOpen(true) },
       SEP,
       { label: "Export", items: [
@@ -838,19 +828,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         defaults={{ model: typeof settings.system.rack_default_model === "string" ? settings.system.rack_default_model : undefined, u: typeof settings.system.rack_default_u === "number" ? settings.system.rack_default_u : undefined }} onPick={onPick} onCancel={() => setPicker(null)} />}
       {auvikOpen && <Suspense fallback={null}><ImportAuvik doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setAuvikOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
       {unplacedOpen && <UnplacedDialog items={doc.auvik?.unplaced ?? []} onClose={() => setUnplacedOpen(false)} />}
-      {importOpen && (
-        <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 520, border: `1px solid ${v("border")}` }}>
-            <div style={{ fontSize: 12, marginBottom: 6, opacity: 0.8 }}>Paste a list, top of rack first, e.g. "Rack1", "- Panel A - (2U)", "- Open - (12U)". Open/Empty/Free leave a gap; add "rear" to mount on the back.</div>
-            <textarea style={{ ...inp, width: "100%", height: 260, boxSizing: "border-box" }} value={importText} onChange={(e) => setImportText(e.target.value)} />
-            <div style={{ marginTop: 8, fontSize: 12 }}>Rack height (0 = size to list): <input style={{ ...inp, width: 50 }} value={importH} onChange={(e) => setImportH(e.target.value)} />
-              <span style={{ float: "right" }}>
-                <button style={btn} onClick={() => setImportOpen(false)}>Cancel</button>
-                <button style={{ ...btn, marginRight: 0 }} onClick={doImport}>Build racks</button>
-              </span></div>
-          </div>
-        </div>
-      )}
+      {importOpen && <Suspense fallback={null}><ImportText doc={doc} rackId={targetRack()?.id ?? null} onClose={() => { setImportOpen(false); setFitTick((k) => k + 1); }} onApply={edit} /></Suspense>}
     </div>
   );
 }
