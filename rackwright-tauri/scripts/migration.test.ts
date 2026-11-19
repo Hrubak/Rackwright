@@ -47,5 +47,16 @@ eq("scale platform", siteVms([{ key: "r1", name: "R" }], { r1: doc3 })[0].platfo
 const pl = newPlan("Example HQ"); pl.vms = { "auvik:a1": {}, "auvik:gone": {} };
 eq("orphans", orphanKeys(pl, vms), ["auvik:gone"]);
 
+const doc4: any = { v: 1, nid: 9, racks: [], cables: [], devices: [
+  dev({ id: 1, name: "EX-SOLO1", type: "Server", model: "Virtual Machine – VMware", auvik_id: "d9" }),
+  dev({ id: 2, name: "EX-SOLO2", type: "Server", model: "Virtual Machine – VMware" }),
+  dev({ id: 3, name: "EX-SOLO3", type: "Server", model: "Virtual Machine – VMware", endpoints: [] }),
+] };
+const v4 = siteVms([{ key: "r4", name: "R4" }], { r4: doc4 });
+const b4 = (n: string) => v4.find(v => v.name === n)!;
+eq("c names", v4.map(v => v.name), ["EX-SOLO1", "EX-SOLO2", "EX-SOLO3"]);
+eq("c auvik key", [b4("EX-SOLO1").key, b4("EX-SOLO1").platform, b4("EX-SOLO1").host], ["auvik:d9", "vmware", ""]);
+eq("c fallback key", b4("EX-SOLO2").key, "r4#2#EX-SOLO2");
+
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);

@@ -36,7 +36,7 @@ export function siteVms(racks: { key: string; name: string }[], docs: Record<str
         for (const e of d.endpoints ?? []) add(d.id, e.name, e.model, e.ip, e.key, h, h?.name ?? "");
       } else {
         for (const e of d.endpoints ?? []) if (e.kind === "vm") add(d.id, e.name, e.model, e.ip, e.key, d, d.name);
-        if (!d.endpoints && (d.model ?? "").startsWith("Virtual Machine")) add(d.id, d.name, d.model ?? "", d.ip ?? "", d.auvik_id, undefined, "");
+        if (d.type !== "Endpoints" && (d.model ?? "").startsWith("Virtual Machine")) add(d.id, d.name, d.model ?? "", d.ip ?? "", d.auvik_id, undefined, "");
       }
     }
   }
