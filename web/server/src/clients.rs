@@ -91,6 +91,19 @@ pub(crate) fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if !has_rooms {
         conn.execute_batch("ALTER TABLE sites ADD COLUMN rooms TEXT NOT NULL DEFAULT '[]';")?;
     }
+    let mut has_migration = false;
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(sites)")?;
+        let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
+        for n in names {
+            if n? == "migration" {
+                has_migration = true;
+            }
+        }
+    }
+    if !has_migration {
+        conn.execute_batch("ALTER TABLE sites ADD COLUMN migration TEXT NOT NULL DEFAULT '{}';")?;
+    }
     conn.execute_batch("CREATE INDEX IF NOT EXISTS racks_site ON racks(site_id);")
 }
 
@@ -231,20 +244,26 @@ struct Site {
     address: String,
     notes: String,
     rooms: Value,
+    migration: Value,
     updated_at: String,
 }
 
-const SITE_SELECT: &str = "SELECT id, client_id, name, address, notes, updated_at, rooms FROM sites";
+const SITE_SELECT: &str = "SELECT id, client_id, name, address, notes, updated_at, rooms, migration FROM sites";
 
 fn row_site(r: &rusqlite::Row) -> rusqlite::Result<Site> {
-    Ok(Site { id: r.get(0)?, client_id: r.get(1)?, name: r.get(2)?, address: r.get(3)?, notes: r.get(4)?, updated_at: r.get(5)?, rooms: parse_rooms(&r.get::<_, String>(6)?) })
+    Ok(Site { id: r.get(0)?, client_id: r.get(1)?, name: r.get(2)?, address: r.get(3)?, notes: r.get(4)?, updated_at: r.get(5)?, rooms: parse_rooms(&r.get::<_, String>(6)?), migration: parse_migration(&r.get::<_, String>(7)?) })
 }
 
 fn parse_rooms(text: &str) -> Value {
     serde_json::from_str::<Value>(text).ok().filter(|v| v.is_array()).unwrap_or_else(|| json!([]))
 }
 
+fn parse_migration(text: &str) -> Value {
+    serde_json::from_str::<Value>(text).ok().filter(|v| v.is_object()).unwrap_or_else(|| json!({}))
+}
+
 const MAX_ROOMS: usize = 256 * 1024;
+const MAX_MIGRATION: usize = 256 * 1024;
 
 fn get_site(conn: &Connection, id: i64) -> Result<Option<Site>, ApiError> {
     Ok(conn.query_row(&format!("{SITE_SELECT} WHERE id = ?1"), params![id], row_site).optional()?)
@@ -400,6 +419,7 @@ struct PatchSiteReq {
     notes: Option<String>,
     client_id: Option<i64>,
     rooms: Option<Value>,
+    migration: Option<Value>,
 }
 
 pub(crate) async fn patch_site(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<i64>, body: Bytes) -> ApiResult {
@@ -416,6 +436,19 @@ pub(crate) async fn patch_site(State(st): State<Shared>, headers: HeaderMap, Pat
             let t = v.to_string();
             if t.len() > MAX_ROOMS {
                 return Err(ApiError::bad("Rooms are too large"));
+            }
+            Some(t)
+        }
+        None => None,
+    };
+    let migration_text = match &req.migration {
+        Some(v) => {
+            if !v.is_object() {
+                return Err(ApiError::bad("Migration plan must be an object"));
+            }
+            let t = v.to_string();
+            if t.len() > MAX_MIGRATION {
+                return Err(ApiError::bad("Migration plan is too large"));
             }
             Some(t)
         }
@@ -448,6 +481,9 @@ pub(crate) async fn patch_site(State(st): State<Shared>, headers: HeaderMap, Pat
     )?;
     if let Some(t) = &rooms_text {
         conn.execute("UPDATE sites SET rooms = ?1 WHERE id = ?2", params![t, id])?;
+    }
+    if let Some(t) = &migration_text {
+        conn.execute("UPDATE sites SET migration = ?1 WHERE id = ?2", params![t, id])?;
     }
     let site = get_site(&conn, id)?.ok_or_else(site_not_found)?;
     Ok(json_ok(&site))

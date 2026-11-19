@@ -64,7 +64,7 @@ export const createRack = (name: string, doc: Doc, site_id: number | null = null
 export const setRackSite = (id: number, site_id: number | null) => api<RackMeta>("PUT", `/api/racks/${id}/site`, { site_id });
 
 export interface ClientMeta { id: number; name: string; notes: string; sites: number; racks: number; updated_at: string }
-export interface SiteRow { id: number; client_id: number; name: string; address: string; notes: string; rooms?: Room[]; updated_at: string }
+export interface SiteRow { id: number; client_id: number; name: string; address: string; notes: string; rooms?: Room[]; migration?: unknown; updated_at: string }
 export interface LinkEnd { rack: number | string; dev: number; name: string }
 export interface LinkBody { site_a: number; site_b: number | null; kind: string; provider?: string; circuit?: string; bandwidth?: string; notes?: string; a_end?: LinkEnd | null; b_end?: LinkEnd | null }
 export interface Link { id: number; client_id: number; site_a: number; site_b: number | null; kind: string; provider: string; circuit: string; bandwidth: string; notes: string; a_end: LinkEnd | null; b_end: LinkEnd | null; updated_at: string }
@@ -75,7 +75,7 @@ export const createClient = (name: string, notes = "") => api<ClientMeta>("POST"
 export const patchClient = (id: number, p: { name?: string; notes?: string }) => api<ClientMeta>("PATCH", `/api/clients/${id}`, p);
 export const deleteClient = (id: number) => api("DELETE", `/api/clients/${id}`);
 export const createSite = (clientId: number, s: { name: string; address?: string; notes?: string }) => api<SiteRow>("POST", `/api/clients/${clientId}/sites`, s);
-export const patchSite = (id: number, p: { name?: string; address?: string; notes?: string; client_id?: number; rooms?: Room[] }) => api<SiteRow>("PATCH", `/api/sites/${id}`, p);
+export const patchSite = (id: number, p: { name?: string; address?: string; notes?: string; client_id?: number; rooms?: Room[]; migration?: unknown }) => api<SiteRow>("PATCH", `/api/sites/${id}`, p);
 export const deleteSite = (id: number) => api("DELETE", `/api/sites/${id}`);
 export const createLink = (clientId: number, b: LinkBody) => api<Link>("POST", `/api/clients/${clientId}/links`, b);
 export const patchLink = (id: number, b: Partial<LinkBody>) => api<Link>("PATCH", `/api/links/${id}`, b);
