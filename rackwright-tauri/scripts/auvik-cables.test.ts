@@ -146,12 +146,13 @@ t("setup: first import draws the firewall cable", cablesBetween(withLinks, "EX-S
   const swEnd = owner(d, c.a) === "EX-SW01" ? "a" : "b";
   const np = portOf(d, "EX-SW01", "1/1/2");
   (c as any)[swEnd] = np.id;
-  devOf(d, "EX-SW01").locked = [...(devOf(d, "EX-SW01").locked ?? []), "port:1/1/2"];
   const rp = sp(mk(d));
   const ch = rp.diff!.changes.find((x) => x.id.startsWith("mv:") && x.title.includes("EX-FW01"));
   t("reimport keeps hand-moved cable", !!ch && ch.defaultOn === false, JSON.stringify(rp.diff!.changes.map((x) => x.id + ":" + x.defaultOn)));
   const out = applySite(rp, defOn(rp)).auvikDoc;
   const k = cablesBetween(out, "EX-SW01", "EX-FW01");
+  const ow = planSite(inv, tenant, mk(d), defaults, "overwrite", undefined, undefined, undefined, links).diff!.changes.find((x) => x.id.startsWith("mv:") && x.title.includes("EX-FW01"));
+  t("hand-moved cable: ticked with overwrite", !!ow && ow.defaultOn === true);
   t("hand-moved cable stays on 1/1/2", k.length === 1 && out.devices.find((x) => x.name === "EX-SW01")!.ports.find((q) => q.id === (k[0] as any)[swEnd])?.name === "1/1/2");
 }
 {

@@ -267,10 +267,10 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
       const memberEnd = p.a.kind === "member" ? p.a : p.b.kind === "member" ? p.b : null;
       const g = c.a.target.isGroup ? c.a.target : c.b.target.isGroup ? c.b.target : null;
       const loc = g && memberEnd ? members.get(`${g.key}|${memberEnd.id}`) : undefined;
-      // API import: a port the person fixed by hand is listed in its device's `locked` as "port:<name>"
-      const handPort = !!opts?.fill && [d.cable!.a, d.cable!.b].some((pid) => { const at = portIdx.get(pid); return !!at && has(at.dev.locked, "port:" + at.dev.ports[at.i].name); });
-      const lockedPort = !!(loc?.ep && has(loc.ep.locked, "port")) || handPort;
-      changes.push({ id: `mv:${c.key}`, cat: "moved", title: names.get(leaf!) ?? leaf!, from: describe(d), to: describe(p), detail: loc?.kind === "moved" ? `moves to ${g!.name}` : undefined, locked: lockedPort, defaultOn: !lockedPort });
+      const lockedPort = !!(loc?.ep && has(loc.ep.locked, "port"));
+      // API import: like a field, a cable move is ticked only with "Overwrite existing values" on (and no locked member port); otherwise it is kept
+      const on = opts?.fill ? opts.fill === "overwrite" && !lockedPort : !lockedPort;
+      changes.push({ id: `mv:${c.key}`, cat: "moved", title: names.get(leaf!) ?? leaf!, from: describe(d), to: describe(p), detail: !on && opts?.fill && !lockedPort ? "kept (differs from Auvik)" : loc?.kind === "moved" ? `moves to ${g!.name}` : undefined, locked: lockedPort, defaultOn: on });
     } else {
       cableStatus.set(c.key, { kind: "new" });
       const mg = c.a.target.isGroup ? c.a.target : c.b.target.isGroup ? c.b.target : null;
