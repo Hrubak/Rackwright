@@ -259,9 +259,16 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
       }
     };
 
+    const migrationBlock = (m: NonNullable<SiteSection["migration"]>) => {
+      h2(m.title, 80);
+      paragraph(m.clusterLine);
+      table(m.capacity[0].map((head, i) => ({ head, w: i === 0 ? 1.8 : 1.2 })), m.capacity.slice(1));
+      paragraph(m.result);
+      if (model.level === "detailed" && m.vms.length) table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }], m.vms);
+    };
     for (const s of model.sites) {
       await siteBlock(s);
-      if (model.level !== "detailed") continue;
+      if (model.level !== "detailed") { if (s.migration) migrationBlock(s.migration); continue; }
       // Switch port maps: 18 x 14 pt boxes, then a table of the used ports.
       const BWd = 18, BHt = 14, GAP = 2;
       for (const sw of s.switches) {
@@ -288,6 +295,7 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
         h2(`Devices at ${s.name}`, 60);
         table([{ head: "Name", w: 2.2 }, { head: "Type", w: 1.4 }, { head: "Model", w: 2.2 }, { head: "IP", w: 1.5 }, { head: "Where", w: 1.6 }], s.devices.map((d) => [d.name, d.type, d.model, d.ip, d.where]));
       }
+      if (s.migration) migrationBlock(s.migration);
       const pw = model.power.filter((p) => p.siteId === s.id);
       if (pw.length) {
         h2(`Power at ${s.name}`, 60);

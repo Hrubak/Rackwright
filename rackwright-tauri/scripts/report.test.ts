@@ -1,6 +1,7 @@
 // npx tsx scripts/report.test.ts — report model (synthetic data only)
 import { readFileSync } from "node:fs";
 import { buildReportModel } from "../src/report/model";
+import { siteVms } from "../src/migration/vms";
 import type { ClientItem } from "../src/clients/store";
 import type { Doc } from "../src/types";
 
@@ -76,6 +77,29 @@ eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), tru
   eq("report counts unchecked racks", unchecked.attention.map((a) => [a.kind, a.level, a.rackKey]), [["stale", "info", "u"]]);
   const checked = buildReportModel({ client: c4, docs: { u: mkRack("2026-11-17") }, options: opts, company: "x" });
   eq("checked rack not listed", checked.attention, []);
+}
+
+// VM migration section
+{
+  const vmDev = (id: number, name: string) => ({ id, name, type: "Servers", model: "Virtual Machine", rack: 1, ip: "", u: 1, u_size: 1, side: 0, half: false, rows: 1, fx: 0, fy: 0, face: "front", ports: [] }) as any;
+  const mdoc: Doc = { v: 1, nid: 10, racks: [{ id: 1, name: "R", u: 12, x: 0, y: 0 }], devices: [vmDev(1, "EX-SQL01"), vmDev(2, "EX-VCSA")], cables: [] } as any;
+  const plan = { v: 1 as const, cluster: { name: "EX-CL01", nodes: 3, cores: 24, ramGb: 384, rawTb: 7.7 },
+    rules: { cpuRatio: 4, ramReserveGb: 8, keepFreePct: 20, nPlus1: true },
+    vms: { }, } as any;
+  const mc = (p: any): ClientItem => ({ key: "c", name: "Example IT", notes: "", links: [], sites: [{ id: 1, name: "Example HQ", address: "", notes: "", racks: [{ key: "m1", name: "R" }], migration: p }] });
+  const mo = { level: "detailed" as const, sites: "all" as const, summary: "", recommendations: "", date: "2026-11-19", prepared_for: "Example IT" };
+  const vk = siteVms([{ key: "m1", name: "R" }], { m1: mdoc });
+  const p2 = { ...plan, vms: { [vk.find((x) => x.name === "EX-SQL01")!.key]: { vcpu: 8, ramGb: 32, diskGb: 500, usedGb: 200, include: true }, [vk.find((x) => x.name === "EX-VCSA")!.key]: { include: false } } };
+  const mm = buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration!;
+  eq("migration title", mm.title, "VM migration to EX-CL01");
+  eq("migration vms", mm.vms.length, 1);
+  eq("migration vm row", mm.vms[0].slice(0, 1).concat(mm.vms[0].slice(3)), ["EX-SQL01", "8", "32", "500", "200"]);
+  eq("migration header", mm.capacity[0], ["Resource", "Needed", "Available", "Used", "Left"]);
+  eq("migration rows", mm.capacity.slice(1).map((r) => r[0]), ["vCPU", "RAM (GB)", "Disk (TB)"]);
+  eq("migration result", mm.result.startsWith("Result: "), true);
+  eq("migration cluster line", mm.clusterLine, "3 nodes, each 24 cores, 384 GB RAM and 7.7 TB raw storage. One node down (N+1).");
+  eq("migration off", buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: { ...mo, migration: false }, company: "x" }).sites[0].migration, undefined);
+  eq("migration no plan", buildReportModel({ client: mc(undefined), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration, undefined);
 }
 
 console.log(fail ? `${fail} failed` : "all passed");

@@ -7,6 +7,9 @@ import type { InvRow } from "../clients/util";
 import { clientAlerts, todayIso } from "../attention/model";
 import type { Alert } from "../attention/model";
 import { powerBudget } from "../power/model";
+import { siteVms, isIncluded, PLATFORM_LABEL } from "../migration/vms";
+import { fitPlan, resultText, failoverText } from "../migration/fit";
+import type { MigrationPlan } from "../migration/types";
 import { switchPorts, switchesOf } from "../views/switchPorts";
 
 export interface SwitchMap { name: string; ports: { name: string; used: boolean; to: string; type: string; ip: string }[] }
@@ -14,6 +17,34 @@ export interface SiteSection {
   id: number; name: string; address: string;
   racks: { key: string; name: string; doc?: Doc; error?: string }[];
   devices: InvRow[]; switches: SwitchMap[];
+  migration?: MigrationSection;
+}
+export interface MigrationSection {
+  title: string; clusterLine: string; capacity: string[][]; result: string; vms: string[][];
+}
+const whole = (n: number) => String(Math.round(n));
+const oneDp = (n: number) => n.toFixed(1);
+const num = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
+
+/** Every string of the migration section, built once so Word and PDF only lay it out. */
+export function buildMigration(plan: MigrationPlan, racks: { key: string; name: string }[], docs: Record<string, Doc | string>): MigrationSection {
+  const c = plan.cluster;
+  const vms = siteVms(racks, docs);
+  const fit = fitPlan(plan, vms);
+  const row = (label: string, r: typeof fit.cpu, f: (n: number) => string) =>
+    [label, f(r.needed), f(r.available), r.available > 0 ? `${Math.round(r.usedPct)}%` : "—", f(r.left)];
+  const nodes = num(c.nodes);
+  return {
+    title: `VM migration to ${c.name}`,
+    clusterLine: `${nodes} ${nodes === 1 ? "node" : "nodes"}, each ${whole(num(c.cores))} cores, ${whole(num(c.ramGb))} GB RAM and ${oneDp(num(c.rawTb))} TB raw storage. ${failoverText(fit)}.`,
+    capacity: [["Resource", "Needed", "Available", "Used", "Left"], row("vCPU", fit.cpu, whole), row("RAM (GB)", fit.ram, whole), row("Disk (TB)", fit.disk, oneDp)],
+    result: `Result: ${resultText(fit)}`,
+    vms: vms.filter((vm) => isIncluded(vm, plan.vms[vm.key])).map((vm) => {
+      const e = plan.vms[vm.key];
+      const t = (n: number | undefined) => (typeof n === "number" && Number.isFinite(n) ? whole(n) : "");
+      return [vm.name, vm.host, PLATFORM_LABEL[vm.platform], t(e?.vcpu), t(e?.ramGb), t(e?.diskGb), t(e?.usedGb)];
+    }),
+  };
 }
 export interface LinkRow { kind: string; from: string; to: string; provider: string; circuit: string; bandwidth: string }
 export interface ReportModel {
@@ -55,7 +86,8 @@ export function buildReportModel(input: { client: ClientItem; docs: Record<strin
       }
     }
     inventory.push(...devices);
-    return { id: s.id, name: s.name, address: s.address, racks, devices, switches };
+    const migration = s.migration && options.migration !== false ? buildMigration(s.migration, s.racks, docs) : undefined;
+    return { id: s.id, name: s.name, address: s.address, racks, devices, switches, migration };
   });
   const nameOf = new Map(client.sites.map((s) => [s.id, s.name]));
   const ids = new Set(chosen.map((s) => s.id));

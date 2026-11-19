@@ -172,6 +172,18 @@ eq("pageBox fallback", pageBox("<w:document><w:body/></w:document>"), { textWidt
   const esc = buildBodyXml(mk("overview", { ...client, sites: [{ ...client.sites[0], name: "A & B <x>" }] }), pics, { styles: st, ...base });
   ok("escaped", esc.includes("A &amp; B &lt;x&gt;"));
   eq("escaped valid xml", XMLValidator.validate(wrap(esc)), true);
+  {
+    const vm = { id: 1, name: "EX-SQL01", type: "Servers", model: "Virtual Machine", rack: 1, ip: "", u: 1, u_size: 1, side: 0, half: false, rows: 1, fx: 0, fy: 0, face: "front", ports: [] } as any;
+    const md: Doc = { v: 1, nid: 5, racks: [{ id: 1, name: "R", u: 12, x: 0, y: 0 }], devices: [vm], cables: [] } as any;
+    const mc: ClientItem = { key: "c", name: "Example IT", notes: "", links: [], sites: [{ id: 1, name: "Example HQ", address: "", notes: "", racks: [{ key: "m1", name: "R" }],
+      migration: { v: 1, cluster: { name: "EX-CL01", nodes: 3, cores: 24, ramGb: 384, rawTb: 7.7 }, rules: { cpuRatio: 4, ramReserveGb: 8, keepFreePct: 20, nPlus1: true }, vms: {} } as any }] };
+    const mm = (level: "overview" | "detailed") => buildReportModel({ client: mc, docs: { m1: md }, options: { level, sites: "all", summary: "", recommendations: "", date: "2026-11-19", prepared_for: "Example IT" }, company: "Example IT" });
+    const mo = buildBodyXml(mm("overview"), new Map(), { styles: st, ...base });
+    const md2 = buildBodyXml(mm("detailed"), new Map(), { styles: st, ...base });
+    ok("migration overview", texts(mo).includes("VM migration to EX-CL01") && !texts(mo).includes("Used (GB)"));
+    ok("migration detailed", texts(md2).includes("VM migration to EX-CL01") && texts(md2).includes("Used (GB)"));
+    eq("migration valid xml", [XMLValidator.validate(wrap(mo)), XMLValidator.validate(wrap(md2))], [true, true]);
+  }
 }
 
 // ---- review fixes ----

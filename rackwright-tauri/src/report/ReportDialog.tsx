@@ -25,6 +25,7 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
   const [prepared, setPrepared] = useState("");
   const [summary, setSummary] = useState("");
   const [recs, setRecs] = useState("");
+  const [migration, setMigration] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [noTemplate, setNoTemplate] = useState(false);
@@ -43,6 +44,7 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
         const all = c.sites.map((s) => s.id);
         setSites(o && o.sites !== "all" ? all.filter((id) => (o.sites as number[]).includes(id)) : all);
         setLevel(o?.level === "detailed" ? "detailed" : "overview");
+        setMigration(o?.migration !== false);
         setSummary(o?.summary ?? ""); setRecs(o?.recommendations ?? "");
         setDate(o?.date || today());
         setPrepared(o?.prepared_for || c.name);
@@ -59,6 +61,7 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
       const o: ReportOptions = {
         level, sites: sites.length === client.sites.length ? "all" : sites, summary, recommendations: recs,
         date: date || today(), prepared_for: prepared.trim() || client.name,
+        migration,
       };
       await store.setReport(client.key, o);
       if (kind === "pdf") { if (await exportClientReport(client.key, o, system)) onClose(); return; }
@@ -90,6 +93,11 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
               <input type="checkbox" checked={sites.includes(s.id)} disabled={busy} onChange={(e) => setSites(e.target.checked ? [...sites, s.id] : sites.filter((x) => x !== s.id))} /> {s.name}
             </label>
           ))}
+          {client.sites.some((s) => sites.includes(s.id) && s.migration) && (
+            <label style={{ display: "block", marginTop: 6 }}>
+              <input type="checkbox" checked={migration} disabled={busy} onChange={(e) => setMigration(e.target.checked)} /> VM migration plan
+            </label>
+          )}
           <label style={lbl}>Report date</label>
           <input type="date" style={inp} value={date} disabled={busy} onChange={(e) => setDate(e.target.value)} />
           <label style={lbl}>Prepared for</label>

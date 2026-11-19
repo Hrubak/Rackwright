@@ -137,9 +137,16 @@ export function buildBodyXml(model: ReportModel, pics: Map<string, BodyPic>, opt
     }
   };
 
+  const migrationBlock = (m: NonNullable<SiteSection["migration"]>) => {
+    out.push(heading(2, m.title), paras(m.clusterLine));
+    out.push(table(m.capacity[0].map((head, i) => ({ head, w: i === 0 ? 1.8 : 1.2 })), m.capacity.slice(1)));
+    out.push(paras(m.result, { bold: true }));
+    if (detailed && m.vms.length) out.push(table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }], m.vms));
+  };
+
   for (const s of model.sites) {
     siteBlock(s);
-    if (!detailed) continue;
+    if (!detailed) { if (s.migration) migrationBlock(s.migration); continue; }
     for (const sw of s.switches) {
       const used = sw.ports.filter((p) => p.used);
       out.push(heading(2, `Switch ${sw.name}`), paras(`${used.length} of ${sw.ports.length} ports used`));
@@ -148,6 +155,7 @@ export function buildBodyXml(model: ReportModel, pics: Map<string, BodyPic>, opt
     if (s.devices.length) {
       out.push(heading(2, `Devices at ${s.name}`), table([{ head: "Name", w: 2.2 }, { head: "Type", w: 1.4 }, { head: "Model", w: 2.2 }, { head: "IP", w: 1.5 }, { head: "Where", w: 1.6 }], s.devices.map((d) => [d.name, d.type, d.model, d.ip, d.where])));
     }
+    if (s.migration) migrationBlock(s.migration);
     const pw = model.power.filter((p) => p.siteId === s.id);
     if (pw.length) {
       out.push(heading(2, `Power at ${s.name}`), table([{ head: "Rack", w: 2 }, { head: "Power", w: 2.6 }, { head: "Circuit", w: 1.6 }, { head: "Amps", w: 1 }], pw.map((p) => [p.rack, fmtW(p.w, p.unknown), p.circuit, p.w > 0 ? String(p.amps) : ""])));
