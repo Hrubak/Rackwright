@@ -3,11 +3,11 @@ import { useState } from "react";
 import { v } from "../../theme";
 import type { ImportSpec } from "../../imports/spec";
 import { readImport } from "../../imports/read";
-import { StatusChip } from "../Panels";
 import { ChangesList } from "../ChangeList";
-import { hostsOf } from "../plan";
-import { TO_PLACE_KINDS } from "./map";
+import type { Kind } from "../plan";
+import DeviceTable from "./DeviceTable";
 import type { SitePlan } from "./sync";
+import type { SortCol } from "./table";
 import { btn, inp } from "./ui";
 
 export interface SiteState {
@@ -17,8 +17,13 @@ export interface SiteState {
   hosts: Record<string, string>;         // VM key -> chosen host key
   over: Record<string, boolean>;         // the person's own tick choices by change id; the rest follow defaultOn
   view: "devices" | "changes";
+  kinds: Record<string, Kind>;           // the person's picks by plan item key (see Overrides in map.ts); a default is never stored
+  types: Record<string, string>;
+  models: Record<string, string>;        // "" = Auvik's text, "tpl:<catalog name>", "vm:hyperv|vmware|kvm"
+  sort: { col: SortCol; dir: 1 | -1 } | null;   // null = Auvik's order
+  filter: string;
 }
-export const newSiteState = (): SiteState => ({ excluded: new Set(), fill: "empty", layout: null, hosts: {}, over: {}, view: "devices" });
+export const newSiteState = (): SiteState => ({ excluded: new Set(), fill: "empty", layout: null, hosts: {}, over: {}, view: "devices", kinds: {}, types: {}, models: {}, sort: null, filter: "" });
 
 /** The ticked change ids, keyed exactly as they appear in the diffs (other racks carry a "<rackId>:" prefix).
  *  The person's choices win; a change that is new after a re-plan follows its default. */
@@ -39,10 +44,6 @@ export default function SitePreview({ view, eff, st, setSt, targetName, isNew }:
   const changes = [...(eff.diff?.changes ?? []), ...eff.other.flatMap((o) => o.diff.changes)];
   const isOn = (c: { id: string }) => ticks.has(c.id);
   const setOn = (ids: string[], on: boolean) => setSt((s) => { const o = { ...s.over }; for (const id of ids) o[id] = on; return { ...s, over: o }; });
-  const hosts = hostsOf(view.items);
-  const hostName = (k: string) => view.items.find((i) => i.key === k)?.dev.name ?? k;
-  const heightOf = (key: string) => { const us = view.plan.units.filter((u) => u.itemKey === key); return us.length ? String(us.reduce((a, u) => a + u.tpl.u_size, 0)) : ""; };
-  const destOf = (i: SitePlan["items"][number]) => (i.mode === "skip" ? "" : i.mode === "off" && TO_PLACE_KINDS.includes(i.kind) ? "To place" : "Inventory");
   const used = view.items.filter((i) => !st.excluded.has(i.dev.apiId ?? i.key)).length;
 
   const readLayout = (t: string) => {
@@ -97,39 +98,8 @@ export default function SitePreview({ view, eff, st, setSt, targetName, isNew }:
           ))}
         </div>
       )}
-      <div style={{ overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4, flex: 1, minHeight: 200, display: st.view === "changes" && changes.length > 0 ? "none" : undefined }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead style={{ position: "sticky", top: 0, background: v("border-faint") }}>
-            <tr style={{ textAlign: "left" }}><th style={{ padding: 4 }}>Import</th><th>Name</th><th>Kind</th><th>Make &amp; model</th><th>Template</th><th>U</th><th>Goes to</th><th>Host</th><th>IP</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {view.items.map((i) => {
-              const id = i.dev.apiId ?? i.key;
-              const off = st.excluded.has(id);
-              return (
-                <tr key={i.key} style={{ borderTop: `1px solid ${v("border-faint")}`, opacity: off ? 0.45 : 1 }}>
-                  <td style={{ padding: "2px 4px" }}><input type="checkbox" aria-label={`Import ${i.dev.name}`} checked={!off} onChange={(e) => edit((s) => { const n = new Set(s.excluded); if (e.target.checked) n.delete(id); else n.add(id); return { ...s, excluded: n }; })} /></td>
-                  <td>{i.dev.name}{i.units.length > 1 && <span style={{ opacity: 0.6 }}> (stack of {i.units.length})</span>}</td>
-                  <td>{i.type}</td><td>{i.dev.model}</td>
-                  <td style={{ opacity: i.generic ? 0.6 : 1 }}>{["rack", "off"].includes(i.mode) ? i.tplName : ""}</td>
-                  <td>{["rack", "off"].includes(i.mode) ? heightOf(i.key) : ""}</td>
-                  <td>{destOf(i)}</td>
-                  <td>
-                    {i.mode === "vm" && (
-                      <select style={{ ...inp, maxWidth: 170 }} value={i.host ?? ""} onChange={(e) => edit((s) => ({ ...s, hosts: { ...s.hosts, [i.key]: e.target.value } }))}>
-                        <option value="">No host</option>
-                        {hosts.map((h) => <option key={h.key} value={h.key}>{h.dev.name}</option>)}
-                        {i.host && !hosts.some((h) => h.key === i.host) && <option value={i.host}>{hostName(i.host)}</option>}
-                      </select>
-                    )}
-                    {i.mode === "vm" && i.hostGuessed && !(i.key in st.hosts) && <span style={{ color: v("warn"), marginLeft: 6 }}>Guessed host — check</span>}
-                  </td>
-                  <td>{i.dev.ips[0]}</td><td><StatusChip s={i.dev.status} /></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div style={{ display: st.view === "changes" && changes.length > 0 ? "none" : "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <DeviceTable view={view} eff={eff} st={st} setSt={setSt} />
       </div>
     </div>
   );

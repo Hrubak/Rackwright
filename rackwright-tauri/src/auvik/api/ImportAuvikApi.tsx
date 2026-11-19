@@ -134,7 +134,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   const planFor = (r: Read, all: boolean): SitePlan => {
     const st = sites[r.tenant.id] ?? newSiteState();
     const inv = !all && st.excluded.size ? { ...r.inv!, devices: r.inv!.devices.filter((d) => !st.excluded.has(d.id)) } : r.inv!;
-    return planSite(inv, r.tenant, docsOf(r.tenant), defaults, st.fill, st.layout ?? undefined, st.hosts);
+    return planSite(inv, r.tenant, docsOf(r.tenant), defaults, st.fill, st.layout ?? undefined, st.hosts, { kinds: st.kinds, types: st.types, models: st.models });
   };
   const active = reads.find((r) => r.tenant.id === tab);
   const plans = useMemo((): { view: SitePlan; eff: SitePlan; error?: undefined } | { error: string } | null => {

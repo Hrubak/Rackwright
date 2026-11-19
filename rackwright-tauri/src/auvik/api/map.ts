@@ -49,7 +49,8 @@ export function specsOf(c: AuvikApiDevice["components"]): Record<string, string>
 /** Kinds that go in the "To place" column; the rest of the off-rack kinds go in "Inventory". */
 export const TO_PLACE_KINDS: Kind[] = ["firewall", "router", "switch", "server", "storage", "ups", "pdu"];
 
-export type ApiPlanItem = PlanItem & { specs?: Record<string, string> };
+/** `baseKind`: the kind the row had before the person's kind pick (set only on a picked row), so the table can tell a pick from the default. */
+export type ApiPlanItem = PlanItem & { specs?: Record<string, string>; baseKind?: Kind };
 
 /** The type word each kind is re-classified from when the person picks a kind. */
 export const KIND_TYPE: Record<Kind, string> = {
@@ -94,8 +95,12 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, ove
     if (!i || i.kind === kind || over?.kinds?.[key] || !KIND_TYPE[kind]) continue;
     items = retype(parsed, items, key, KIND_TYPE[kind], ctx);
   }
+  const baseKind = new Map<string, Kind>();
   for (const [key, kind] of Object.entries(over?.kinds ?? {})) {
-    if (!items.some((i) => i.key === key) || !KIND_TYPE[kind]) continue;
+    const before = items.find((i) => i.key === key);
+    if (!before || !KIND_TYPE[kind]) continue;
+    const k0 = kept?.[key];
+    baseKind.set(key, k0 && KIND_TYPE[k0] ? k0 : before.kind);   // without this pick the kept kind would apply
     items = retype(parsed, items, key, KIND_TYPE[kind], ctx).map((i) => (i.key === key ? { ...i, kindOver: true } : i));
   }
   for (const i of items.filter((x) => x.mode === "rack")) items = setMode(items, i.key, "off", ctx);
@@ -110,6 +115,7 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, ove
       if (i.kind === "controller" && i.mode === "skip" && !/virtual|\bvm\b/i.test(`${i.dev.name} ${i.dev.model}`)) { out.mode = "off"; out.virtual = false; }   // a real controller is inventory, never silently dropped
       if (i.kind === "ipmi" && i.host === "new") { out.mode = "off"; out.host = "off"; }   // no host to attach to: off-rack only, a layout places devices
       if (Object.keys(specs).length) out.specs = specs;
+      if (baseKind.has(i.key)) out.baseKind = baseKind.get(i.key);
       const m = over?.models?.[i.key];
       if (m?.startsWith("tpl:")) {
         const t = CATALOG.find((c) => c.name === m.slice(4));

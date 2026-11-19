@@ -44,6 +44,7 @@ export interface SitePlan {
   diff: Diff | null;                                          // null when the site has no Auvik document yet
   other: { rackId: number; rackName: string; diff: Diff }[]; // fill-only changes in the site's other rack documents
   elsewhere: Set<string>;                                      // plan unit keys already held by another rack document: never added to "(Auvik)"
+  heldIn: Record<string, string>;                              // the same keys -> the name of the rack document that holds the device
   layoutRows?: Row[];
   over?: Overrides;                                            // the person's kind / type / model picks, by plan item key
 }
@@ -123,15 +124,16 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
   const other: SitePlan["other"] = [];
   const picks = handPicks(over);
   const elsewhere = new Set<string>();
+  const heldIn: Record<string, string> = {};
   for (const r of siteDocs.racks) {
     if (r.id === mine?.id) continue;
     const d = tickHand(computeDiff(r.doc, plan, items, { fill }), plan, picks);
-    for (const k of d.matched.keys()) elsewhere.add(k);
+    for (const k of d.matched.keys()) { elsewhere.add(k); heldIn[k] ??= r.name; }
     const changes = d.changes.filter((c) => isFld(c.id));
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, parsed, items, plan, other, elsewhere,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, parsed, items, plan, other, elsewhere, heldIn,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
     diff: mine ? dropElsewhere(tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks), elsewhere) : null,
   };

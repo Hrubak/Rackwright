@@ -381,6 +381,8 @@ async function main() {
     // C1, M2
     const pc = planSite(inv, tenant, mkDocs([{ id: 9, name: "Lab", doc: lab() }]), defaults, "empty");
     t("C1: device held by another doc is not offered as new", pc.elsewhere.size > 0 && !pc.plan.units.some((u) => pc.elsewhere.has(u.key) && false) && [...pc.elsewhere].length >= 1);
+    const srvKey = pc.items.find((i) => i.dev.name === "EX-SRV01")!.key;
+    t("heldIn: a device matched in another doc names that rack document", pc.plan.units.some((u) => u.itemKey === srvKey && pc.heldIn[u.key] === "Lab") && Object.keys(pc.heldIn).length === pc.elsewhere.size, JSON.stringify(pc.heldIn));
     const rc = applySite(pc, new Set(pc.other[0].diff.changes.map((c) => c.id)));
     t("C1: no EX-SRV01 created in (Auvik)", !rc.auvikDoc.devices.some((d) => d.name === "EX-SRV01") && rc.auvikDoc.devices.length > 0);
     const lo = rc.others.find((o) => o.rackId === 9)!.doc.devices[0] as any;
@@ -444,6 +446,7 @@ async function main() {
     const ik = pk.items.find((i) => i.key === sw1)!;
     t("kind override: row is an endpoint now", ik.kind === "endpoint" && ik.mode === "endpoint" && ik.kindOver === true && !pk.plan.units.some((u) => u.itemKey === sw1), `${ik.kind} ${ik.mode}`);
     t("kind override kept on SitePlan.over", pk.over?.kinds?.[sw1] === "endpoint");
+    t("baseKind: the kind before the person's pick", ik.baseKind === "switch" && base.items.find((i) => i.key === sw1)!.baseKind === undefined, String(ik.baseKind));
     const dk = applySite(pk, new Set()).auvikDoc;
     const mk1 = memberOf(dk, sw1);
     t("kind override: EX-SW01 is a member of an Endpoints box, type locked", !!mk1 && dk.devices.some((x) => x.type === "Endpoints" && x.endpoints?.includes(mk1!)) && !!mk1!.locked?.includes("type") && !byName(dk, "EX-SW01"), JSON.stringify(mk1));
@@ -542,6 +545,7 @@ async function main() {
     }
     // explicit pick beats the kept kind
     const dS = applySite(planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { kinds: { [prn]: "server" } }), new Set()).auvikDoc;
+    t("baseKind over a kept kind is the kept kind", planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: dS }]), defaults, "empty", undefined, undefined, { kinds: { [prn]: "storage" } }).items.find((i) => i.key === prn)!.baseKind === "server");
     t("explicit kind beats the kept one", planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: dS }]), defaults, "empty", undefined, undefined, { kinds: { [prn]: "storage" } }).items.find((i) => i.key === prn)!.kind === "storage");
     // a tpl: pick on a VM row saves the model text but sets no template
     const pvt = planSite(vInv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { models: { [vm1]: "tpl:" + tpl2.name } }).items.find((i) => i.key === vm1)!;
