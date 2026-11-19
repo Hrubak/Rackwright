@@ -98,7 +98,8 @@ export function findEp(list: Ep[], m: { key: string; mac: string; name: string }
 export interface FieldChange { field: string; from: string; to: string; kept: boolean }
 /** A member found in one of the API import's Endpoints boxes: its move onto the switch is one change (mvm), cable included. */
 const fromEpBox = (loc: MemberLoc | undefined, opts?: DiffOpts) => !!opts?.fill && loc?.kind === "moved" && !!(loc.dev as any)?.auvik_epbox;
-export interface DiffOpts { fill?: "empty" | "overwrite" }
+/** fill: the API import (fill rules, Endpoints boxes, hand-locked ports). byMatch: a cable end on a device matched by name, serial or MAC counts even without an Auvik id (the site's other rack documents). */
+export interface DiffOpts { fill?: "empty" | "overwrite"; byMatch?: boolean }
 /** Field differences between a document device and what Auvik says now. */
 export function deviceFields(d: X, u: PlanUnit): FieldChange[] {
   if (u.placeholder) return [];
@@ -224,6 +225,7 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
   const portIdx = new Map<number, { dev: X; i: number }>();
   for (const d of all) d.ports.forEach((p, i) => portIdx.set(p.id, { dev: d, i }));
   const docKey = (e: Ep) => e.key || (allMembers.find((m) => findEp([e], m) === 0)?.key ?? epId(e));
+  const keyOfDev = new Map<Device, string>([...matched].map(([k, d]) => [d, k]));
   const docEnd = (pid: number): End => {
     const at = portIdx.get(pid); if (!at) return NONE;
     const { dev, i } = at, port = dev.ports[i];
@@ -234,8 +236,9 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
       const id = docKey(ep);
       return { id, port: "", kind: "member", name: ep.name, managed: true };
     }
-    if (!dev.auvik_id || dev.auvik_id.startsWith("vm:")) return NONE;
-    return { id: dev.auvik_id, port: port.name, kind: kinds.get(dev.auvik_id) ?? "", name: dev.name, managed: true };
+    const id: string | undefined = dev.auvik_id || (opts?.byMatch ? keyOfDev.get(dev) : undefined);
+    if (!id || id.startsWith("vm:")) return NONE;
+    return { id, port: port.name, kind: kinds.get(id) ?? "", name: dev.name, managed: true };
   };
   const D: Conn[] = [];
   for (const c of doc.cables) {
@@ -264,7 +267,9 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
       const memberEnd = p.a.kind === "member" ? p.a : p.b.kind === "member" ? p.b : null;
       const g = c.a.target.isGroup ? c.a.target : c.b.target.isGroup ? c.b.target : null;
       const loc = g && memberEnd ? members.get(`${g.key}|${memberEnd.id}`) : undefined;
-      const lockedPort = !!(loc?.ep && has(loc.ep.locked, "port"));
+      // API import: a port the person fixed by hand is listed in its device's `locked` as "port:<name>"
+      const handPort = !!opts?.fill && [d.cable!.a, d.cable!.b].some((pid) => { const at = portIdx.get(pid); return !!at && has(at.dev.locked, "port:" + at.dev.ports[at.i].name); });
+      const lockedPort = !!(loc?.ep && has(loc.ep.locked, "port")) || handPort;
       changes.push({ id: `mv:${c.key}`, cat: "moved", title: names.get(leaf!) ?? leaf!, from: describe(d), to: describe(p), detail: loc?.kind === "moved" ? `moves to ${g!.name}` : undefined, locked: lockedPort, defaultOn: !lockedPort });
     } else {
       cableStatus.set(c.key, { kind: "new" });

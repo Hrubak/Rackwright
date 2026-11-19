@@ -1,7 +1,16 @@
 // Auvik API cables -> neighbours on the plan devices, so the existing plan (buildLinks) draws them. Pure; no backend.ts import.
 import type { AuvikDevice, ParsedAuvik } from "../parse";
-import type { AuvikLink } from "../../api";
+import type { AuvikInventory, AuvikLink, AuvikLinks } from "../../api";
 import { isEndpointMode, meaningful, portKey, type PlanItem } from "../plan";
+
+/** The preview's one note about connections that were left out: links to devices the inventory does not list, plus the ones the server dropped
+ *  (wireless, VLAN). "" when there are none. */
+export function leftOutNote(inv: AuvikInventory, links: AuvikLinks | undefined | null): string {
+  if (!links) return "";
+  const ids = new Set(inv.devices.map((d) => d.id));
+  const n = links.dropped + links.links.filter((l) => !ids.has(l.device) || !ids.has(l.peerDevice)).length;
+  return n ? `${n} connection${n === 1 ? " was" : "s were"} left out (wireless, VLAN or devices Auvik doesn't list).` : "";
+}
 
 /** What a port-less cable shows in place of a port. */
 export const NO_PORT = "no port data";

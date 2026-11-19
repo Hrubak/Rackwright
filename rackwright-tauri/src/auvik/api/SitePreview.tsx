@@ -6,6 +6,7 @@ import { readImport } from "../../imports/read";
 import { ChangesList } from "../ChangeList";
 import type { Kind } from "../plan";
 import DeviceTable from "./DeviceTable";
+import { leftOutNote } from "./links";
 import type { SitePlan } from "./sync";
 import type { SortCol } from "./table";
 import { btn, inp } from "./ui";
@@ -30,20 +31,24 @@ export const newSiteState = (): SiteState => ({ excluded: new Set(), fill: "empt
 export const ticksOf = (p: SitePlan, over: Record<string, boolean>): Set<string> =>
   new Set([...(p.diff?.changes ?? []), ...p.other.flatMap((o) => o.diff.changes)].filter((c) => over[c.id] ?? c.defaultOn).map((c) => c.id));
 
-export default function SitePreview({ view, eff, st, setSt, targetName, isNew }: {
+export default function SitePreview({ view, eff, st, setSt, targetName, isNew, linkNote = "" }: {
   view: SitePlan;          // every device, for the table
   eff: SitePlan;           // without the unticked devices: what will be saved
   st: SiteState; setSt: (f: (s: SiteState) => SiteState) => void;
   targetName: string; isNew: boolean;
+  linkNote?: string;       // why the cables were not read, or ""
 }) {
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
+  const [allNotes, setAllNotes] = useState(false);
   const ticks = ticksOf(eff, st.over);
   const edit = (f: (s: SiteState) => SiteState) => setSt(f);   // the plan is redone; the person's tick choices stay
   const changes = [...(eff.diff?.changes ?? []), ...eff.other.flatMap((o) => o.diff.changes)];
   const isOn = (c: { id: string }) => ticks.has(c.id);
   const setOn = (ids: string[], on: boolean) => setSt((s) => { const o = { ...s.over }; for (const id of ids) o[id] = on; return { ...s, over: o }; });
+  const notes = [linkNote, leftOutNote(view.inv, view.links), ...view.plan.warnings, ...eff.notes].filter(Boolean);
+  const shown = allNotes ? notes : notes.slice(0, 3);
   const used = view.items.filter((i) => !st.excluded.has(i.dev.apiId ?? i.key)).length;
 
   const readLayout = (t: string) => {
@@ -62,7 +67,8 @@ export default function SitePreview({ view, eff, st, setSt, targetName, isNew }:
         Goes to <b>{targetName}</b>{isNew ? " (new site)" : ""}: {used} of {view.items.length} devices ticked.
         {eff.target.docId == null ? ` A new document "${eff.target.name}" will be made.` : ` "${eff.target.name}" will be updated.`}
       </div>
-      {view.plan.warnings.slice(0, 3).map((w, i) => <div key={i} style={{ opacity: 0.7 }}>Note: {w}</div>)}
+      {shown.map((w, i) => <div key={i} style={{ opacity: 0.7 }}>Note: {w}</div>)}
+      {notes.length > 3 && <a style={{ cursor: "pointer", textDecoration: "underline", opacity: 0.85 }} onClick={() => setAllNotes((o) => !o)}>{allNotes ? "Show fewer" : `Show all ${notes.length} notes`}</a>}
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", margin: "6px 0" }}>
         <label title="Off: only empty fields are filled. On: Auvik values replace yours (fields you edited by hand are still kept)."><input type="checkbox" checked={st.fill === "overwrite"} onChange={(e) => edit((s) => ({ ...s, fill: e.target.checked ? "overwrite" : "empty" }))} /> Overwrite existing values</label>
         <button style={{ ...btn, marginRight: 0 }} onClick={() => setLayoutOpen((o) => !o)}>{st.layout ? "Rack layout added" : "Add rack layout"}</button>

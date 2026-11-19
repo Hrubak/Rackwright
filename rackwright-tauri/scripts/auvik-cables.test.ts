@@ -1,8 +1,9 @@
 // Auvik cables: server links -> neighbours -> plan cables. Synthetic fixtures from the server tests.
 import { readFileSync } from "node:fs";
-import { endpointPorts, linksToNeighbors } from "../src/auvik/api/links";
+import { endpointPorts, leftOutNote, linksToNeighbors } from "../src/auvik/api/links";
 import { apiItems, toAuvikDevice, type AuvikApiDevice } from "../src/auvik/api/map";
 import { applySite, planSite, type SiteDocs } from "../src/auvik/api/sync";
+import { newCable } from "../src/edit";
 import type { Doc } from "../src/types";
 import type { AuvikInventory, AuvikLinks, AuvikTenant } from "../src/api";
 
@@ -127,6 +128,71 @@ t("one of two endpoints skipped: the other is still not attached", raw(shared, [
 // second import after the move changes nothing
 const again = sitePlan(inv, moved, links);
 t("re-import after the move: no move, one copy", !again.diff!.changes.some((c) => c.title === MOVE) && boxOf(applySite(again, ticked(again)).auvikDoc, "EX-PRN01").length === 1);
+
+// --- re-import and other racks
+const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+const withLinks = applySite(planSite(inv, tenant, mk(), defaults, "empty", undefined, undefined, undefined, links), null as any).auvikDoc;
+const devOf = (d: Doc, n: string) => d.devices.find((x) => x.name === n)!;
+const portOf = (d: Doc, dn: string, pn: string) => { const dv = devOf(d, dn); let p = dv.ports.find((x) => x.name === pn); if (!p) { p = { id: d.nid++, name: pn, type: "RJ45", label: "" }; dv.ports.push(p); } return p; };
+const owner = (d: Doc, pid: number) => d.devices.find((x) => x.ports.some((q) => q.id === pid))!.name;
+const cablesBetween = (d: Doc, x: string, y: string) => d.cables.filter((c) => { const n = [owner(d, c.a), owner(d, c.b)]; return n.includes(x) && n.includes(y); });
+const defOn = (p: ReturnType<typeof plan>) => new Set([...(p.diff?.changes ?? []), ...p.other.flatMap((o) => o.diff.changes)].filter((c) => c.defaultOn).map((c) => c.id));
+const sp = (siteDocs: SiteDocs) => planSite(inv, tenant, siteDocs, defaults, "empty", undefined, undefined, undefined, links);
+t("setup: first import draws the firewall cable", cablesBetween(withLinks, "EX-SW01", "EX-FW01").length === 1);
+
+{
+  const d = clone(withLinks);
+  const c = cablesBetween(d, "EX-SW01", "EX-FW01")[0];
+  const swEnd = owner(d, c.a) === "EX-SW01" ? "a" : "b";
+  const np = portOf(d, "EX-SW01", "1/1/2");
+  (c as any)[swEnd] = np.id;
+  devOf(d, "EX-SW01").locked = [...(devOf(d, "EX-SW01").locked ?? []), "port:1/1/2"];
+  const rp = sp(mk(d));
+  const ch = rp.diff!.changes.find((x) => x.id.startsWith("mv:") && x.title.includes("EX-FW01"));
+  t("reimport keeps hand-moved cable", !!ch && ch.defaultOn === false, JSON.stringify(rp.diff!.changes.map((x) => x.id + ":" + x.defaultOn)));
+  const out = applySite(rp, defOn(rp)).auvikDoc;
+  const k = cablesBetween(out, "EX-SW01", "EX-FW01");
+  t("hand-moved cable stays on 1/1/2", k.length === 1 && out.devices.find((x) => x.name === "EX-SW01")!.ports.find((q) => q.id === (k[0] as any)[swEnd])?.name === "1/1/2");
+}
+{
+  const d = clone(withLinks);
+  const k = newCable(d, portOf(d, "EX-SW01", "1/1/10").id, portOf(d, "EX-SW02", "1/1/10").id);
+  const rp = sp(mk(d));
+  const g = rp.diff!.changes.filter((x) => x.cat === "gone");
+  t("reimport keeps hand-added cable", g.length > 0 && g.every((x) => x.defaultOn === false), JSON.stringify(g));
+  const out = applySite(rp, defOn(rp)).auvikDoc;
+  t("hand-added cable still there", typeof k !== "string" && out.cables.some((c) => c.id === k.id));
+}
+const stripAuvik = (d: Doc) => { const o = clone(d); delete o.auvik; return o; };
+const pos = (d: Doc) => JSON.stringify(d.devices.map((x) => [x.id, x.rack, x.u, x.side, x.fx, x.fy]));
+{
+  const bare = firstImport(inv);
+  const a = stripAuvik(bare);
+  const rp = sp({ siteId: 1, racks: [{ id: 5, name: "Rack A", version: 1, doc: a }] });
+  const o = rp.other.find((x) => x.rackId === 5);
+  const cn = o?.diff.changes.filter((c) => c.id.startsWith("5:cn:")) ?? [];
+  t("cable in other rack doc: listed under Rack A", cn.length > 0 && cn.every((c) => c.defaultOn), JSON.stringify(o?.diff.changes.map((c) => c.id)));
+  const out = applySite(rp, defOn(rp)).others.find((x) => x.rackId === 5)?.doc;
+  t("cable in other rack doc: added, positions unchanged", !!out && cablesBetween(out, "EX-SW01", "EX-FW01").length === 1 && cablesBetween(out, "EX-SW01", "EX-SW02").length === 2 && pos(out) === pos(a));
+  const again = sp({ siteId: 1, racks: [{ id: 5, name: "Rack A", version: 2, doc: out! }] });
+  t("cable in other rack doc: re-import lists nothing", !again.other.some((x) => x.diff.changes.some((c) => c.id.includes(":cn:") || c.id.includes(":mv:") || c.id.includes(":gone:"))), JSON.stringify(again.other.map((x) => x.diff.changes.map((c) => c.id))));
+}
+{
+  const base = firstImport(inv);
+  const sw = devOf(base, "EX-SW01").id;
+  const a = stripAuvik(base); a.devices = a.devices.filter((x) => x.id === sw); a.cables = [];
+  const m = clone(base); m.devices = m.devices.filter((x) => x.id !== sw); m.cables = [];
+  const rp = sp({ siteId: 1, racks: [{ id: 3, name: "Example Site (Auvik)", version: 1, doc: m }, { id: 5, name: "Rack A", version: 1, doc: a }] });
+  const out = applySite(rp, defOn(rp));
+  const all = [out.auvikDoc, ...out.others.map((o) => o.doc)];
+  t("cable across docs not drawn", all.every((d) => cablesBetween(d, "EX-SW01", "EX-FW01").length === 0 && cablesBetween(d, "EX-SW01", "EX-SW02").length === 0));
+  t("cable across docs: note", rp.notes.includes("Not drawn: EX-SW01 and EX-FW01 are in different racks"), JSON.stringify(rp.notes));
+  t("across docs: note once per pair", rp.notes.filter((n) => n.includes("EX-SW01 and EX-SW02")).length === 1);
+  t("across docs: no cable change listed", ![...(rp.diff?.changes ?? []), ...rp.other.flatMap((o) => o.diff.changes)].some((c) => c.cat === "newCable" && /EX-SW01/.test(c.title)), JSON.stringify(rp.diff!.changes.map((c) => c.id)));
+}
+
+const none0: AuvikLinks = { ...links, dropped: 0 };
+t("left-out note", leftOutNote(inv, links) === "3 connections were left out (wireless, VLAN or devices Auvik doesn't list)." && leftOutNote(inv, { ...none0, dropped: 1 }) === "1 connection was left out (wireless, VLAN or devices Auvik doesn't list)." && leftOutNote(inv, { ...none0, links: [...none0.links, { device: "d-1001-01", iface: "1", peerDevice: "nope", peerIface: "2", portless: false }] }).startsWith("1 connection was") && leftOutNote(inv, none0) === "" && leftOutNote(inv, null) === "");
 
 if (fails) { console.log(fails + " failed"); process.exit(1); }
 console.log("all passed");

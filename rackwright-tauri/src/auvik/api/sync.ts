@@ -3,7 +3,7 @@
 import * as A from "../../api";
 import type { AuvikInventory, AuvikLinks, AuvikTenant } from "../../api";
 import type { ClientItem } from "../../clients/store";
-import { addRack, clone, fromTpl, setOffColumn } from "../../edit";
+import { addRack, clone, fromTpl, newCable, nid, setOffColumn } from "../../edit";
 import { modelById, specOf } from "../../racks";
 import { isManual, markManual, setSource } from "../../source";
 import type { Device, Doc } from "../../types";
@@ -13,7 +13,7 @@ import type { ImportSpec } from "../../imports/spec";
 import { applyInPlace } from "../apply";
 import { Change, Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
-import { classify, epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type HostCtx, type ImportPlan, type Kind } from "../plan";
+import { classify, epKindOf, groupTemplate, hostCtxOf, isEndpointMode, locatePort, resolvePlan, summarize, type EpKind, type HostCtx, type ImportPlan, type Kind, type PlanCable, type PlanUnit } from "../plan";
 import { NO_PORT, endpointPorts } from "./links";
 import { KIND_FAMILY, TO_PLACE_KINDS, apiItems, type ApiPlanItem, type Family, type Overrides } from "./map";
 
@@ -48,6 +48,7 @@ export interface SitePlan {
   heldIn: Record<string, string>;                              // the same keys -> the name of the rack document that holds the device
   held: Record<string, Held>;                                  // plan item keys the site's documents already hold (any document, "(Auvik)" too)
   layoutRows?: Row[];
+  notes: string[];                                             // "Not drawn: ..." lines: cables the import cannot draw (the two devices are in different rack documents)
   links?: AuvikLinks;                                          // the site's cables, when read
   over?: Overrides;                                            // the person's kind / type / model picks, by plan item key
   epPorts?: Map<string, { sw: string; port: string; attach: boolean }>;   // the switch and port of each endpoint that has one (see endpointPorts)
@@ -120,6 +121,67 @@ function markHand(doc: Doc, p: SitePlan, picks: Map<string, Set<string>>) {
     }
   }
 }
+const isCableChange = (id: string) => /^(?:\d+:)?(?:cn|mv):/.test(id);
+/** The two devices a plan cable joins, or null when an end is an endpoint-group member or an OOBM. */
+const unitEnds = (c: PlanCable): [PlanUnit, PlanUnit] | null =>
+  c.a.target.isGroup || c.b.target.isGroup || c.a.oobm || c.b.oobm ? null : [c.a.target as PlanUnit, c.b.target as PlanUnit];
+const cableOf = (plan: ImportPlan, id: string) => { const k = /^(?:\d+:)?(?:cn|mv):(.+)$/.exec(id)?.[1]; return plan.cables.find((c) => c.key === k); };
+const endsOf = (plan: ImportPlan, id: string) => { const c = cableOf(plan, id); return c ? unitEnds(c) : null; };
+/** The "(Auvik)" document lists no cable that has an end held in another rack document: that cable belongs there, or is not drawn. */
+const dropCablesElsewhere = (d: Diff, plan: ImportPlan, mineM: Map<string, Device>, keys: Set<string>): Diff => ({
+  ...d,
+  changes: d.changes.filter((c) => {
+    if (!isCableChange(c.id)) return true;
+    const e = endsOf(plan, c.id);
+    return !e || !e.some((u) => keys.has(u.key) && !mineM.has(u.key));
+  }),
+});
+/** Another rack document: field changes, and cable changes whose two ends it holds and the "(Auvik)" document does not. */
+const otherChanges = (d: Diff, plan: ImportPlan, mineM: Map<string, Device>): Change[] => d.changes.filter((c) => {
+  if (isFld(c.id)) return true;
+  if (!isCableChange(c.id)) return false;
+  const e = endsOf(plan, c.id);
+  return !!e && e.every((u) => d.matched.has(u.key) && !mineM.has(u.key));
+});
+/** One note per pair of devices that a cable joins but that are in different rack documents (a device held nowhere counts as the "(Auvik)" document). */
+function notDrawn(plan: ImportPlan, mineM: Map<string, Device>, others: Map<string, Device>[]): string[] {
+  const home = (k: string) => { if (mineM.has(k)) return "m"; const i = others.findIndex((m) => m.has(k)); return i >= 0 ? "o" + i : "m"; };
+  const seen = new Set<string>(), out: string[] = [];
+  for (const c of plan.cables) {
+    const e = unitEnds(c);
+    if (!e || home(e[0].key) === home(e[1].key)) continue;
+    const [a, b] = e;
+    const k = a.key + "|" + b.key;
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(`Not drawn: ${a.name} and ${b.name} are in different racks`);
+  }
+  return out;
+}
+/** Draws the ticked cable changes (cn / mv) in a rack document that holds both ends. Uses the ports the devices have (a named port that is missing is made);
+ *  never moves a device. A port that is already cabled is left alone. */
+function drawCables(doc: Doc, plan: ImportPlan, diff: Diff, pick: Set<string>): boolean {
+  const used = (pid: number, except?: number) => doc.cables.some((k) => k.id !== except && (k.a === pid || k.b === pid));
+  let changed = false;
+  for (const c of plan.cables) {
+    const e = unitEnds(c), st = diff.cable.get(c.key);
+    if (!e || !st || st.kind === "existing" || !c.a.iface || !c.b.iface) continue;
+    if (!pick.has((st.kind === "new" ? "cn:" : "mv:") + c.key)) continue;
+    const da = diff.matched.get(e[0].key), db = diff.matched.get(e[1].key);
+    if (!da || !db) continue;
+    const ha = locatePort(da, c.a.iface, e[0]), hb = locatePort(db, c.b.iface, e[1]), old = st.kind === "moved" ? st.from : undefined;
+    if (!ha || !hb || (!ha.port && !ha.create) || (!hb.port && !hb.create)) continue;
+    if ((ha.port && used(ha.port.id, old?.id)) || (hb.port && used(hb.port.id, old?.id))) continue;
+    const make = (h: typeof ha, dv: Device) => h.port ?? (() => { const p = { id: nid(doc), name: h.create!.name, type: h.create!.type, label: "" }; dv.ports.push(p); return p; })();
+    if (old) doc.cables = doc.cables.filter((k) => k.id !== old.id);
+    const k = newCable(doc, make(ha, da).id, make(hb, db).id);
+    if (typeof k === "string") continue;
+    if (old) for (const f of ["color", "style", "type", "length", "unit", "notes", "logical"]) if ((old as any)[f] !== undefined) (k as any)[f] = (old as any)[f];
+    k.label = c.label; if (!old) k.type = "Cat6";
+    changed = true;
+  }
+  return changed;
+}
+
 /** A device found in another rack document is left where it is: it is not offered as new here. */
 const dropElsewhere = (d: Diff, keys: Set<string>): Diff => ({ ...d, changes: d.changes.filter((c) => !(c.id.startsWith("new:") && keys.has(c.id.slice(4)))) });
 
@@ -182,19 +244,23 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
   const picks = handPicks(over);
+  const mineRaw = mine ? tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks) : null;
+  const mineM = mineRaw?.matched ?? new Map<string, Device>();
+  const otherM: Map<string, Device>[] = [];
   const elsewhere = new Set<string>();
   const heldIn: Record<string, string> = {};
   for (const r of siteDocs.racks) {
     if (r.id === mine?.id) continue;
-    const d = tickHand(computeDiff(r.doc, plan, items, { fill }), plan, picks);
+    const d = tickHand(computeDiff(r.doc, plan, items, { fill, byMatch: true }), plan, picks);
+    otherM.push(d.matched);
     for (const k of d.matched.keys()) { elsewhere.add(k); heldIn[k] ??= r.name; }
-    const changes = d.changes.filter((c) => isFld(c.id));
+    const changes = otherChanges(d, plan, mineM);
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, links, epPorts, parsed, items, plan, other, elsewhere, heldIn, held,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, links, epPorts, parsed, items, plan, other, elsewhere, heldIn, held, notes: notDrawn(plan, mineM, otherM),
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
-    diff: mine ? dropElsewhere(tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks), elsewhere) : null,
+    diff: mineRaw ? dropCablesElsewhere(dropElsewhere(mineRaw, elsewhere), plan, mineM, elsewhere) : null,
   };
   if (layout) p.layoutRows = build(p, null).rows;
   return p;
@@ -285,7 +351,8 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   const before = new Set(doc.devices.map((d) => d.id));
   const ticked = new Set(sel ?? []);
   const picks = handPicks(p.over);
-  const diff0 = dropElsewhere(tickHand(computeDiff(doc, p.plan, p.items, { fill: p.fill }), p.plan, picks), p.elsewhere);
+  const raw0 = tickHand(computeDiff(doc, p.plan, p.items, { fill: p.fill }), p.plan, picks);
+  const diff0 = dropCablesElsewhere(dropElsewhere(raw0, p.elsewhere), p.plan, raw0.matched, p.elsewhere);
   if (!mine || !sel) for (const id of defaultSelection(diff0)) ticked.add(id);
   for (const k of p.elsewhere) ticked.delete(`new:${k}`);
   // A matched device is imported when it has nothing to tick, or one of its changes is ticked.
@@ -317,9 +384,10 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   for (const r of p.siteDocs.racks) {
     if (r.id === mine?.id) continue;
     const od = clone(r.doc);
-    const diff = tickHand(computeDiff(od, p.plan, p.items, { fill: p.fill }), p.plan, picks);
+    const diff = tickHand(computeDiff(od, p.plan, p.items, { fill: p.fill, byMatch: true }), p.plan, picks);
     const pre = `${r.id}:`;
-    const pick = sel ? new Set([...sel].filter((x) => x.startsWith(pre)).map((x) => x.slice(pre.length))) : new Set(diff.changes.filter((c) => isFld(c.id) && c.defaultOn).map((c) => c.id));
+    const listed = new Set(otherChanges(diff, p.plan, raw0.matched).map((c) => c.id));   // only what the preview lists for this document
+    const pick = sel ? new Set([...sel].filter((x) => x.startsWith(pre)).map((x) => x.slice(pre.length)).filter((x) => listed.has(x))) : new Set(otherChanges(diff, p.plan, raw0.matched).filter((c) => c.defaultOn).map((c) => c.id));
     let changed = false;
     for (const u of orderUnits(p.plan)) {
       const dev = diff.matched.get(u.key) as X | undefined;
@@ -332,6 +400,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
         changed = true;
       }
     }
+    if (drawCables(od, p.plan, diff, pick)) changed = true;
     if (changed) { markHand(od, p, picks); others.push({ rackId: r.id, doc: od }); }
   }
   return { auvikDoc: doc, others, rows };

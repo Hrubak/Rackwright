@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { v } from "../../theme";
 import * as A from "../../api";
-import type { AuvikInventory, AuvikTenant } from "../../api";
+import type { AuvikInventory, AuvikLinks, AuvikTenant } from "../../api";
 import { ClientItem, clientStore } from "../../clients/store";
 import { RACK_MODELS, modelById } from "../../racks";
 import { useSettings } from "../../settings/context";
@@ -12,9 +12,10 @@ import { Defaults, SiteDocs, SitePlan, mapTenantToSite, planSite, saveSite, skip
 import { Busy, BusyStyle, btn, inp } from "./ui";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const cablesFailed = (site: string) => `Cables could not be read for ${site}; devices are imported without them.`;
 type Stage = "pick" | "reading" | "preview" | "saving" | "done";
 interface SitePick { on: boolean; siteId: number | null }   // siteId null = (new site)
-interface Read { tenant: AuvikTenant; inv: AuvikInventory | null; note: string }   // inv null = skipped
+interface Read { tenant: AuvikTenant; inv: AuvikInventory | null; note: string; links: AuvikLinks | null; linkNote: string }   // inv null = skipped; links null = no cables (linkNote says why)
 
 export default function ImportAuvikApi({ client, onDone, onClose }: { client: ClientItem; onDone: () => Promise<unknown> | void; onClose: () => void }) {
   const system = useSettings().system;
@@ -28,7 +29,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   const [docs, setDocs] = useState<Map<number, SiteDocs> | null>(null);
   const [picks, setPicks] = useState<Record<string, SitePick>>({});
   const [reads, setReads] = useState<Read[]>([]);
-  const [progress, setProgress] = useState({ n: 0, of: 0, name: "" });
+  const [progress, setProgress] = useState({ n: 0, of: 0, name: "", cables: false });
   const [sites, setSites] = useState<Record<string, SiteState>>({});
   const [tab, setTab] = useState("");
   const [lines, setLines] = useState<string[]>([]);
@@ -104,19 +105,32 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
     for (let i = 0; i < chosen.length; i++) {
       const t = chosen[i];
       if (stopped.current || !alive.current) break;
-      setProgress({ n: i + 1, of: chosen.length, name: t.name });
+      setProgress({ n: i + 1, of: chosen.length, name: t.name, cables: false });
       const ac = new AbortController(); abort.current = ac;
+      let inv: AuvikInventory;
       try {
-        const inv = await A.auvikInventory(t.id, ac.signal);
-        const skip = skipLine(t.name, inv);
-        if (skip) out.push({ tenant: t, inv: null, note: skip });
-        else out.push({ tenant: t, inv, note: "" });   // a site that finished is kept even if Stop landed just after
+        inv = await A.auvikInventory(t.id, ac.signal);
       } catch (e) {
         if (stopped.current) break;
         // one site that fails (a 403 included) is skipped; the other sites are still read and imported
         const denied = e instanceof A.ApiError && e.status === 403;
-        out.push({ tenant: t, inv: null, note: skipLine(t.name, denied ? { status: "denied", note: "", devices: [] } : e) });
+        out.push({ tenant: t, inv: null, note: skipLine(t.name, denied ? { status: "denied", note: "", devices: [] } : e), links: null, linkNote: "" });
+        continue;
       }
+      const skip = skipLine(t.name, inv);
+      if (skip) { out.push({ tenant: t, inv: null, note: skip, links: null, linkNote: "" }); continue; }
+      // The cables come after the devices. A site whose devices were read is kept even when its cables fail or Stop lands here.
+      setProgress({ n: i + 1, of: chosen.length, name: t.name, cables: true });
+      let links: AuvikLinks | null = null, linkNote = "";
+      try {
+        const l = await A.auvikLinks(t.id, ac.signal);
+        if (l.status === "ok") { links = l; if (!l.links.length) linkNote = `Auvik lists no connections for ${t.name}.`; }
+        else linkNote = l.status === "empty" ? `Auvik lists no connections for ${t.name}.` : cablesFailed(t.name);
+      } catch {
+        if (stopped.current) { out.push({ tenant: t, inv, note: "", links: null, linkNote: "" }); break; }
+        linkNote = cablesFailed(t.name);
+      }
+      out.push({ tenant: t, inv, note: "", links, linkNote });
     }
     abort.current = null;
     if (!alive.current) return;
@@ -134,7 +148,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   const planFor = (r: Read, all: boolean): SitePlan => {
     const st = sites[r.tenant.id] ?? newSiteState();
     const inv = !all && st.excluded.size ? { ...r.inv!, devices: r.inv!.devices.filter((d) => !st.excluded.has(d.id)) } : r.inv!;
-    return planSite(inv, r.tenant, docsOf(r.tenant), defaults, st.fill, st.layout ?? undefined, st.hosts, { kinds: st.kinds, types: st.types, models: st.models });
+    return planSite(inv, r.tenant, docsOf(r.tenant), defaults, st.fill, st.layout ?? undefined, st.hosts, { kinds: st.kinds, types: st.types, models: st.models }, r.links ?? undefined);
   };
   const active = reads.find((r) => r.tenant.id === tab);
   const plans = useMemo((): { view: SitePlan; eff: SitePlan; error?: undefined } | { error: string } | null => {
@@ -149,7 +163,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
     const next = { ...picks };
     for (const r of reads) {
       if (!r.inv) { out.push(r.note); continue; }
-      setProgress({ n: out.length + 1, of: reads.length, name: r.tenant.name });
+      setProgress({ n: out.length + 1, of: reads.length, name: r.tenant.name, cables: false });
       try {
         const p = planFor(r, false);
         const sel = ticksOf(p, sites[r.tenant.id].over);
@@ -232,7 +246,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
 
         {stage === "reading" && (
           <div style={{ padding: "10px 0" }}>
-            <Busy style={{ marginBottom: 6 }}>Reading site {progress.n} of {progress.of}: {progress.name}…</Busy>
+            <Busy style={{ marginBottom: 6 }}>{progress.cables ? "Reading cables for site" : "Reading site"} {progress.n} of {progress.of}: {progress.name}…</Busy>
             <progress style={{ width: "100%", accentColor: v("link") }} value={progress.n - 1} max={progress.of} />
             <div style={{ marginTop: 8 }}><button style={btn} onClick={stop}>Stop</button><span style={{ opacity: 0.7 }}>Stop keeps the sites already read.</span></div>
           </div>
@@ -251,7 +265,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
             {active?.inv && plans && "view" in plans && (
               <SitePreview key={active.tenant.id} view={plans.view} eff={plans.eff} st={sites[active.tenant.id] ?? newSiteState()}
                 setSt={(f) => setSites((o) => ({ ...o, [active.tenant.id]: f(o[active.tenant.id] ?? newSiteState()) }))}
-                targetName={nameOf(active.tenant)} isNew={picks[active.tenant.id]?.siteId == null} />
+                targetName={nameOf(active.tenant)} isNew={picks[active.tenant.id]?.siteId == null} linkNote={active.linkNote} />
             )}
             {!active?.inv && <div style={{ padding: 12, opacity: 0.8 }}>Nothing to import from these sites.</div>}
             <div style={{ marginTop: 10, textAlign: "right" }}>
