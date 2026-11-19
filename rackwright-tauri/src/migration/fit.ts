@@ -62,14 +62,17 @@ export function resultText(f: FitResult): string {
   const head = LEVEL_TEXT[f.overall];
   if (f.overall === "incomplete") return `${head} \u2014 ${f.missing.length} ${f.missing.length === 1 ? "VM has" : "VMs have"} no size`;
   if (f.overall === "fits") return head;
-  const entries: [string, ResourceFit][] = [["CPU", f.cpu], ["RAM", f.ram], ["Disk", f.disk]];
+  const entries: [string, ResourceFit][] = [["CPU", f.cpu], ["RAM", f.ram], ["disk", f.disk]];
   const top = entries.reduce((a, b) => (b[1].usedPct > a[1].usedPct ? b : a));
   if (f.overall === "over" && f.cpu.level !== "over" && f.ram.level !== "over" && f.disk.level !== "over") {
     const n = new Set(f.problems.map(p => p.key)).size;
     return `${head} (${n} ${n === 1 ? "VM" : "VMs"} too big for a node)`;
   }
-  const pct = Number.isFinite(top[1].usedPct) ? `${Math.round(top[1].usedPct)}%` : "no capacity";
-  return `${head} (${top[0]} ${pct})`;
+  if (!Number.isFinite(top[1].usedPct)) return `${head} (no ${top[0]} capacity)`;
+  let pct = Math.round(top[1].usedPct);
+  if (top[1].level === "over" && pct <= 100) pct = 101;
+  if (top[1].level === "tight" && pct <= TIGHT_PCT) pct = TIGHT_PCT + 1;
+  return `${head} (${top[0]} ${pct}%)`;
 }
 
 export function failoverText(f: FitResult): string {
