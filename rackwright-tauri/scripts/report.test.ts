@@ -93,10 +93,11 @@ eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), tru
   const mm = buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration!;
   eq("migration title", mm.title, "VM migration to EX-CL01");
   eq("migration vms", mm.vms.length, 1);
-  eq("migration vm row", mm.vms[0].slice(0, 1).concat(mm.vms[0].slice(3)), ["EX-SQL01", "8", "32", "500", "200"]);
-  eq("migration header", mm.capacity[0], ["Resource", "Needed", "Available", "Used", "Left"]);
+  eq("migration vm row", mm.vms[0].slice(0, 1).concat(mm.vms[0].slice(3)), ["EX-SQL01", "8", "32", "500", "200", ""]);
+  eq("migration header", mm.capacity[0], ["Resource", "Needed", "Available", "% used", "Left"]);
   eq("migration rows", mm.capacity.slice(1).map((r) => r[0]), ["vCPU", "RAM (GB)", "Disk (TB)"]);
   eq("migration result", mm.result.startsWith("Result: "), true);
+  eq("migration used today", mm.usedToday, "Used today: 0.2 TB");
   eq("migration cluster line", mm.clusterLine, "3 nodes, each 24 cores, 384 GB RAM and 7.7 TB raw storage. One node down (N+1).");
   eq("migration default on", buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration !== undefined, true);
   eq("zero capacity dash", buildReportModel({ client: mc({ ...p2, cluster: { ...p2.cluster, cores: 0 } }), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration!.capacity[1][3], "\u2014");

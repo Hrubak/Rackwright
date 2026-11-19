@@ -7,8 +7,8 @@ import type { InvRow } from "../clients/util";
 import { clientAlerts, todayIso } from "../attention/model";
 import type { Alert } from "../attention/model";
 import { powerBudget } from "../power/model";
-import { siteVms, isIncluded, PLATFORM_LABEL } from "../migration/vms";
-import { fitPlan, resultText, failoverText } from "../migration/fit";
+import { siteVms, isIncluded, unreadableRacks, PLATFORM_LABEL } from "../migration/vms";
+import { fitPlan, resultText, failoverText, pctText, fmtNum } from "../migration/fit";
 import type { MigrationPlan } from "../migration/types";
 import { switchPorts, switchesOf } from "../views/switchPorts";
 
@@ -20,29 +20,31 @@ export interface SiteSection {
   migration?: MigrationSection;
 }
 export interface MigrationSection {
-  title: string; clusterLine: string; capacity: string[][]; result: string; vms: string[][];
+  title: string; clusterLine: string; capacity: string[][]; result: string; usedToday: string; vms: string[][];
 }
-const whole = (n: number) => String(Math.round(n));
-const oneDp = (n: number) => n.toFixed(1);
+const whole = (n: number) => fmtNum(n, 0);
+const oneDp = (n: number) => fmtNum(n, 1);
+const sizeText = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 1 });
 const num = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
 
 /** Every string of the migration section, built once so Word and PDF only lay it out. */
 export function buildMigration(plan: MigrationPlan, racks: { key: string; name: string }[], docs: Record<string, Doc | string>): MigrationSection {
   const c = plan.cluster;
   const vms = siteVms(racks, docs);
-  const fit = fitPlan(plan, vms);
+  const fit = fitPlan(plan, vms, { unreadable: unreadableRacks(racks, docs) });
   const row = (label: string, r: typeof fit.cpu, f: (n: number) => string) =>
-    [label, f(r.needed), f(r.available), r.available > 0 ? `${Math.round(r.usedPct)}%` : "—", f(r.left)];
+    [label, f(r.needed), f(r.available), pctText(r), f(r.left)];
   const nodes = num(c.nodes);
   return {
     title: `VM migration to ${c.name}`,
     clusterLine: `${nodes} ${nodes === 1 ? "node" : "nodes"}, each ${whole(num(c.cores))} cores, ${whole(num(c.ramGb))} GB RAM and ${oneDp(num(c.rawTb))} TB raw storage. ${failoverText(fit)}.`,
-    capacity: [["Resource", "Needed", "Available", "Used", "Left"], row("vCPU", fit.cpu, whole), row("RAM (GB)", fit.ram, whole), row("Disk (TB)", fit.disk, oneDp)],
+    capacity: [["Resource", "Needed", "Available", "% used", "Left"], row("vCPU", fit.cpu, whole), row("RAM (GB)", fit.ram, whole), row("Disk (TB)", fit.disk, oneDp)],
     result: `Result: ${resultText(fit)}`,
+    usedToday: `Used today: ${oneDp(fit.usedTb)} TB`,
     vms: vms.filter((vm) => isIncluded(vm, plan.vms[vm.key])).map((vm) => {
       const e = plan.vms[vm.key];
-      const t = (n: number | undefined) => (typeof n === "number" && Number.isFinite(n) ? whole(n) : "");
-      return [vm.name, vm.host, PLATFORM_LABEL[vm.platform], t(e?.vcpu), t(e?.ramGb), t(e?.diskGb), t(e?.usedGb)];
+      const t = (n: number | undefined, w = false) => (typeof n === "number" && Number.isFinite(n) ? (w ? whole(n) : sizeText(n)) : "");
+      return [vm.name, vm.host, PLATFORM_LABEL[vm.platform], t(e?.vcpu, true), t(e?.ramGb), t(e?.diskGb), t(e?.usedGb), fit.problems.find((p) => p.key === vm.key)?.reason ?? ""];
     }),
   };
 }

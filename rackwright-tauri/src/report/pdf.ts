@@ -118,8 +118,8 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
 
   const h1 = (s: string) => { ensure(60); y += 6; setText(16, true, primary); pdf.text(s, M, y + 12); y += 26; };
   const h2 = (s: string, keep = 40) => { ensure(keep); setText(12.5, true, secondary); pdf.text(fitText(s, CW), M, y + 10); y += 20; };
-  const paragraph = (text: string, size = 10, c: RGB = ink) => {
-    setText(size, false, c);
+  const paragraph = (text: string, size = 10, c: RGB = ink, bold = false) => {
+    setText(size, bold, c);
     const lh = size * 1.4;
     for (const para of text.replace(/\r/g, "").split("\n")) {
       if (!para.trim()) { y += lh * 0.6; continue; }
@@ -263,8 +263,9 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
       h2(m.title, 80);
       paragraph(m.clusterLine);
       table(m.capacity[0].map((head, i) => ({ head, w: i === 0 ? 1.8 : 1.2 })), m.capacity.slice(1));
-      paragraph(m.result);
-      if (model.level === "detailed" && m.vms.length) table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }], m.vms);
+      paragraph(m.result, 10, ink, true);
+      paragraph(m.usedToday);
+      if (model.level === "detailed" && m.vms.length) table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }, { head: "Note", w: 1.8 }], m.vms);
     };
     for (const s of model.sites) {
       await siteBlock(s);

@@ -7,7 +7,7 @@ export interface ClusterSpec { name: string; nodes: number; cores: number; ramGb
 export interface FitRules { cpuRatio: number; ramReserveGb: number; keepFreePct: number; nPlus1: boolean }
 export interface VmEntry {
   vcpu?: number; ramGb?: number; diskGb?: number; usedGb?: number;
-  include?: boolean; notes?: string;
+  include?: boolean; notes?: string; name?: string;
   source?: Partial<Record<SizeField, SizeSourceId>>;
 }
 export interface MigrationPlan {
@@ -37,7 +37,7 @@ export function readPlan(x: unknown): MigrationPlan | undefined {
   return {
     ...x,
     v: 1,
-    cluster: x.cluster as unknown as ClusterSpec,
+    cluster: { ...(x.cluster as unknown as ClusterSpec), name: typeof x.cluster.name === "string" ? x.cluster.name : "" },
     rules: { ...DEFAULT_RULES, ...(isObj(x.rules) ? x.rules : {}) },
     vms: isObj(x.vms) ? (x.vms as Record<string, VmEntry>) : {},
   };

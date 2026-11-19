@@ -140,8 +140,8 @@ export function buildBodyXml(model: ReportModel, pics: Map<string, BodyPic>, opt
   const migrationBlock = (m: NonNullable<SiteSection["migration"]>) => {
     out.push(heading(2, m.title), paras(m.clusterLine));
     out.push(table(m.capacity[0].map((head, i) => ({ head, w: i === 0 ? 1.8 : 1.2 })), m.capacity.slice(1)));
-    out.push(paras(m.result, { bold: true }));
-    if (detailed && m.vms.length) out.push(table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }], m.vms));
+    out.push(paras(m.result, { bold: true }), paras(m.usedToday));
+    if (detailed && m.vms.length) out.push(table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }, { head: "Note", w: 1.8 }], m.vms));
   };
 
   for (const s of model.sites) {

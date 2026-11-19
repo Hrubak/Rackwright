@@ -65,7 +65,7 @@ export default function FloorTab({ client, siteId, docs, units, onOpenRack, onSa
       await store.setRooms(p.key, p.id, p.rooms);
       if (!pending.current) dirty.current = false;
       setSaved(true); setMsg("");
-      if (store.web) await onSaved(); // web: reload so the plan shows what was stored
+      await onSaved(); // reload so a remount shows what was stored
     } catch (e) { setMsg(errOf(e)); }
   }, [store, onSaved]);
   const flushRef = useRef(flush); flushRef.current = flush;

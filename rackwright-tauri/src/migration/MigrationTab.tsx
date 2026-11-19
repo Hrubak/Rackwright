@@ -11,7 +11,7 @@ import { NODE_PRESETS } from "./presets";
 import { SIZE_SOURCES, applyFill } from "./sources";
 import { newPlan, readPlan, type ClusterSpec, type FitRules, type MigrationPlan, type VmEntry } from "./types";
 import VmTable from "./VmTable";
-import { orphanKeys, siteVms } from "./vms";
+import { orphanKeys, siteVms, unreadableRacks } from "./vms";
 
 const btn = { background: v("control"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "4px 10px", cursor: "pointer", fontSize: 12 } as const;
 const errOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -55,7 +55,7 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
       await store.setMigration(q.key, q.id, q.plan);
       if (!queued.current) { dirty.current = false; setPending(false); }
       setSaved(true); setMsg("");
-      if (store.web) await onSaved(); // web: reload so the tab shows what was stored
+      await onSaved(); // reload so a remount shows what was stored
     } catch (e) { setMsg(errOf(e)); }
   }, [store, onSaved]);
   const flushRef = useRef(flush); flushRef.current = flush;
@@ -69,7 +69,8 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
     timer.current = setTimeout(() => void flush(), 600);
   };
 
-  const fit = useMemo(() => (plan ? fitPlan(plan, vms) : undefined), [plan, vms]);
+  const unreadable = useMemo(() => (site ? unreadableRacks(site.racks, docs) : []), [site, docs]);
+  const fit = useMemo(() => (plan ? fitPlan(plan, vms, { unreadable }) : undefined), [plan, vms, unreadable]);
 
   if (!client.sites.length) return <div style={{ opacity: 0.8 }}>Add a site on the Sites tab to start a migration plan.</div>;
   if (!site) return null;
@@ -129,7 +130,7 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
       <div style={row}>
         <b>Target cluster</b>
         <label style={lab}>Name<input style={{ ...inp, width: 120 }} value={plan.cluster.name} onChange={(e) => setCluster({ name: e.target.value })} /></label>
-        {num("Nodes", plan.cluster.nodes, true, (n) => setCluster({ nodes: n }), 44)}
+        {num("Nodes", plan.cluster.nodes, true, (n) => setCluster({ nodes: Math.max(1, n) }), 44)}
         {NODE_PRESETS.length > 0 && (
           <label style={lab}>Start from
             <select style={inp} value={plan.cluster.preset ?? ""} onChange={(e) => pickPreset(e.target.value)}>
@@ -154,6 +155,7 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
         <span style={{ fontSize: 11, opacity: 0.7 }}>Defaults to be checked against Scale's guidance.</span>
       </div>
 
+      {unreadable.length > 0 && <div style={{ fontSize: 12, color: v("error-text"), marginBottom: 6 }}>Could not read {unreadable.join(", ")}. {unreadable.length === 1 ? "Its" : "Their"} VMs are not counted.</div>}
       <CapacityTable fit={fit} />
 
       <div style={{ ...row, marginTop: 4 }}>
@@ -172,8 +174,8 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
           <div style={{ fontSize: 12, opacity: 0.8, margin: "2px 0 6px" }}>These sizes are kept until you remove them.</div>
           {orphans.map((k) => (
             <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
-              <span style={{ fontSize: 12 }}>{k}</span>
-              <button style={btn} onClick={() => { const rest = { ...plan.vms }; delete rest[k]; edit({ ...plan, vms: rest }); }}>Remove</button>
+              <span style={{ fontSize: 12 }}>{plan.vms[k]?.name ?? k}</span>
+              {unreadable.length === 0 && <button style={btn} onClick={() => { const rest = { ...plan.vms }; delete rest[k]; edit({ ...plan, vms: rest }); }}>Remove</button>}
             </div>
           ))}
         </div>

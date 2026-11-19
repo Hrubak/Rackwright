@@ -43,6 +43,11 @@ export function siteVms(racks: { key: string; name: string }[], docs: Record<str
   return [...out.values()].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
+/** Names of racks whose file could not be read (error text) or is not loaded. */
+export function unreadableRacks(racks: { key: string; name: string }[], docs: Record<string, Doc | string>): string[] {
+  return racks.filter((r) => { const d = docs[r.key]; return !d || typeof d === "string"; }).map((r) => r.name);
+}
+
 export function defaultInclude(vm: SiteVm): { include: boolean; reason: string } {
   if (vm.infra) return { include: false, reason: "Infrastructure VM" };
   if (vm.platform === "scale") return { include: false, reason: "Already on Scale" };

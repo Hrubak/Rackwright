@@ -1,10 +1,10 @@
 // npx tsx scripts/migration.test.ts — migration plan defaults and reading (synthetic data only)
 import { DEFAULT_RULES, newPlan, readPlan } from "../src/migration/types";
-import { fitPlan, resultText, failoverText, parseSize } from "../src/migration/fit";
+import { fitPlan, resultText, failoverText, parseSize, pctText, fmtNum } from "../src/migration/fit";
 import { applyFill } from "../src/migration/sources";
 import { NODE_PRESETS } from "../src/migration/presets";
 import type { SiteVm } from "../src/migration/vms";
-import { siteVms, defaultInclude, isIncluded, orphanKeys } from "../src/migration/vms";
+import { siteVms, defaultInclude, isIncluded, orphanKeys, unreadableRacks } from "../src/migration/vms";
 
 let fail = 0;
 const eq = (name: string, a: unknown, b: unknown) => {
@@ -116,6 +116,19 @@ const filled2 = applyFill(pl2, { a: { vcpu: 8 } }, "asio", true);
 eq("fill overwrite", [filled2.vms.a.vcpu, filled2.vms.a.source], [8, { vcpu: "asio" }]);
 eq("preset ids", new Set(NODE_PRESETS.map(x => x.id)).size, NODE_PRESETS.length);
 if (NODE_PRESETS.length) eq("presets positive", NODE_PRESETS.every(x => x.cores > 0 && x.ramGb > 0 && x.rawTb > 0), true);
+
+// --- final review fixes
+eq("unreadable racks", unreadableRacks([{ key: "r1", name: "EX-Rack1" }, { key: "r2", name: "EX-Rack2" }, { key: "r3", name: "EX-Rack3" }], { r1: doc1, r2: "load error" } as any), ["EX-Rack2", "EX-Rack3"]);
+const fu = fitPlan((() => { const q = newPlan("Example HQ"); q.cluster = { ...q.cluster, cores: 24, ramGb: 384, rawTb: 7.7 }; q.vms = { a: one }; return q; })(), [mk("a")], { unreadable: ["EX-Rack2"] });
+eq("unreadable incomplete", [fu.overall, resultText(fu)], ["incomplete", "Incomplete \u2014 could not read EX-Rack2"]);
+eq("pctText over", pctText({ needed: 100.4, available: 100, usedPct: 100.4, left: 0, level: "over" }), "101%");
+eq("pctText none", pctText({ needed: 1, available: 0, usedPct: Infinity, left: -1, level: "over" }), "\u2014");
+eq("fmtNum", [fmtNum(1234.56, 0), fmtNum(7.7, 1)], ["1,235", "7.7"]);
+const fk = fp({ a: one }, [mk("a")], p => { p.rules.keepFreePct = 150; });
+eq("keepFree clamp", fk.disk.available >= 0, true);
+const fz = fp({ a: one }, [mk("a")], p => { p.cluster.cores = 0; p.cluster.ramGb = 0; });
+eq("zero cluster no per-VM problem", fz.problems, []);
+eq("readPlan cluster name default", readPlan({ cluster: { nodes: 3 } })!.cluster.name, "");
 
 console.log(fail ? `${fail} failed` : "all passed");
 if (fail) process.exit(1);

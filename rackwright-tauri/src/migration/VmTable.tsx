@@ -23,13 +23,13 @@ export default function VmTable({ vms, plan, fit, onEntry }: { vms: SiteVm[]; pl
           const reason = defaultInclude(vm).reason;
           const note = inc ? problem : reason ? `Left out: ${reason}` : "Left out";
           const set = (f: SizeField, n: number | undefined) => {
-            const next: VmEntry = { ...(e ?? {}), source: { ...(e?.source ?? {}), [f]: "manual" } };
+            const next: VmEntry = { ...(e ?? {}), name: vm.name, source: { ...(e?.source ?? {}), [f]: "manual" } };
             if (n === undefined) { delete next[f]; delete next.source![f]; } else next[f] = n;
             onEntry(vm.key, next);
           };
           return (
             <tr key={vm.key} style={{ borderTop: `1px solid ${v("border-subtle")}`, opacity: inc ? 1 : 0.65 }}>
-              <td style={td}><input type="checkbox" aria-label={`Include ${vm.name}`} checked={inc} onChange={(ev) => onEntry(vm.key, { ...(e ?? {}), include: ev.target.checked })} /></td>
+              <td style={td}><input type="checkbox" aria-label={`Include ${vm.name}`} checked={inc} onChange={(ev) => onEntry(vm.key, { ...(e ?? {}), name: vm.name, include: ev.target.checked })} /></td>
               <td style={td}>{vm.name}</td>
               <td style={td}>{vm.host}</td>
               <td style={td}>{PLATFORM_LABEL[vm.platform]}</td>
