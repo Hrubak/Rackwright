@@ -247,7 +247,7 @@ Placement (both renderers, same headings): overview level — right after the si
 
 - [ ] **Step 1:** CHANGELOG `## 3.21.0 — <date>`, plain sentences: the Migration tab, what the result means, that the reserve and keep-free defaults are settings to check, the report section, that sizes are typed in this release.
 - [ ] **Step 2:** `node scripts/version.mjs 3.21.0` then `node scripts/version.mjs --check`.
-- [ ] **Step 3:** Full pre-commit check, the customer-data scan from HANDOFF.md (only the known `vsz` hit in `src/auvik/plan.ts`), `grep -l tauri-apps web/dist/assets/*.js` empty.
+- [ ] **Step 3:** Full pre-commit check, the customer-data scan from HANDOFF.md (only the one known hit in `src/auvik/plan.ts`), `grep -l tauri-apps web/dist/assets/*.js` empty.
 - [ ] **Step 4:** Whole-branch review (one reviewer). Fix what it finds.
 - [ ] **Step 5:** Commit `Release 3.21.0: VM migration plan`. **Stop. Ask the user "Push it" or "Not yet".**
 

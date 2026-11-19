@@ -16,6 +16,11 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
 
 Design: `docs/superpowers/specs/2026-11-18-auvik-api-import-design.md`.
 
+## VM migration
+
+- 3.21.0: VM migration plan per site onto a Scale Computing HyperCore cluster (web and desktop): typed cluster and VM sizes, capacity check with N+1, report section. Done. Design: `docs/superpowers/specs/2026-11-19-vm-migration-plan-design.md`.
+- Next: migration waves (date, order, status per VM); "Fill sizes from Asio" (ConnectWise Asio, web only, through the size-source hook in `src/migration/sources.ts`); Scale node models only with cited spec-sheet numbers.
+
 ## Look and feel (planned after Clients and sites)
 
 - **Logo and icon.** A Rackwright logo and an app icon (desktop exe, browser tab, sign-in page).

@@ -2,6 +2,17 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.21.0 — 2026-11-19
+Web and desktop. Update the LXC as usual and download the new desktop exe.
+- **VM migration plan.** A new **Migration** tab on each client plans moving a site's virtual machines from VMware ESXi and Hyper-V hosts onto a Scale Computing HyperCore cluster, and shows whether they fit. Pick the site, press **Start a plan**, and type in the cluster: nodes, and cores, RAM and raw storage per node.
+- **The VMs come from your racks.** The list is every VM the site already holds: the "Virtual machines" boxes and the VMs from an Auvik import. Each shows the host it runs on now, when Rackwright knows it, and its platform. vCenter-style infrastructure VMs and VMs already on Scale start left out, with the reason shown; tick one to include it.
+- **Type the sizes.** For each VM, type vCPU, RAM (GB), disk provisioned (GB) and disk used (GB). Tab moves along the row. The fit uses the provisioned disk; used disk is shown for information.
+- **The result.** Fits (up to 80% used), Tight (80 to 100%) or Doesn't fit (over 100%), for CPU, RAM and disk. With "One node can fail (N+1)" ticked (the default), CPU and RAM are counted with one node down and storage keeps room to rebuild after losing a node. Storage counts HyperCore's two copies of every block. A VM that needs more RAM or more vCPUs than one node has is marked and makes the result "Doesn't fit". While a VM still has no size the result says "Incomplete", never "Fits".
+- **Settings to check.** vCPU per core (default 4), the RAM reserve per node (default 8 GB) and Keep free (default 20%) can be changed per plan. The 8 GB and 20% defaults still need checking against Scale's guidance.
+- **In the client report.** Word and PDF reports get a "VM migration to <cluster>" section for each site with a plan: the cluster, the capacity table and the result; Detailed adds the VM table. Left-out VMs are not printed. Untick "VM migration plan" in the report dialog to leave it out.
+- If a VM disappears from the racks (for example after a re-import), its typed sizes are kept under "No longer in the racks" until you remove them. Re-importing from Auvik never changes the plan.
+- Sizes are typed in this release; filling them from ConnectWise Asio comes later. There are no ready-made Scale node models to pick from yet.
+
 ## 3.20.0 — 2026-11-19
 Web only; the desktop app is unchanged. Update the LXC as usual.
 - **Cables from Auvik.** Import from Auvik now reads each site's cables too. After a site's devices you see "Reading cables for site 2 of 5". Switch ports get cables to the firewall, the other switches, servers and endpoints that Auvik sees on them. Both ports of a LAG get their own cable.
