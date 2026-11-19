@@ -13,6 +13,7 @@ import type { RackLocation } from "../location";
 import type { ClientTab } from "../home/Dashboard";
 import { useSettings } from "../settings/context";
 import FloorTab from "../rooms/FloorTab";
+import MigrationTab from "../migration/MigrationTab";
 import { ClientItem, RackItem, SiteItem, clientStore } from "./store";
 import { IS_WEB } from "../backend";
 import { auvikStatus } from "../api";
@@ -147,6 +148,7 @@ export default function ClientPage({ clientKey: key, tab, site: siteFilter, rev,
       {err && <div style={{ background: v("error-bg"), color: v("error-text"), padding: "6px 14px", marginBottom: 10 }}>{err}</div>}
       {busy && <div style={{ opacity: 0.7, marginBottom: 6 }}>Working...</div>}
       {tab === "floor" && <FloorTab client={client} siteId={siteFilter} docs={docs} units={units} onOpenRack={(r) => open(r)} onSaved={refresh} />}
+      {tab === "migration" && <MigrationTab client={client} siteId={siteFilter} docs={docs} onSaved={refresh} />}
       {tab === "inventory" && <Inventory client={scoped} fullClient={client} docs={docs} onOpen={(r, devId) => open(r, { devId })} />}
       {tab === "cabling" && <Cabling client={scoped} docs={docs} onOpen={(r, cableId) => open(r, { cableId })} />}
       {tab === "links" && <Links client={client} docs={docs} store={store} onChanged={refresh} />}

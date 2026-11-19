@@ -5,7 +5,7 @@ import type { ClientTab } from "../home/Dashboard";
 import { ClientItem, ClientListItem, clientStore } from "./store";
 
 const sel = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "3px 6px", fontSize: 12, maxWidth: 200 } as const;
-export const CLIENT_TABS: [ClientTab, string][] = [["floor", "Floor plan"], ["sites", "Sites"], ["racks", "Racks"], ["inventory", "Inventory"], ["cabling", "Cabling"], ["links", "Links"]];
+export const CLIENT_TABS: [ClientTab, string][] = [["floor", "Floor plan"], ["sites", "Sites"], ["racks", "Racks"], ["inventory", "Inventory"], ["cabling", "Cabling"], ["migration", "Migration"], ["links", "Links"]];
 
 export default function ClientBar({ clientKey, tab, site, rev, onClient, onSite, onTab, onReport }: {
   clientKey: string; tab: ClientTab; site?: number; rev: number;
