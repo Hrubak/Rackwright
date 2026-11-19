@@ -201,6 +201,9 @@ function drawCables(doc: Doc, plan: ImportPlan, diff: Diff, pick: Set<string>): 
 /** A device found in another rack document is left where it is: it is not offered as new here. */
 const dropElsewhere = (d: Diff, keys: Set<string>): Diff => ({ ...d, changes: d.changes.filter((c) => !(c.id.startsWith("new:") && keys.has(c.id.slice(4)))) });
 
+/** Without cables read (none, denied, failed, skipped) we cannot say Auvik no longer lists a connection: drop those changes. */
+const noGone = (d: Diff, links?: AuvikLinks): Diff => links && links.status === "ok" ? d : { ...d, changes: d.changes.filter((c) => !c.id.startsWith("gone:")) };
+
 /** A row the site already holds: where (see Family), in which rack document, and a device's current type there. */
 export interface Held { family: Family; rack: string; type?: string }
 
@@ -246,6 +249,9 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
   // Endpoints that hang off a switch move onto it, unless the port looks like an uplink or is shared, or the site already holds
   // the endpoint somewhere else (a hand-made group, an older .xlsx group, another rack document): those keep their place.
   const epPorts = links?.links.length ? endpointPorts(parsed, items) : new Map<string, { sw: string; port: string; attach: boolean }>();
+  // A switch held in another rack document is not here to attach to: its endpoints stay in (or go to) their Endpoints box, with the switch and port in the Port column.
+  const swKey = new Map(items.map((i) => [i.dev.name, i.key]));
+  for (const [k, e] of epPorts) { const h = held[swKey.get(e.sw) ?? ""]; if (h && h.rack !== mine?.name) epPorts.set(k, { ...e, attach: false }); }
   if (epPorts.size) {
     const others = siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc);
     const stay = new Set<string>();
@@ -277,7 +283,7 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
   const p: SitePlan = {
     tenant, inv, siteDocs, defaults, fill, layout, hosts, over, links, epPorts, parsed, items, plan, other, elsewhere, heldIn, held, foreign: homes.foreign, notes: homes.notes,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
-    diff: mineRaw ? dropCablesElsewhere(dropElsewhere(mineRaw, elsewhere), homes.foreign) : null,
+    diff: mineRaw ? noGone(dropCablesElsewhere(dropElsewhere(mineRaw, elsewhere), homes.foreign), links) : null,
   };
   if (layout) p.layoutRows = build(p, null).rows;
   return p;

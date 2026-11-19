@@ -164,6 +164,7 @@ t("setup: first import draws the firewall cable", cablesBetween(withLinks, "EX-S
   const out = applySite(rp, defOn(rp)).auvikDoc;
   t("hand-added cable still there", typeof k !== "string" && out.cables.some((c) => c.id === k.id));
 }
+const sp2 = (l: AuvikLinks) => planSite(inv, tenant, mk(withLinks), defaults, "empty", undefined, undefined, undefined, l);
 const stripAuvik = (d: Doc) => { const o = clone(d); delete o.auvik; return o; };
 const pos = (d: Doc) => JSON.stringify(d.devices.map((x) => [x.id, x.rack, x.u, x.side, x.fx, x.fy]));
 {
@@ -240,6 +241,46 @@ t("left-out note", leftOutNote(inv, links) === "3 connections were left out (wir
   const hand = rp.notes.filter((n) => n.endsWith("are in Rack A; add this cable there by hand."));
   t("oobm cable inside Rack A: note says add it by hand", hand.length === 1 && /^Not drawn: EX-SW01 and EX-SRV01 are in Rack A/.test(hand[0]), JSON.stringify(rp.notes));
   t("oobm cable inside Rack A: no cable change in the Auvik doc", !(rp.diff?.changes ?? []).some((c) => c.id.startsWith("cn:") && rp.plan.cables.some((k) => (k.a.oobm || k.b.oobm) && c.id === "cn:" + k.key)));
+}
+
+// switch held in another rack document: its endpoints stay in their box, nothing moves into a detached group
+{
+  const swId = (d: Doc) => devOf(d, "EX-SW01").id;
+  const epGroup = (d: Doc) => d.devices.filter((x) => /^Endpoints on /.test(x.name)).map((x) => x.name);
+  const noSwitch = (base: Doc) => { const m = clone(base); m.devices = m.devices.filter((x) => x.id !== swId(base)); m.cables = []; return m; };
+  const rackA = (base: Doc) => { const a = stripAuvik(base); a.devices = a.devices.filter((x) => x.id === swId(base)); a.cables = []; return a; };
+  // re-import: the printer sits in its Printers box (made without cables), the switch is in Rack A
+  const boxed = firstImport(inv);
+  const m = noSwitch(boxed), a = rackA(boxed);
+  const rp = sp({ siteId: 1, racks: [{ id: 3, name: "Example Site (Auvik)", version: 1, doc: m }, { id: 5, name: "Rack A", version: 1, doc: a }] });
+  t("switch in Rack A: no Move change", !rp.diff!.changes.some((c) => c.title === MOVE || c.id.startsWith("mvm:")), JSON.stringify(rp.diff!.changes.map((c) => c.id)));
+  const out = applySite(rp, defOn(rp)).auvikDoc;
+  t("switch in Rack A: printer stays in its box", boxOf(out, "EX-PRN01").length === 1 && /Printers/.test(boxOf(out, "EX-PRN01")[0]), JSON.stringify(boxOf(out, "EX-PRN01")));
+  t("switch in Rack A: port text has the switch and port", epOf(out, "EX-PRN01")?.port === "EX-SW01 1/1/5", JSON.stringify(epOf(out, "EX-PRN01")));
+  t("switch in Rack A: no 'Endpoints on EX-SW01' device", epGroup(out).length === 0, JSON.stringify(epGroup(out)));
+  // first import with the switch already in Rack A
+  const fp = sp({ siteId: 1, racks: [{ id: 5, name: "Rack A", version: 1, doc: a }] });
+  const fo = applySite(fp, defOn(fp)).auvikDoc;
+  t("first import, switch in Rack A: endpoint goes to a box, not a group", boxOf(fo, "EX-PRN01").length === 1 && /Printers/.test(boxOf(fo, "EX-PRN01")[0]) && epGroup(fo).length === 0, JSON.stringify([boxOf(fo, "EX-PRN01"), epGroup(fo)]));
+  t("first import, switch in Rack A: port text", epOf(fo, "EX-PRN01")?.port === "EX-SW01 1/1/5", JSON.stringify(epOf(fo, "EX-PRN01")));
+}
+
+// no cables read: never say Auvik no longer lists a connection
+{
+  const gone = (p: ReturnType<typeof plan>) => (p.diff?.changes ?? []).filter((c) => c.id.startsWith("gone:"));
+  t("setup: cables with links ok are kept as is", gone(sp(mk(withLinks))).length === 0);
+  const noLinks = planSite(inv, tenant, mk(withLinks), defaults, "empty");
+  t("re-import without links: no gone changes", gone(noLinks).length === 0, JSON.stringify(gone(noLinks).map((c) => c.id)));
+  const denied = planSite(inv, tenant, mk(withLinks), defaults, "empty", undefined, undefined, undefined, { status: "denied", note: "", links: [], dropped: 0 });
+  t("re-import with cables denied: no gone changes", gone(denied).length === 0);
+  const empty = planSite(inv, tenant, mk(withLinks), defaults, "empty", undefined, undefined, undefined, { status: "empty", note: "", links: [], dropped: 0 });
+  t("re-import with cables empty: no gone changes", gone(empty).length === 0);
+  const sel = defOn(noLinks);
+  t("re-import without links: nothing removed by default", [...sel].every((id) => !id.startsWith("gone:")) && applySite(noLinks, sel).auvikDoc.cables.length === withLinks.cables.length);
+  const one: AuvikLinks = { ...links, links: links.links.slice(1) };
+  const part = sp2(one);
+  const g = gone(part);
+  t("re-import with links ok, one cable missing: its gone is listed, unticked", g.length === 1 && g[0].defaultOn === false, JSON.stringify(g.map((c) => c.id)));
 }
 
 if (fails) { console.log(fails + " failed"); process.exit(1); }

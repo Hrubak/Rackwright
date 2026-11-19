@@ -127,7 +127,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
         if (l.status === "ok") { links = l; if (!l.links.length) linkNote = `Auvik lists no connections for ${t.name}.`; }
         else linkNote = l.status === "empty" ? `Auvik lists no connections for ${t.name}.` : cablesFailed(t.name);
       } catch {
-        if (stopped.current) { out.push({ tenant: t, inv, note: "", links: null, linkNote: "" }); break; }
+        if (stopped.current) { out.push({ tenant: t, inv, note: "", links: null, linkNote: `Cables were not read for ${t.name} (stopped); devices are imported without them.` }); break; }
         linkNote = cablesFailed(t.name);
       }
       out.push({ tenant: t, inv, note: "", links, linkNote });
