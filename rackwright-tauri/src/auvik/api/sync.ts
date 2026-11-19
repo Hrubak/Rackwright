@@ -5,7 +5,7 @@ import type { AuvikInventory, AuvikTenant } from "../../api";
 import type { ClientItem } from "../../clients/store";
 import { addRack, clone, fromTpl, setOffColumn } from "../../edit";
 import { modelById, specOf } from "../../racks";
-import { markManual, setSource } from "../../source";
+import { isManual, markManual, setSource } from "../../source";
 import type { Device, Doc } from "../../types";
 import { applyImport } from "../../imports/apply";
 import { planImport, type Row } from "../../imports/plan";
@@ -13,7 +13,7 @@ import type { ImportSpec } from "../../imports/spec";
 import { applyInPlace } from "../apply";
 import { Change, Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
-import { epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type ImportPlan } from "../plan";
+import { classify, epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type ImportPlan, type Kind } from "../plan";
 import { TO_PLACE_KINDS, apiItems, type ApiPlanItem, type Overrides } from "./map";
 
 export interface SiteDocs { siteId: number; racks: { id: number; name: string; version: number; doc: Doc }[] }
@@ -73,6 +73,26 @@ function tickHand(d: Diff, plan: ImportPlan, picks: Map<string, Set<string>>): D
   };
   return { ...d, changes: d.changes.map((c) => (hand(c) ? { ...c, defaultOn: true, detail: c.id.split(":").pop() } : c)) };
 }
+/** Device.type -> the kind it stands for. Types that name no kind (Patch panel, Shelf, ...) give none, so a Type pick never moves a row. */
+const TYPE_KIND: Record<string, Kind> = { Firewall: "firewall", Router: "router", Switch: "switch", Server: "server", Storage: "storage", UPS: "ups", PDU: "pdu", Wireless: "ap" };
+const kindOfType = (type: string): Kind | null => {
+  if (TYPE_KIND[type]) return TYPE_KIND[type];
+  const k = classify({ type, name: "", model: "" });
+  return k === "endpoint" ? null : k;
+};
+/** Kinds an earlier import's hand pick left in the site's documents, by plan key "api:<id>": a device whose type is
+ *  manual or locked, a member of an Endpoints box ("endpoint") or a VM box ("vm") whose `locked` has "type".
+ *  They keep a picked kind on the next import. They are not new hand picks: never marked again, never ticked. */
+export function keptKinds(s: SiteDocs): Record<string, Kind> {
+  const out: Record<string, Kind> = {};
+  for (const r of s.racks) for (const d of r.doc.devices as X[]) {
+    const id = (d.auvik_id ?? "").split("#")[0];
+    if (id.startsWith("api:") && !d.endpoints && isManual(d, "type")) { const k = kindOfType(d.type || ""); if (k) out[id] = k; }
+    const box = (d as any).auvik_epbox ? "endpoint" : d.auvik_id?.startsWith("vm:") ? "vm" : null;
+    if (box) for (const e of d.endpoints ?? []) if (e.key?.startsWith("api:") && e.locked?.includes("type")) out[e.key] = box;
+  }
+  return out;
+}
 /** After saving: every hand-picked field the document now holds is marked manual (and locked); a box member gets it in its `locked`. */
 function markHand(doc: Doc, p: SitePlan, picks: Map<string, Set<string>>) {
   for (const [key, fields] of picks) {
@@ -97,7 +117,7 @@ const dropElsewhere = (d: Diff, keys: Set<string>): Diff => ({ ...d, changes: d.
 export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>, over?: Overrides): SitePlan {
   const found = findAuvikDoc(siteDocs, tenant.id);
   const mine = found ? siteDocs.racks.find((r) => r.id === found.id)! : null;
-  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }), over);
+  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }), over, keptKinds(siteDocs));
   const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
@@ -173,7 +193,8 @@ function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[], pi
       const have = eps.find((e) => e.key === key);
       if (have) {
         have.status = a.status;
-        if (picks.get(it.key)?.has("type")) have.type = it.type;   // a hand pick on a member that is already there
+        // a hand pick on a member that is already there applies without a tick, by design: these boxes are not part of the diff
+        if (picks.get(it.key)?.has("type")) have.type = it.type;
         if (picks.get(it.key)?.has("model") && it.modelOver) have.model = it.modelOver;
         continue;
       }

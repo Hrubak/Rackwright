@@ -84,9 +84,16 @@ export function defaultModelChoice(i: Pick<PlanItem, "kind" | "dev">): string {
  *  A model value is "" (Auvik's text), "tpl:<catalog name>" or "vm:hyperv|vmware|kvm". */
 export interface Overrides { kinds?: Record<string, Kind>; types?: Record<string, string>; models?: Record<string, string> }
 
-export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
+/** `kept` = kinds the site's documents hold from an earlier hand pick (see keptKinds in sync.ts). They re-classify the row
+ *  like a pick, but are not a new hand edit (no kindOver). The person's own `over.kinds` win. */
+export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides, kept?: Record<string, Kind>): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
   const parsed: ParsedAuvik = { site: org, devices: devs.map((d) => toAuvikDevice(d, org)), warnings: [] };
   let items: PlanItem[] = buildItems(parsed, ctx);
+  for (const [key, kind] of Object.entries(kept ?? {})) {
+    const i = items.find((x) => x.key === key);
+    if (!i || i.kind === kind || over?.kinds?.[key] || !KIND_TYPE[kind]) continue;
+    items = retype(parsed, items, key, KIND_TYPE[kind], ctx);
+  }
   for (const [key, kind] of Object.entries(over?.kinds ?? {})) {
     if (!items.some((i) => i.key === key) || !KIND_TYPE[kind]) continue;
     items = retype(parsed, items, key, KIND_TYPE[kind], ctx).map((i) => (i.key === key ? { ...i, kindOver: true } : i));
@@ -106,7 +113,10 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, ove
       const m = over?.models?.[i.key];
       if (m?.startsWith("tpl:")) {
         const t = CATALOG.find((c) => c.name === m.slice(4));
-        if (t) { out.tplOver = t.name; out.modelOver = t.model || t.name; out.tplName = t.name; out.generic = false; }
+        if (t) {
+          out.modelOver = t.model || t.name;
+          if (out.mode === "rack" || out.mode === "off") { out.tplOver = t.name; out.tplName = t.name; out.generic = false; }   // only a device row has a template
+        }
       } else if (m?.startsWith("vm:")) {
         const v = m.slice(3);
         if (v in VM_MODELS) out.modelOver = VM_MODELS[v as VmVendor];

@@ -12,7 +12,7 @@ import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, KIND_LABEL, KIND_TYPE
 import { CATALOG } from "../src/edit";
 import { classify, setMode, resolvePlan as resolveP } from "../src/auvik/plan";
 import { setOffColumn } from "../src/edit";
-import { findAuvikDoc, mapTenantToSite, planSite, applySite, saveSite, skipLine, type SiteDocs } from "../src/auvik/api/sync";
+import { findAuvikDoc, mapTenantToSite, planSite, applySite, saveSite, skipLine, keptKinds, type SiteDocs } from "../src/auvik/api/sync";
 import { parseLayout } from "../src/imports/layout";
 import { ApiError } from "../src/api";
 
@@ -522,6 +522,30 @@ async function main() {
     // and on a fresh import too
     const fr = applySite(planSite(inv, tenant, mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: dt }]), defaults, "overwrite"), new Set()).auvikDoc;
     t("re-import (Overwrite, nothing ticked): type stays", byName(fr, "EX-SW02").type === "Patch panel");
+    t("re-import: a Type pick (Patch panel) does not move the row", planSite(inv, tenant, mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: dr }]), defaults, "overwrite").items.find((i) => i.key === sw2)!.kind === "switch");
+
+    // a kind pick is kept on the next import (read back from the saved lock): no move back, no duplicate, nothing ticked for it
+    const count = (d: Doc, n: string) => `${d.devices.filter((x) => x.name === n && !x.endpoints).length}/${d.devices.flatMap((x) => x.endpoints ?? []).filter((e) => e.name === n).length}`;
+    for (const [n, kind, want] of [["EX-SW01", "endpoint", "0/1"], ["EX-PRN01", "server", "1/0"]] as const) {
+      const k = keyOf(n);
+      const d1 = applySite(planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { kinds: { [k]: kind } }), new Set()).auvikDoc;
+      t(`kind pick ${n} -> ${kind}: first import`, count(d1, n) === want, count(d1, n));
+      t(`kind pick ${n}: keptKinds reads it back`, keptKinds(mkDocs([{ id: 2, name: "A", doc: d1 }]))[k] === kind);
+      for (const fill of ["empty", "overwrite"] as const) {
+        const p2 = planSite(inv, tenant, mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: d1 }]), defaults, fill);
+        const i2 = p2.items.find((i) => i.key === k)!;
+        const on = p2.diff!.changes.filter((c) => c.defaultOn && (c.id.includes(":" + k + ":") || c.id.endsWith(":" + k) || c.id.endsWith("|" + k)));
+        t(`kind pick ${n} re-import (${fill}): same kind, not a new hand pick, nothing ticked`, i2.kind === kind && !i2.kindOver && !on.length, `${i2.kind} ${on.map((c) => c.id)}`);
+        const d2 = applySite(p2, sel(p2)).auvikDoc;
+        t(`kind pick ${n} re-import (${fill}): stays in place, no duplicate`, count(d2, n) === want, count(d2, n));
+      }
+    }
+    // explicit pick beats the kept kind
+    const dS = applySite(planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { kinds: { [prn]: "server" } }), new Set()).auvikDoc;
+    t("explicit kind beats the kept one", planSite(inv, tenant, mkDocs([{ id: 2, name: "A", doc: dS }]), defaults, "empty", undefined, undefined, { kinds: { [prn]: "storage" } }).items.find((i) => i.key === prn)!.kind === "storage");
+    // a tpl: pick on a VM row saves the model text but sets no template
+    const pvt = planSite(vInv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { models: { [vm1]: "tpl:" + tpl2.name } }).items.find((i) => i.key === vm1)!;
+    t("tpl pick on a VM row: model text only, no template", pvt.modelOver === tpl2.model && pvt.tplOver === undefined && pvt.tplName !== tpl2.name);
   }
 
   console.log(fails ? `${fails} FAILED` : "all passed");
