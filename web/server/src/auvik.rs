@@ -712,6 +712,10 @@ async fn read_links(a: &Auvik, id: &str) -> Result<Value, AuvikErr> {
                     continue;
                 }
             };
+            if from.device.is_empty() || to.device.is_empty() {
+                dropped += 1;
+                continue;
+            }
             if is_cable(&from.kind) && is_cable(&to.kind) {
                 let (first, second) = if iid <= tid { (from, to) } else { (to, from) };
                 linked.insert(sorted_pair(&from.device, &to.device));

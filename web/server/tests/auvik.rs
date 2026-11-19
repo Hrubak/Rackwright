@@ -558,6 +558,8 @@ async fn auvik_routes_not_cached() {
         (Method::GET, "/api/auvik", false),
         (Method::GET, "/api/auvik/tenants", true),
         (Method::GET, "/api/auvik/tenants/1001/inventory", true),
+        (Method::GET, "/api/auvik/tenants/1001/links", true),
+        (Method::GET, "/api/auvik/tenants/bad!id/links", true),
         (Method::GET, "/api/auvik/tenants/bad!id/inventory", true),
     ] {
         let mut b = Request::builder().method(method).uri(uri);
@@ -659,6 +661,9 @@ async fn key_never_leaks() {
     let (app, _d, _m) = inv_app(|m| m.echo500 = true).await;
     let mut c = signed_in(&app).await;
     let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::BAD_GATEWAY);
+    assert_eq!(v["error"], "Auvik could not be read. Try again in a few minutes.");
+    let (s, v) = c.get(LINKS_MAIN).await;
     assert_eq!(s, StatusCode::BAD_GATEWAY);
     assert_eq!(v["error"], "Auvik could not be read. Try again in a few minutes.");
     let lines = log_lines();
