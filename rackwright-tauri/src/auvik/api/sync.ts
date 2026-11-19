@@ -143,24 +143,31 @@ const otherChanges = (d: Diff, plan: ImportPlan, mineM: Map<string, Device>): Ch
 /** Where each end of every plan cable lives: "m" the "(Auvik)" document (also where a device held nowhere is added), "o<i>" the i-th other rack document.
  *  A device end lives where the device is held; an endpoint-group end where the group's box is (else in "(Auvik)"); an OOBM end on its host server.
  *  `foreign` = cables with an end outside "(Auvik)" (the Auvik document lists no change for them); `notes` = one "Not drawn" line per pair whose ends are in different documents. */
-function cableHomes(plan: ImportPlan, mine: SiteDocs["racks"][number] | undefined, mineM: Map<string, Device>, others: { doc: Doc }[], otherM: Map<string, Device>[]): { foreign: Set<string>; notes: string[] } {
+function cableHomes(plan: ImportPlan, mine: SiteDocs["racks"][number] | undefined, mineM: Map<string, Device>, others: { doc: Doc; name: string }[], otherM: Map<string, Device>[]): { foreign: Set<string>; notes: string[] } {
   const unitHome = (k: string) => { if (mineM.has(k)) return "m"; const i = otherM.findIndex((m) => m.has(k)); return i >= 0 ? "o" + i : "m"; };
   const boxHome = (k: string) => {
     if (mine?.doc.devices.some((d) => (d as X).auvik_id === k)) return "m";
     const i = others.findIndex((o) => o.doc.devices.some((d) => (d as X).auvik_id === k));
     return i >= 0 ? "o" + i : "m";
   };
-  const end = (r: PortRef): { home: string; name: string } => {
-    if (r.oobm) { const o = plan.oobms.find((x) => x.key === r.oobm); return o ? { home: unitHome(o.unit.key), name: o.unit.name } : { home: "m", name: "" }; }
-    if (r.target.isGroup) return { home: boxHome(r.target.key), name: r.target.name };
-    return { home: unitHome(r.target.key), name: r.target.name };
+  const end = (r: PortRef): { home: string; name: string; id: string; leaf: boolean } => {
+    if (r.oobm) { const o = plan.oobms.find((x) => x.key === r.oobm); return o ? { home: unitHome(o.unit.key), name: o.unit.name, id: r.oobm, leaf: true } : { home: "m", name: "", id: r.oobm, leaf: true }; }
+    if (r.target.isGroup) return { home: boxHome(r.target.key), name: r.target.name, id: r.target.key, leaf: true };
+    return { home: unitHome(r.target.key), name: r.target.name, id: r.target.key, leaf: false };
   };
   const foreign = new Set<string>(), seen = new Set<string>(), notes: string[] = [];
   for (const c of plan.cables) {
     const a = end(c.a), b = end(c.b);
     if (a.home !== "m" || b.home !== "m") foreign.add(c.key);
-    if (a.home === b.home) continue;
-    const k = a.name + "|" + b.name;
+    if (a.home === b.home) {
+      // an endpoint box or OOBM cable inside one other rack document: not drawn there, but never lost silently
+      if (a.home === "m" || !(a.leaf || b.leaf)) continue;
+      const k = "same|" + a.id + "|" + b.id;
+      if (seen.has(k)) continue;
+      seen.add(k); notes.push(`Not drawn: ${a.name} and ${b.name} are in ${others[+a.home.slice(1)].name}; add this cable there by hand.`);
+      continue;
+    }
+    const k = a.id + "|" + b.id;
     if (seen.has(k)) continue;
     seen.add(k); notes.push(`Not drawn: ${a.name} and ${b.name} are in different racks`);
   }

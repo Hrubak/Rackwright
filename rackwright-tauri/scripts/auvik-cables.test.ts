@@ -229,5 +229,18 @@ t("left-out note", leftOutNote(inv, links) === "3 connections were left out (wir
   t("oobm end, both in one doc: listed, no note", !!oc && same.diff!.changes.some((c) => c.id === "cn:" + oc.key) && !same.notes.some((n) => n.includes("EX-SRV01")), JSON.stringify(same.notes));
 }
 
+// OOBM cable whose host and switch are both in another rack document: not drawn, noted
+{
+  const srv = inv.devices.find((x) => x.id === "d-1001-06")!;
+  const bmc = { ...srv, id: "d-1001-30", name: "EX-SRV01-idrac", type: "ipmi", makeModel: "iDRAC9 Platform Management", serial: "EXSN0030", ips: ["192.0.2.80"], macs: ["00:00:5E:00:53:30"], components: [] };
+  const inv3: AuvikInventory = { ...inv, devices: [...inv.devices, bmc] };
+  const l3: AuvikLinks = { ...links, links: [...links.links, { device: "d-1001-01", iface: "1/1/20", peerDevice: "d-1001-30", peerIface: "mgmt", portless: false }] };
+  const a = stripAuvik(applySite(planSite(inv3, tenant, mk(), defaults, "empty"), null as any).auvikDoc);
+  const rp = planSite(inv3, tenant, { siteId: 1, racks: [{ id: 5, name: "Rack A", version: 1, doc: a }] }, defaults, "empty", undefined, undefined, undefined, l3);
+  const hand = rp.notes.filter((n) => n.endsWith("are in Rack A; add this cable there by hand."));
+  t("oobm cable inside Rack A: note says add it by hand", hand.length === 1 && /^Not drawn: EX-SW01 and EX-SRV01 are in Rack A/.test(hand[0]), JSON.stringify(rp.notes));
+  t("oobm cable inside Rack A: no cable change in the Auvik doc", !(rp.diff?.changes ?? []).some((c) => c.id.startsWith("cn:") && rp.plan.cables.some((k) => (k.a.oobm || k.b.oobm) && c.id === "cn:" + k.key)));
+}
+
 if (fails) { console.log(fails + " failed"); process.exit(1); }
 console.log("all passed");
