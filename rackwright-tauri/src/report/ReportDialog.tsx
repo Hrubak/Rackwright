@@ -94,9 +94,9 @@ export default function ReportDialog({ clientKey, onClose }: { clientKey?: strin
             </label>
           ))}
           {client.sites.some((s) => sites.includes(s.id) && s.migration) && (
-            <label style={{ display: "block", marginTop: 6 }}>
+            <><label style={lbl}>Include</label><label style={{ display: "block" }}>
               <input type="checkbox" checked={migration} disabled={busy} onChange={(e) => setMigration(e.target.checked)} /> VM migration plan
-            </label>
+            </label></>
           )}
           <label style={lbl}>Report date</label>
           <input type="date" style={inp} value={date} disabled={busy} onChange={(e) => setDate(e.target.value)} />

@@ -182,6 +182,11 @@ eq("pageBox fallback", pageBox("<w:document><w:body/></w:document>"), { textWidt
     const md2 = buildBodyXml(mm("detailed"), new Map(), { styles: st, ...base });
     ok("migration overview", texts(mo).includes("VM migration to EX-CL01") && !texts(mo).includes("Used (GB)"));
     ok("migration detailed", texts(md2).includes("VM migration to EX-CL01") && texts(md2).includes("Used (GB)"));
+    {
+      const c2: ClientItem = { ...mc, sites: [{ ...mc.sites[0], migration: { ...(mc.sites[0].migration as any), cluster: { name: "EX & <CL01>", nodes: 3, cores: 24, ramGb: 384, rawTb: 7.7 } } }] };
+      const x = buildBodyXml(buildReportModel({ client: c2, docs: { m1: md }, options: { level: "overview", sites: "all", summary: "", recommendations: "", date: "2026-11-19", prepared_for: "Example IT" }, company: "x" }), new Map(), { styles: st, ...base });
+      ok("migration escaped", x.includes("EX &amp; &lt;CL01&gt;") && XMLValidator.validate(wrap(x)) === true);
+    }
     eq("migration valid xml", [XMLValidator.validate(wrap(mo)), XMLValidator.validate(wrap(md2))], [true, true]);
   }
 }

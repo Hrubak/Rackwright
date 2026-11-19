@@ -32,7 +32,7 @@ export function buildMigration(plan: MigrationPlan, racks: { key: string; name: 
   const vms = siteVms(racks, docs);
   const fit = fitPlan(plan, vms);
   const row = (label: string, r: typeof fit.cpu, f: (n: number) => string) =>
-    [label, f(r.needed), f(r.available), r.available > 0 ? `${Math.round(r.usedPct)}%` : "—", f(r.left)];
+    [label, f(r.needed), f(r.available), r.available > 0 ? `${Math.round(r.usedPct)}%` : "â€”", f(r.left)];
   const nodes = num(c.nodes);
   return {
     title: `VM migration to ${c.name}`,

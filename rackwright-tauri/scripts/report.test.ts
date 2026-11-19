@@ -98,6 +98,8 @@ eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), tru
   eq("migration rows", mm.capacity.slice(1).map((r) => r[0]), ["vCPU", "RAM (GB)", "Disk (TB)"]);
   eq("migration result", mm.result.startsWith("Result: "), true);
   eq("migration cluster line", mm.clusterLine, "3 nodes, each 24 cores, 384 GB RAM and 7.7 TB raw storage. One node down (N+1).");
+  eq("migration default on", buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration !== undefined, true);
+  eq("zero capacity dash", buildReportModel({ client: mc({ ...p2, cluster: { ...p2.cluster, cores: 0 } }), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration!.capacity[1][3], "\u2014");
   eq("migration off", buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: { ...mo, migration: false }, company: "x" }).sites[0].migration, undefined);
   eq("migration no plan", buildReportModel({ client: mc(undefined), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration, undefined);
 }
