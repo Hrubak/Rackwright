@@ -195,5 +195,39 @@ const pos = (d: Doc) => JSON.stringify(d.devices.map((x) => [x.id, x.rack, x.u, 
 const none0: AuvikLinks = { ...links, dropped: 0 };
 t("left-out note", leftOutNote(inv, links) === "3 connections were left out (wireless, VLAN or devices Auvik doesn't list)." && leftOutNote(inv, { ...none0, dropped: 1 }) === "1 connection was left out (wireless, VLAN or devices Auvik doesn't list)." && leftOutNote(inv, { ...none0, links: [...none0.links, { device: "d-1001-01", iface: "1", peerDevice: "nope", peerIface: "2", portless: false }] }).startsWith("1 connection was") && leftOutNote(inv, none0) === "" && leftOutNote(inv, null) === "");
 
+// endpoint-group and OOBM ends count like device ends
+{
+  const base = firstImport(inv);
+  const sw = devOf(withLinks, "EX-SW01").id;
+  const a = stripAuvik(withLinks); a.devices = a.devices.filter((x) => x.id === sw); a.cables = [];
+  const m = clone(withLinks); m.devices = m.devices.filter((x) => x.id !== sw); m.cables = [];
+  const rp = sp({ siteId: 1, racks: [{ id: 3, name: "Example Site (Auvik)", version: 1, doc: m }, { id: 5, name: "Rack A", version: 1, doc: a }] });
+  const mc = rp.diff!.changes.filter((c) => c.id.startsWith("cn:") || c.id.startsWith("mv:"));
+  const grp = rp.plan.cables.filter((c) => c.a.target.isGroup || c.b.target.isGroup);
+  t("group end: setup has a cable to an endpoint member", grp.length > 0 && base.devices.length > 0);
+  t("group end, switch in another rack: no ticked cable change in the Auvik doc", !mc.some((c) => grp.some((g) => c.id.endsWith(":" + g.key))), JSON.stringify(mc.map((c) => c.id)));
+  t("group end, switch in another rack: Not drawn note", rp.notes.some((n) => /^Not drawn: EX-SW01 and Endpoints on EX-SW01 are in different racks$/.test(n) || /^Not drawn: Endpoints on EX-SW01 and EX-SW01 are in different racks$/.test(n)), JSON.stringify(rp.notes));
+  const out = applySite(rp, defOn(rp));
+  t("group end, switch in another rack: nothing drawn", [out.auvikDoc, ...out.others.map((o) => o.doc)].every((d) => d.cables.length === 0));
+}
+{
+  const srv = inv.devices.find((x) => x.id === "d-1001-06")!;
+  const bmc = { ...srv, id: "d-1001-30", name: "EX-SRV01-idrac", type: "ipmi", makeModel: "iDRAC9 Platform Management", serial: "EXSN0030", ips: ["192.0.2.80"], macs: ["00:00:5E:00:53:30"], components: [] };
+  const inv3: AuvikInventory = { ...inv, devices: [...inv.devices, bmc] };
+  const l3: AuvikLinks = { ...links, links: [...links.links, { device: "d-1001-01", iface: "1/1/20", peerDevice: "d-1001-30", peerIface: "mgmt", portless: false }] };
+  const pl = (docs: SiteDocs) => planSite(inv3, tenant, docs, defaults, "empty", undefined, undefined, undefined, l3);
+  const base = applySite(planSite(inv3, tenant, mk(), defaults, "empty"), null as any).auvikDoc;
+  const srvId = devOf(base, "EX-SRV01").id;
+  const a = stripAuvik(base); a.devices = a.devices.filter((x) => x.id === srvId); a.cables = [];
+  const m = clone(base); m.devices = m.devices.filter((x) => x.id !== srvId); m.cables = [];
+  const rp = pl({ siteId: 1, racks: [{ id: 3, name: "Example Site (Auvik)", version: 1, doc: m }, { id: 5, name: "Rack A", version: 1, doc: a }] });
+  const oc = rp.plan.cables.find((c) => c.a.oobm || c.b.oobm);
+  t("oobm end: setup has an OOBM cable", !!oc, JSON.stringify(rp.plan.cables.map((c) => c.key)));
+  t("oobm end, host in another rack: no cable change in the Auvik doc", !!oc && !rp.diff!.changes.some((c) => c.id === "cn:" + oc.key || c.id === "mv:" + oc.key));
+  t("oobm end, host in another rack: Not drawn note", rp.notes.some((n) => /^Not drawn: EX-SW01 and EX-SRV01 are in different racks$/.test(n) || /^Not drawn: EX-SRV01 and EX-SW01 are in different racks$/.test(n)), JSON.stringify(rp.notes));
+  const same = pl({ siteId: 1, racks: [{ id: 3, name: "Example Site (Auvik)", version: 1, doc: base }] });
+  t("oobm end, both in one doc: listed, no note", !!oc && same.diff!.changes.some((c) => c.id === "cn:" + oc.key) && !same.notes.some((n) => n.includes("EX-SRV01")), JSON.stringify(same.notes));
+}
+
 if (fails) { console.log(fails + " failed"); process.exit(1); }
 console.log("all passed");
