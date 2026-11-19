@@ -50,7 +50,7 @@ export function classify(d: Pick<AuvikDevice, "type" | "name" | "model">): Kind 
   if (/virtual machine/.test(t)) return "vm";
   return "endpoint";
 }
-const INFRA_VM = /smartzone|\bvsz\b|vcenter|vcsa|controller|\bwlc\b|unifi\s*(network|controller)|sophos|firewall/i;
+export const INFRA_VM = /smartzone|\bvsz\b|vcenter|vcsa|controller|\bwlc\b|unifi\s*(network|controller)|sophos|firewall/i;
 
 const RACK_KINDS: Kind[] = ["firewall", "router", "switch", "server", "storage", "ups", "pdu"];
 const PHONE_RE = /grandstream|mitel|yealink|polycom|\bpoly\b|fanvil|snom|avaya|cisco ip phone|aastra/i;
