@@ -1,7 +1,7 @@
 // Per-site Auvik sync: plan, fill rules across the site's rack documents, layout auto-place, safe save.
 // Pure except saveSite. Must not import backend.ts at load (tests run under tsx); the API and the site creator are injected.
 import * as A from "../../api";
-import type { AuvikInventory, AuvikTenant } from "../../api";
+import type { AuvikInventory, AuvikLinks, AuvikTenant } from "../../api";
 import type { ClientItem } from "../../clients/store";
 import { addRack, clone, fromTpl, setOffColumn } from "../../edit";
 import { modelById, specOf } from "../../racks";
@@ -47,6 +47,7 @@ export interface SitePlan {
   heldIn: Record<string, string>;                              // the same keys -> the name of the rack document that holds the device
   held: Record<string, Held>;                                  // plan item keys the site's documents already hold (any document, "(Auvik)" too)
   layoutRows?: Row[];
+  links?: AuvikLinks;                                          // the site's cables, when read
   over?: Overrides;                                            // the person's kind / type / model picks, by plan item key
 }
 
@@ -153,14 +154,14 @@ function heldOf(inv: AuvikInventory, org: string, siteDocs: SiteDocs, ctx: HostC
 }
 const isVmBox = (d: Device) => !!(d as X).auvik_id?.startsWith("vm:") || d.type === "Virtual machines";
 
-export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>, over?: Overrides): SitePlan {
+export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>, over?: Overrides, links?: AuvikLinks): SitePlan {
   const found = findAuvikDoc(siteDocs, tenant.id);
   const mine = found ? siteDocs.racks.find((r) => r.id === found.id)! : null;
   const ctx = hostCtxOf(mine?.doc ?? { devices: [] }), kept = keptKinds(siteDocs);
   const held = heldOf(inv, tenant.name, siteDocs, ctx, kept);
   const fam: Record<string, Family> = Object.fromEntries(Object.entries(held).map(([k, h]) => [k, h.family]));
   if (over?.kinds) over = { ...over, kinds: Object.fromEntries(Object.entries(over.kinds).filter(([k, kind]) => !fam[k] || KIND_FAMILY[kind] === fam[k])) };   // a cross-family pick on a held row is no pick
-  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, ctx, over, kept, fam);
+  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, ctx, over, kept, fam, links?.links);
   const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
@@ -175,7 +176,7 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, parsed, items, plan, other, elsewhere, heldIn, held,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, links, parsed, items, plan, other, elsewhere, heldIn, held,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
     diff: mine ? dropElsewhere(tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks), elsewhere) : null,
   };
@@ -365,7 +366,7 @@ export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api:
       try {
         const r = await api.getRack(id);
         const docs: SiteDocs = { ...p.siteDocs, racks: p.siteDocs.racks.map((x) => (x.id === id ? { id, name: r.name, version: r.version, doc: r.doc } : x)) };
-        const np = planSite(p.inv, p.tenant, docs, p.defaults, p.fill, p.layout, p.hosts, p.over);
+        const np = planSite(p.inv, p.tenant, docs, p.defaults, p.fill, p.layout, p.hosts, p.over, p.links);
         const out = applySite(np, sel);
         const nd = np.target.docId === id ? out.auvikDoc : out.others.find((o) => o.rackId === id)?.doc;
         if (!nd) return;   // their version needs nothing from us

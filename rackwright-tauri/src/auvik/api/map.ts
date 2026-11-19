@@ -1,7 +1,9 @@
 // Trimmed Auvik API devices (from the server) -> the existing import plan. Pure; no backend.ts import.
 import type { AuvikDevice, ParsedAuvik } from "../parse";
 import { CATALOG } from "../../edit";
-import { buildItems, retype, setMode, type HostCtx, type Kind, type PlanItem } from "../plan";
+import type { AuvikLink } from "../../api";
+import { linksToNeighbors } from "./links";
+import { buildItems, isEndpointMode, retype, setMode, type HostCtx, type Kind, type PlanItem } from "../plan";
 
 export interface AuvikApiComponent { type: string; name: string; detail: string }
 export interface AuvikApiDevice {
@@ -102,11 +104,29 @@ export const kindsFor = (held?: Family): Kind[] => (Object.keys(KIND_LABEL) as K
  *  A model value is "" (Auvik's text), "tpl:<catalog name>" or "vm:hyperv|vmware|kvm". */
 export interface Overrides { kinds?: Record<string, Kind>; types?: Record<string, string>; models?: Record<string, string> }
 
+/** A port-less cable between two devices (neither an endpoint nor a VM) cannot be drawn: drop its neighbours and say so
+ *  once per pair. A port-less cable to an endpoint keeps its neighbour: the endpoint joins the switch's group with no port. */
+function dropPortless(parsed: ParsedAuvik, items: PlanItem[], pairs: { a: string; b: string }[]) {
+  const seen = new Set<string>();
+  const plain = (name: string) => { const i = items.find((x) => x.dev.name === name); return !!i && !isEndpointMode(i.mode) && i.mode !== "vm"; };
+  for (const { a, b } of pairs) {
+    const k = [a, b].sort().join("|");
+    if (seen.has(k) || !plain(a) || !plain(b)) continue;
+    seen.add(k);
+    for (const d of parsed.devices) {
+      const other = d.name === a ? b : d.name === b ? a : null;
+      if (other !== null) d.neighbors = d.neighbors.filter((n) => !(n.iface === "" && n.name === other));
+    }
+    parsed.warnings.push(`${a} and ${b} are connected (no port data)`);
+  }
+}
+
 /** `kept` = kinds the site's documents hold from an earlier hand pick (see keptKinds in sync.ts). They re-classify the row
  *  like a pick, but are not a new hand edit (no kindOver). The person's own `over.kinds` win.
  *  `held` = the family of each row the site already holds (see Family): a kept or picked kind of another family is ignored. */
-export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides, kept?: Record<string, Kind>, held?: Record<string, Family>): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
+export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides, kept?: Record<string, Kind>, held?: Record<string, Family>, links?: AuvikLink[]): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
   const parsed: ParsedAuvik = { site: org, devices: devs.map((d) => toAuvikDevice(d, org)), warnings: [] };
+  const portless = links?.length ? linksToNeighbors(parsed.devices, links).portless : [];
   let items: PlanItem[] = buildItems(parsed, ctx);
   const ok = (key: string, kind: Kind | undefined): kind is Kind => !!kind && !!KIND_TYPE[kind] && (!held?.[key] || KIND_FAMILY[kind] === held[key]);
   for (const [key, kind] of Object.entries(kept ?? {})) {
@@ -123,6 +143,7 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, ove
     items = retype(parsed, items, key, KIND_TYPE[kind], ctx).map((i) => (i.key === key ? { ...i, kindOver: true } : i));
   }
   for (const i of items.filter((x) => x.mode === "rack")) items = setMode(items, i.key, "off", ctx);
+  dropPortless(parsed, items, portless);
   const byId = new Map(devs.map((d) => [d.id, d]));
   return {
     parsed,

@@ -156,6 +156,8 @@ export const putClientReport = (id: number, o: unknown) => api("PUT", `/api/clie
 // Auvik (web only, see web/API.md)
 export interface AuvikTenant { id: string; name: string; type: "multiClient" | "client"; parent: string | null }
 export interface AuvikInventory { status: "ok" | "denied" | "empty"; note: string; devices: AuvikApiDevice[] }
+export interface AuvikLink { device: string; iface: string; peerDevice: string; peerIface: string; portless: boolean }
+export interface AuvikLinks { status: "ok" | "denied" | "empty"; note: string; links: AuvikLink[]; dropped: number }
 export const auvikStatus = () => api<{ configured: boolean; region: string; username: string }>("GET", "/api/auvik");
 export const auvikTest = () => api<{ ok: boolean; error?: string }>("POST", "/api/auvik/test");
 export const auvikTenants = () => api<AuvikTenant[]>("GET", "/api/auvik/tenants");
@@ -164,4 +166,10 @@ export function auvikInventory(id: string, signal?: AbortSignal): Promise<AuvikI
   const limit = AbortSignal.timeout(4 * 60 * 1000);
   const both = signal ? AbortSignal.any([limit, signal]) : limit;
   return api<AuvikInventory>("GET", `/api/auvik/tenants/${encodeURIComponent(id)}/inventory`, undefined, both);
+}
+/** The site's cables. Waits up to 4 minutes, like the inventory. */
+export function auvikLinks(id: string, signal?: AbortSignal): Promise<AuvikLinks> {
+  const limit = AbortSignal.timeout(4 * 60 * 1000);
+  const both = signal ? AbortSignal.any([limit, signal]) : limit;
+  return api<AuvikLinks>("GET", `/api/auvik/tenants/${encodeURIComponent(id)}/links`, undefined, both);
 }
