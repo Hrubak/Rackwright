@@ -38,8 +38,8 @@ For one site, plan moving its VMs off VMware ESXi and Hyper-V hosts onto a Scale
 Pure TS in `src/migration/fit.ts`, unit-tested.
 
 - **CPU:** needed = sum of vCPU of included VMs. Available = cores per node × nodes counted × ratio. Ratio default **4:1** vCPU per physical core, editable (1–10). Cores, not threads.
-- **RAM:** **no overcommit** (HyperCore does not overcommit memory). Needed = sum of VM RAM. Available = (RAM per node − reserve per node) × nodes counted. Reserve per node is an editable setting, default **8 GB** — *to be checked against Scale's guidance*.
-- **Storage:** HyperCore keeps two copies of every block (replication factor 2). Usable = raw per node × nodes ÷ 2. With N+1 on, usable = raw per node × (nodes − 1) ÷ 2, so the cluster can heal after losing a node. Each VM stores two disk sizes: **provisioned** and **used**. Needed = sum of **provisioned** disk (the safe number). Used disk is shown as its own column and total, for information only; it does not change the result. "Keep free" is an editable setting, default **20%** — *to be checked against Scale's guidance* — subtracted from usable.
+- **RAM:** **no overcommit** (HyperCore does not overcommit memory). Needed = sum of VM RAM. Available = (RAM per node − reserve per node) × nodes counted. Reserve per node is an editable setting, default **8 GB** — *our estimate; Scale publishes no fixed figure* (3.21.1).
+- **Storage:** HyperCore keeps two copies of every block (replication factor 2). Usable = raw per node × nodes ÷ 2. With N+1 on, usable = raw per node × (nodes − 1) ÷ 2, so the cluster can heal after losing a node. Each VM stores two disk sizes: **provisioned** and **used**. Needed = sum of **provisioned** disk (the safe number). Used disk is shown as its own column and total, for information only; it does not change the result. "Keep free" is an editable setting, default **20%**, subtracted from usable. Scale's capacity guidance sets its Major alert at 80% used, which is 20% free ([HyperCore user guide: capacity](https://docs.scalecomputing.com/articles/sc-hypercore-user-guide/capacity), [SCRIBE overview](https://docs.scalecomputing.com/articles/sc-hypercore-user-guide/scribe-overview)).
 - **Status per resource:** Fits (≤ 80% of available), Tight (80–100%), Doesn't fit (> 100%). The overall result is the worst of the three.
 - **Per VM:** a VM "can't run" if its RAM is more than one node's usable RAM (RAM per node − reserve) or its vCPU is more than one node's **physical cores** (no ratio applied: one VM can't use more vCPUs than a node has cores). Shown on the row and makes the overall result "Doesn't fit".
 - **Missing sizes:** an included VM with any blank size makes the result **"Incomplete — N VMs have no size"**, never "Fits". The totals still show what is known.
@@ -112,9 +112,15 @@ Rule (user, 2026-11-19): ship a preset only if its numbers come from a Scale Com
 
 3.21.0 ships **no presets**. Scale's sheets (for example the [SC Platform Family Brochure](https://www.scalecomputing.com/documents/Data-Sheets/SC-Platform-Family-Brochure.pdf) and the [SC Hardware Data Sheet](https://scalecomputing.com/documents/Data-Sheets/SC-Hardware-Data-Sheet.pdf)) list each node as a set of options (HE150: RAM 8, 16, 32 or 64 GB; one NVMe drive of 500 GB to 4 TB), not as fixed node sizes, and the HE250 rows don't clearly give CPU, RAM and storage. Any one preset would be our choice of options, not a spec-sheet number. The "Start from" dropdown is hidden while the list is empty; nodes are typed from the quote.
 
-## To be checked against Scale's guidance
+## Defaults checked against Scale's guidance (3.21.1)
 
-- The per-node RAM reserve default (8 GB) and the "keep free" default (20%). Both are editable settings in the plan; the user checks the defaults. The builder does not look them up or change them.
+Checked by the user on 2026-11-19 against the [HyperCore user guide: capacity](https://docs.scalecomputing.com/articles/sc-hypercore-user-guide/capacity) and the [SCRIBE overview](https://docs.scalecomputing.com/articles/sc-hypercore-user-guide/scribe-overview):
+
+- **Keep free 20%:** confirmed. It matches Scale's Major alert level (80% used).
+- **N+1 on by default for RAM:** confirmed. Scale sizes RAM so the cluster can lose a node.
+- **RAM reserve 8 GB per node:** our estimate. Scale publishes no fixed figure. It stays an editable setting, and the Migration tab says so next to the rules.
+
+The report prints the rules used under the capacity table: vCPU per core, N+1 on or off, the per-node RAM reserve and the keep-free percentage, as counted (after limits).
 
 ## Approval
 

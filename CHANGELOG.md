@@ -2,6 +2,11 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.21.1 — 2026-11-19
+Web and desktop. Update the LXC as usual and download the new desktop exe.
+- **VM migration defaults checked.** Keep free 20% matches Scale's Major capacity alert (80% used), and N+1 on by default matches how Scale sizes RAM, so those two are no longer marked "to be checked". The 8 GB RAM reserve per node stays editable; the Migration tab now says it is our estimate, because Scale publishes no fixed figure.
+- **Rules in the report.** The "VM migration to <cluster>" section in Word and PDF prints the rules used under the capacity table: vCPU per core, N+1 on or off, RAM reserved per node and storage kept free. Readers can now recompute "Available". A vCPU-per-core value above 10 prints as 10, the value that was counted.
+
 ## 3.21.0 — 2026-11-19
 Web and desktop. Update the LXC as usual and download the new desktop exe.
 - **VM migration plan.** A new **Migration** tab on each client plans moving a site's virtual machines from VMware ESXi and Hyper-V hosts onto a Scale Computing HyperCore cluster, and shows whether they fit. Pick the site, press **Start a plan**, and type in the cluster: nodes, and cores, RAM and raw storage per node.

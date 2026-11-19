@@ -152,7 +152,7 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
         {num("RAM reserve (GB)", plan.rules.ramReserveGb, false, (n) => setRules({ ramReserveGb: n }), 48)}
         {num("Keep free (%)", plan.rules.keepFreePct, false, (n) => setRules({ keepFreePct: n }), 48)}
         <label style={lab}><input type="checkbox" checked={plan.rules.nPlus1} onChange={(e) => setRules({ nPlus1: e.target.checked })} />One node can fail (N+1)</label>
-        <span style={{ fontSize: 11, opacity: 0.7 }}>Defaults to be checked against Scale's guidance.</span>
+        <span style={{ fontSize: 11, opacity: 0.7 }}>RAM reserve is our estimate: Scale publishes no fixed figure.</span>
       </div>
 
       {unreadable.length > 0 && <div style={{ fontSize: 12, color: v("error-text"), marginBottom: 6 }}>Could not read {unreadable.join(", ")}. {unreadable.length === 1 ? "Its" : "Their"} VMs are not counted.</div>}

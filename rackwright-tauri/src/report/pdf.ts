@@ -263,6 +263,7 @@ export async function buildReportPdf(model: ReportModel, brand: ReportBrand): Pr
       h2(m.title, 80);
       paragraph(m.clusterLine);
       table(m.capacity[0].map((head, i) => ({ head, w: i === 0 ? 1.8 : 1.2 })), m.capacity.slice(1));
+      paragraph(m.rulesLine);
       paragraph(m.result, 10, ink, true);
       paragraph(m.usedToday);
       if (model.level === "detailed" && m.vms.length) table([{ head: "VM", w: 2 }, { head: "Now on", w: 1.6 }, { head: "Platform", w: 1.5 }, { head: "vCPU", w: 0.8 }, { head: "RAM (GB)", w: 1 }, { head: "Disk (GB)", w: 1 }, { head: "Used (GB)", w: 1 }, { head: "Note", w: 1.8 }], m.vms);

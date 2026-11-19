@@ -20,7 +20,7 @@ export interface SiteSection {
   migration?: MigrationSection;
 }
 export interface MigrationSection {
-  title: string; clusterLine: string; capacity: string[][]; result: string; usedToday: string; vms: string[][];
+  title: string; clusterLine: string; capacity: string[][]; result: string; usedToday: string; rulesLine: string; vms: string[][];
 }
 const whole = (n: number) => fmtNum(n, 0);
 const oneDp = (n: number) => fmtNum(n, 1);
@@ -41,6 +41,7 @@ export function buildMigration(plan: MigrationPlan, racks: { key: string; name: 
     capacity: [["Resource", "Needed", "Available", "% used", "Left"], row("vCPU", fit.cpu, whole), row("RAM (GB)", fit.ram, whole), row("Disk (TB)", fit.disk, oneDp)],
     result: `Result: ${resultText(fit)}`,
     usedToday: `Used today: ${oneDp(fit.usedTb)} TB`,
+    rulesLine: `Rules: ${sizeText(fit.rules.cpuRatio)} vCPU per core; N+1 ${fit.rules.nPlus1 ? "on" : "off"}; ${sizeText(fit.rules.ramReserveGb)} GB RAM reserved per node; ${sizeText(fit.rules.keepFreePct)}% of storage kept free.`,
     vms: vms.filter((vm) => isIncluded(vm, plan.vms[vm.key])).map((vm) => {
       const e = plan.vms[vm.key];
       const t = (n: number | undefined, w = false) => (typeof n === "number" && Number.isFinite(n) ? (w ? whole(n) : sizeText(n)) : "");

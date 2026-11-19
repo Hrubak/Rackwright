@@ -97,6 +97,9 @@ eq("to wording", sw.some((s) => s.ports.some((p) => / \(.+\)$/.test(p.to))), tru
   eq("migration header", mm.capacity[0], ["Resource", "Needed", "Available", "% used", "Left"]);
   eq("migration rows", mm.capacity.slice(1).map((r) => r[0]), ["vCPU", "RAM (GB)", "Disk (TB)"]);
   eq("migration result", mm.result.startsWith("Result: "), true);
+  eq("migration rules line", mm.rulesLine, "Rules: 4 vCPU per core; N+1 on; 8 GB RAM reserved per node; 20% of storage kept free.");
+  eq("migration rules clamped", buildReportModel({ client: mc({ ...p2, rules: { ...p2.rules, cpuRatio: 12, nPlus1: false, keepFreePct: 15 } }), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration!.rulesLine, "Rules: 10 vCPU per core; N+1 off; 8 GB RAM reserved per node; 15% of storage kept free.");
+  eq("migration rules one node", buildReportModel({ client: mc({ ...p2, cluster: { ...p2.cluster, nodes: 1 } }), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration!.rulesLine.includes("N+1 off"), true);
   eq("migration used today", mm.usedToday, "Used today: 0.2 TB");
   eq("migration cluster line", mm.clusterLine, "3 nodes, each 24 cores, 384 GB RAM and 7.7 TB raw storage. One node down (N+1).");
   eq("migration default on", buildReportModel({ client: mc(p2), docs: { m1: mdoc }, options: mo, company: "x" }).sites[0].migration !== undefined, true);

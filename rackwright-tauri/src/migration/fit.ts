@@ -10,6 +10,8 @@ export interface FitResult {
   usedTb: number; counted: number; failover: "n+1" | "off" | "none";
   problems: { key: string; reason: string }[]; missing: string[];
   included: number; excluded: number; overall: Overall; unreadable: string[];
+  /** The rule values actually counted, after limits (vCPU per core 1–10, keep free 0–95%). */
+  rules: { cpuRatio: number; ramReserveGb: number; keepFreePct: number; nPlus1: boolean };
 }
 
 export const LEVEL_TEXT: Record<Overall, string> = { fits: "Fits", tight: "Tight", over: "Doesn't fit", incomplete: "Incomplete" };
@@ -56,7 +58,7 @@ export function fitPlan(plan: MigrationPlan, vms: SiteVm[], opts?: { unreadable?
   const disk = resource(diskGb / 1000, (rawTb * counted / 2) * (1 - keepFree / 100));
   const worst = [cpu, ramFit, disk].reduce<Level>((w, x) => (RANK[x.level] > RANK[w] ? x.level : w), "fits");
   const overall: Overall = problems.length || worst === "over" ? "over" : missing.length || unreadable.length ? "incomplete" : worst;
-  return { cpu, ram: ramFit, disk, usedTb: usedGb / 1000, counted, failover, problems, missing, included, excluded, overall, unreadable };
+  return { cpu, ram: ramFit, disk, usedTb: usedGb / 1000, counted, failover, problems, missing, included, excluded, overall, unreadable, rules: { cpuRatio, ramReserveGb: reserve, keepFreePct: keepFree, nPlus1: failover === "n+1" } };
 }
 
 /** One percent text for the tab, the report and the result line; rounds up so a level never reads as the one below. */

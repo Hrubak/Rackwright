@@ -39,7 +39,7 @@ The **Migration** tab on a client plans moving one site's virtual machines from 
 2. Type the target cluster: name, number of nodes, and cores, RAM (GB) and raw storage (TB) per node.
 3. Type each VM's vCPU, RAM, provisioned disk and used disk. The VM list comes from the site's racks ("Virtual machines" boxes and Auvik-imported VMs).
 
-The result is Fits, Tight, Doesn't fit or Incomplete (a VM still has no size). By default CPU and RAM are counted with one node down (N+1), storage counts HyperCore's two copies, and 20% is kept free. vCPU per core, the RAM reserve per node and Keep free are settings on the plan. The plan is saved with the site and goes into the client report as "VM migration to <cluster>".
+The result is Fits, Tight, Doesn't fit or Incomplete (a VM still has no size). By default CPU and RAM are counted with one node down (N+1), storage counts HyperCore's two copies, and 20% is kept free. vCPU per core, the RAM reserve per node and Keep free are settings on the plan. The plan is saved with the site and goes into the client report as "VM migration to <cluster>", with the rules it used printed under the capacity table. Keep free 20% matches Scale's Major capacity alert (80% used); the 8 GB RAM reserve per node is our estimate, since Scale publishes no fixed figure.
 
 ## Client report in Word
 Besides the PDF, the Client report dialog has **Export Word**. It builds the same Overview or Detailed report into your own Word master template, so the cover, headers, footers, fonts and colours stay as your designer made them.
