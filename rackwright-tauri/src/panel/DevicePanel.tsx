@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { v } from "../theme";
 import type { Device, Doc, Service } from "../types";
 import { STATUSES, statusOf, specFieldsFor, setField, connectedTo, powerPath, copyAsText } from "../device/info";
+import { typeOptions } from "../deviceTypes";
 import PortsEditor from "../PortsEditor";
 import { EndpointTable } from "../auvik/Panels";
 import { deviceAlerts, todayIso, type IpEntry } from "../attention/model";
@@ -102,7 +103,7 @@ export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose
       </div>}
       {tab === "specs" && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <label style={label}>Name{lockIcon("name")}<br /><input style={{ ...inp, width: "100%" }} value={dev.name} onChange={(e) => devSet("name", e.target.value)} /></label>
-        <label style={label}>Type{lockIcon("type")}<br /><input style={{ ...inp, width: "100%" }} value={dev.type} onChange={(e) => devSet("type", e.target.value)} /></label>
+        <label style={label}>Type{lockIcon("type")}<br /><select style={{ ...inp, width: "100%" }} value={dev.type} onChange={(e) => devSet("type", e.target.value)}>{typeOptions(dev.type).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
         {specFieldsFor(dev).map((f) => {
           const raw = (dev as any)[f.key];
           const val = raw == null ? "" : String(raw);

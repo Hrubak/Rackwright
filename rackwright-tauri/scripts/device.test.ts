@@ -1,6 +1,7 @@
 // npx tsx scripts/device.test.ts — device fields and helpers (synthetic data only)
 import { statusOf, setField, connectedTo, powerPath, copyAsText, SPEC_FIELDS, STATUSES } from "../src/device/info";
 import type { Doc } from "../src/types";
+import { DEVICE_TYPES, typeOptions } from "../src/deviceTypes";
 
 let fail = 0;
 const eq = (name: string, a: unknown, b: unknown) => {
@@ -56,6 +57,14 @@ eq("text U", txt.includes("U12"), true);
 eq("text link", txt.includes("SW-1"), true);
 eq("spec ups", SPEC_FIELDS.length, 14);
 eq("spec order", SPEC_FIELDS.slice(0, 3).map((f) => f.label), ["Manufacturer", "Model", "Serial"]);
+
+for (const t of ["Switch", "Server", "Wireless", "UPS", "Patch panel", "Endpoints", "Virtual machines"]) eq(`types has ${t}`, DEVICE_TYPES.includes(t), true);
+eq("types unique", new Set(DEVICE_TYPES).size, DEVICE_TYPES.length);
+eq("types sorted", DEVICE_TYPES, [...DEVICE_TYPES].sort((a, b) => a.localeCompare(b)));
+eq("typeOptions custom first", typeOptions("Custom Box")[0], "Custom Box");
+eq("typeOptions custom keeps list", typeOptions("Custom Box").slice(1), DEVICE_TYPES);
+eq("typeOptions known", typeOptions("Switch"), DEVICE_TYPES);
+eq("typeOptions empty", typeOptions(""), DEVICE_TYPES);
 
 if (fail) { console.log(`${fail} failed`); process.exit(1); }
 console.log("device tests passed");
