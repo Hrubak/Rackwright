@@ -106,6 +106,12 @@ Each task by a Sonnet subagent at low effort, a reviewer at medium after each, t
 
 Exact preset values (from public Scale spec sheets, marked as starting points), column widths, debounce timing, filter details.
 
+## Node presets
+
+Rule (user, 2026-11-19): ship a preset only if its numbers come from a Scale Computing spec sheet cited here; otherwise leave it out. An empty "Start from" list is fine.
+
+3.21.0 ships **no presets**. Scale's sheets (for example the [SC Platform Family Brochure](https://www.scalecomputing.com/documents/Data-Sheets/SC-Platform-Family-Brochure.pdf) and the [SC Hardware Data Sheet](https://scalecomputing.com/documents/Data-Sheets/SC-Hardware-Data-Sheet.pdf)) list each node as a set of options (HE150: RAM 8, 16, 32 or 64 GB; one NVMe drive of 500 GB to 4 TB), not as fixed node sizes, and the HE250 rows don't clearly give CPU, RAM and storage. Any one preset would be our choice of options, not a spec-sheet number. The "Start from" dropdown is hidden while the list is empty; nodes are typed from the quote.
+
 ## To be checked against Scale's guidance
 
 - The per-node RAM reserve default (8 GB) and the "keep free" default (20%). Both are editable settings in the plan; the user checks the defaults. The builder does not look them up or change them.
