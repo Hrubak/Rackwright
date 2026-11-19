@@ -3,7 +3,7 @@ import { v } from "./theme";
 import { findBundles } from "./bundles";
 import { isOutlet } from "./edit";
 import type { Cable, Device, Doc, Route } from "./types";
-import { CableOpts, DEFAULT_OPTS, Stub, StubEnd, dotCables, layoutStubs, visibleCables } from "./cableView";
+import { CableOpts, DEFAULT_OPTS, Stub, StubEnd, dotCables, layoutStubs, loosePath, visibleCables } from "./cableView";
 
 export type CableColorMode = "own" | "type";
 export type Focus = { kind: "cable" | "dev" | "rack"; id: number } | null;
@@ -190,16 +190,17 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, onOp
     return m;
   }, [doc.devices]);
   // geometry only changes with the routes, the colour mode or edited cables
+  const loose = opts.style === "loose";
   const shapes = useMemo(() => routes.map((r) => {
     const c = cmap.get(r.cable), n = r.pts.length;
     return {
-      id: r.cable, d: roundedPath(r.pts), dash: c?.style === "dashed" ? "6 4" : undefined, kind: cableKind(c?.type),
+      id: r.cable, d: loose && n > 0 ? loosePath(r.pts[0], r.dir_a, r.pts[n - 1], r.dir_b, r.cable) : roundedPath(r.pts), dash: c?.style === "dashed" ? "6 4" : undefined, kind: cableKind(c?.type),
       color: colorMode === "type" ? typeColor(c?.type) : c?.color || "#999", // theme-ok
       a: r.pts[0], b: r.pts[n - 1], da: r.dir_a, db: r.dir_b,
       oa: !!pinfo.get(c?.a ?? -1)?.outlet, ob: !!pinfo.get(c?.b ?? -1)?.outlet,
       ends: c ? [pinfo.get(c.a)?.dev.id, pinfo.get(c.b)?.dev.id] : [],
     };
-  }), [routes, cmap, colorMode, pinfo]);
+  }), [routes, cmap, colorMode, pinfo, loose]);
 
   const vis = useMemo(() => visibleCables(doc, opts, selected, hoverDev), [doc, opts, selected, hoverDev]);
   const dots = useMemo(() => dotCables(doc, opts), [doc, opts]);
@@ -246,7 +247,7 @@ export default function Cables({ doc, routes, selected, hoverDev, onSelect, onOp
   return (
     <g>
       {opts.style === "routed" && <Harness routes={shownRoutes} faded={active} />}
-      {opts.style === "routed" && shown.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onOpen={onOpenC} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
+      {(opts.style === "routed" || opts.style === "loose") && shown.map((s) => <CableShape key={s.id} {...s} state={stateOf(s)} onPick={onPick} onOpen={onOpenC} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />)}
       {opts.style === "stubs" && stubs.map((s, i) => {
         const sh = shapeById.get(s.cable);
         return <StubShape key={`${s.cable}:${i}`} s={s} color={sh?.color || "#999"} state={sh ? stateOf(sh) : "normal"} zoom={zoom} onPick={onPick} onOpen={onOpenC} onEnter={onEnter} onMove={onMove} onLeave={onLeave} />; // theme-ok
@@ -304,7 +305,7 @@ export function CableOverlay({ cables, mode, onMode, opts = DEFAULT_OPTS, onOpts
           </label>
           <label>Style{" "}
             <select value={opts.style} onChange={(e) => onOpts({ ...opts, style: e.target.value as CableOpts["style"] })} style={selSt}>
-              <option value="routed">routed</option><option value="stubs">stubs</option>
+              <option value="routed">routed</option><option value="stubs">stubs</option><option value="loose">loose</option>
             </select>
           </label>
           <label title="Hide cables to Endpoints, Virtual machines and off-rack devices">

@@ -540,6 +540,7 @@ export default function App({ web }: { web?: WebProps } = {}) {
         SEP,
         { label: "Routed", checked: cableOpts.style === "routed", run: () => setCable({ style: "routed" }) },
         { label: "Stubs", checked: cableOpts.style === "stubs", run: () => setCable({ style: "stubs" }) },
+        { label: "Loose", checked: cableOpts.style === "loose", run: () => setCable({ style: "loose" }) },
         SEP,
         { label: "Hide endpoint cables", checked: cableOpts.hideEndpoints, run: () => setCable({ hideEndpoints: !cableOpts.hideEndpoints }) },
       ] },

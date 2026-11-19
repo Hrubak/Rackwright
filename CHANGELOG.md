@@ -2,6 +2,12 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.22.0 — 2026-11-19
+Web and desktop. Update the LXC as usual and download the new desktop exe.
+- **Loose cables.** A new cable style shows patch cables as they really hang: straight from port to port with a little sag, instead of routed through the ducts and tray. Pick **loose** under Style in the cable box at the bottom left of the Rack view, or View › Cables › Loose. Each cable sags a little differently, so a bundle fans out and stays readable.
+- Colours, plugs, hover, click, double-click and the tooltip work the same as before. Your choice is remembered in this browser (or on this PC for the desktop app), like the other cable settings.
+- Routed and stubs look exactly as before. Rack PDFs, client report pictures and Visio exports always use the routed drawing.
+
 ## 3.21.1 — 2026-11-19
 Web and desktop. Update the LXC as usual and download the new desktop exe.
 - **VM migration defaults checked.** Keep free 20% matches Scale's Major capacity alert (80% used), and N+1 on by default matches how Scale sizes RAM, so those two are no longer marked "to be checked". The 8 GB RAM reserve per node stays editable; the Migration tab now says it is our estimate, because Scale publishes no fixed figure.

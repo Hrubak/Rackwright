@@ -2,7 +2,7 @@
 import type { Cable, Device, Doc } from "./types";
 
 export type CableShow = "all" | "selected" | "none";
-export type CableStyle = "routed" | "stubs";
+export type CableStyle = "routed" | "stubs" | "loose";
 export interface CableOpts { show: CableShow; style: CableStyle; hideEndpoints: boolean }
 export const DEFAULT_OPTS: CableOpts = { show: "all", style: "routed", hideEndpoints: false };
 export const STUB_LEN = 18;
@@ -14,7 +14,7 @@ export function loadOpts(): CableOpts {
     const o = JSON.parse(localStorage.getItem(KEY) || "{}");
     return {
       show: o.show === "selected" || o.show === "none" ? o.show : "all",
-      style: o.style === "stubs" ? "stubs" : "routed",
+      style: o.style === "stubs" || o.style === "loose" ? o.style : "routed",
       hideEndpoints: !!o.hideEndpoints,
     };
   } catch { return { ...DEFAULT_OPTS }; }
@@ -108,4 +108,28 @@ export function layoutStubs(ends: StubEnd[], len = STUB_LEN): Stub[] {
     }
   }
   return out;
+}
+
+// ---- loose style: a patch cable hanging straight from port to port
+
+/** A fixed number in [0, 1) for a cable id and a salt, so a cable keeps the same shape on every redraw. */
+function jitter(id: number, salt: number): number {
+  let x = (Math.imul(id | 0, 2654435761) + Math.imul(salt, 40503)) >>> 0;
+  x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13;
+  return (x >>> 0) / 4294967296;
+}
+const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+const fin = (n: number) => (Number.isFinite(n) ? n : 0);
+const pt = (x: number, y: number) => `${+fin(x).toFixed(2)} ${+fin(y).toFixed(2)}`;
+
+/** SVG path for the loose style: out of port a along da (+1 down, -1 up), one sagging curve, into port b along db. */
+export function loosePath(a: [number, number], da: number, b: [number, number], db: number, id: number): string {
+  const sa = da < 0 ? -1 : 1, sb = db < 0 ? -1 : 1;
+  const ax = fin(a[0]), ay = fin(a[1]), bx = fin(b[0]), by = fin(b[1]);
+  const a1y = ay + sa * 10, b1y = by + sb * 10; // past the plug body
+  const dist = Math.hypot(bx - ax, b1y - a1y);
+  const k = clamp(0.35 * dist, 14, 110);
+  const sag = clamp(0.16 * dist, 6, 64) * (0.7 + 0.6 * jitter(id, 1));
+  const jx = (jitter(id, 2) - 0.5) * Math.min(14, dist * 0.08);
+  return `M${pt(ax, ay)}L${pt(ax, a1y)}C${pt(ax + jx, a1y + sa * k + sag)} ${pt(bx + jx, b1y + sb * k + sag)} ${pt(bx, b1y)}L${pt(bx, by)}`;
 }
