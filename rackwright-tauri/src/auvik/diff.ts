@@ -105,9 +105,12 @@ export function deviceFields(d: X, u: PlanUnit): FieldChange[] {
   const ip = a.ips[0] || "";
   if (ip && ip !== (d.ip || "")) add("ip", d.ip || "", ip);
   if (a.serial && a.serial !== (d.serial || "")) add("serial", d.serial || "", a.serial);
-  if (a.model && a.model !== (d.model || "")) add("model", d.model || "", a.model, !!d.model && d.model !== d.auvik_model);
+  const model = u.item.modelOver || a.model;   // API import: a picked catalog model or a Virtual Machine model
+  if (model && model !== (d.model || "")) add("model", d.model || "", model, !!d.model && d.model !== d.auvik_model);
   if (u.name !== d.name && d.auvik_name && u.name.toLowerCase() !== d.auvik_name.toLowerCase()) add("name", d.name, u.name);   // only when Auvik renamed it
-  if (u.tpl.type && d.type && u.tpl.type !== d.type && d.auvik_model !== undefined && a.model !== d.auvik_model) add("type", d.type, u.tpl.type);
+  const typeOver = u.item.typeOver ?? (u.item.kindOver ? u.tpl.type : undefined);   // API import: the person's Type, or the type of the Kind they picked
+  if (typeOver) { if (typeOver !== (d.type || "")) add("type", d.type || "", typeOver); }
+  else if (u.tpl.type && d.type && u.tpl.type !== d.type && d.auvik_model !== undefined && a.model !== d.auvik_model) add("type", d.type, u.tpl.type);
   return out;
 }
 const MEMBER_FIELDS = ["name", "ip", "mac", "kind", "model", "type"] as const;

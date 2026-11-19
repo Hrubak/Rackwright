@@ -25,6 +25,10 @@ export interface PlanItem {
   mount: Mount;           // desktop firewalls: "kit" = 1U rack-mount kit with front ports, "shelf" = on a shelf
   kitName: string;        // template used for the mount kit
   hostGuessed?: boolean;  // VM rows from the API import: host came from guessHost (names), so the preview asks to check it
+  tplOver?: string;       // API import: catalog template name the person picked (Model dropdown); resolvePlan uses it
+  typeOver?: string;      // API import: Device.type the person picked
+  modelOver?: string;     // API import: model text to save (a picked catalog model, or a Virtual Machine model)
+  kindOver?: boolean;     // API import: the kind came from the person
 }
 
 export const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -471,7 +475,8 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const stack = unitNums.length > 1;
     for (const u of stack ? unitNums : [null]) {
       const lay = layout(u);
-      let { tpl, generic } = matchTemplate({ ...it.dev, type: it.type }, it.kind, lay.maxPort);
+      const picked = it.tplOver ? CATALOG.find((c) => c.name === it.tplOver) : undefined;
+      let { tpl, generic } = picked ? { tpl: clone(picked), generic: false } : matchTemplate({ ...it.dev, type: it.type }, it.kind, lay.maxPort);
       if (it.kind === "firewall" && it.mount === "kit" && isDesktopTpl(tpl)) { tpl = mountKit(tpl); generic = false; }
       
       list.push({
@@ -567,7 +572,7 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const u = unitFor(best.other.key, best.iface);
     let g = groups.get(u.key);
     if (!g) { g = { key: `g:${u.key}`, name: `Endpoints on ${u.name}`, unit: u, members: [], summary: "", isGroup: true, tpl: groupTemplate(0) }; groups.set(u.key, g); }
-    g.members.push({ name: d.name, type: d.type, model: d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: best.iface, status: d.status, key: it.key, kind: epKindOf(it) });
+    g.members.push({ name: d.name, type: d.type, model: it.modelOver || d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: best.iface, status: d.status, key: it.key, kind: epKindOf(it) });
   }
   const groupList = [...groups.values()];
   for (const g of groupList) {
@@ -592,7 +597,7 @@ export function resolvePlan(p: ParsedAuvik, items: PlanItem[]): ImportPlan {
     const bk = hostUnit ? `vm:${hk}` : "vm:none";
     let b = vmBoxes.get(bk);
     if (!b) { b = { key: bk, name: hostUnit ? `VMs on ${hostUnit.name}` : "VMs (no host)", hostKey: hostUnit ? hk : null, hostUnit, members: [], summary: "", tpl: vmTemplate() }; vmBoxes.set(bk, b); }
-    b.members.push({ name: d.name, type: it.type, model: d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: "", status: d.status, key: it.key, kind: "vm" });
+    b.members.push({ name: d.name, type: it.type, model: it.modelOver || d.model, ip: d.ips[0] || "", mac: d.macs[0] || "", port: "", status: d.status, key: it.key, kind: "vm" });
   }
   const vmList = [...vmBoxes.values()].sort((x, y) => (x.hostKey ? 0 : 1) - (y.hostKey ? 0 : 1) || x.name.localeCompare(y.name));
   for (const b of vmList) { b.members.sort((x, y) => x.name.localeCompare(y.name)); b.summary = summarize(b.members.map((m) => m.kind)); }

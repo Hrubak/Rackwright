@@ -181,7 +181,9 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
       fill(d, u, u.tpl.model || "");
       d.name = u.name; setSource(d, "name", "auvik"); d.ip = a.ips[0] || d.ip || ""; if (a.ips[0]) setSource(d, "ip", "auvik");
       if (a.serial) { d.serial = a.serial; setSource(d, "serial", "auvik"); }
-      if (a.model) { d.model = a.model; setSource(d, "model", "auvik"); }
+      const model = u.item.modelOver || a.model;   // API import: a picked catalog model or a Virtual Machine model
+      if (model) { d.model = model; setSource(d, "model", "auvik"); }
+      if (u.item.typeOver) { d.type = u.item.typeOver; setSource(d, "type", "auvik"); }   // hand picks are marked manual by the caller
     }
     devOf.set(u.key, d);
     if (u.mode === "off") { d.face = d.plate ? "both" : "front"; putOff(d); }

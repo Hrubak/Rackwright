@@ -5,16 +5,16 @@ import type { AuvikInventory, AuvikTenant } from "../../api";
 import type { ClientItem } from "../../clients/store";
 import { addRack, clone, fromTpl, setOffColumn } from "../../edit";
 import { modelById, specOf } from "../../racks";
-import { setSource } from "../../source";
+import { markManual, setSource } from "../../source";
 import type { Device, Doc } from "../../types";
 import { applyImport } from "../../imports/apply";
 import { planImport, type Row } from "../../imports/plan";
 import type { ImportSpec } from "../../imports/spec";
 import { applyInPlace } from "../apply";
-import { Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
+import { Change, Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
 import { epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type ImportPlan } from "../plan";
-import { TO_PLACE_KINDS, apiItems, type ApiPlanItem } from "./map";
+import { TO_PLACE_KINDS, apiItems, type ApiPlanItem, type Overrides } from "./map";
 
 export interface SiteDocs { siteId: number; racks: { id: number; name: string; version: number; doc: Doc }[] }
 type Fill = "empty" | "overwrite";
@@ -45,31 +45,75 @@ export interface SitePlan {
   other: { rackId: number; rackName: string; diff: Diff }[]; // fill-only changes in the site's other rack documents
   elsewhere: Set<string>;                                      // plan unit keys already held by another rack document: never added to "(Auvik)"
   layoutRows?: Row[];
+  over?: Overrides;                                            // the person's kind / type / model picks, by plan item key
 }
 
 const isFld = (id: string) => id.startsWith("fld:");
+
+/** The fields the person picked by hand, by plan item key: a kind or a type -> "type", a model (not Auvik's) -> "model".
+ *  A Virtual Machine pre-pick is not in here: it is an Auvik value. */
+export function handPicks(over?: Overrides): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const add = (k: string, f: string) => out.set(k, (out.get(k) ?? new Set<string>()).add(f));
+  for (const k of Object.keys(over?.kinds ?? {})) add(k, "type");
+  for (const [k, v] of Object.entries(over?.types ?? {})) if (v) add(k, "type");
+  for (const [k, v] of Object.entries(over?.models ?? {})) if (v) add(k, "model");
+  return out;
+}
+/** A hand pick's field change on a matched device or box member is ticked by default: the person chose it.
+ *  Ids may carry a rack prefix ("<rackId>:fld:..."). */
+function tickHand(d: Diff, plan: ImportPlan, picks: Map<string, Set<string>>): Diff {
+  if (!picks.size) return d;
+  const itemOf = new Map(plan.units.map((u) => [u.key, u.itemKey]));
+  const hand = (c: Change): boolean => {
+    const m = /^(?:\d+:)?(fldm?):(.+):([^:]+)$/.exec(c.id);
+    if (!m) return false;
+    const key = m[1] === "fld" ? itemOf.get(m[2]) : m[2];
+    return !!key && !!picks.get(key)?.has(m[3]);
+  };
+  return { ...d, changes: d.changes.map((c) => (hand(c) ? { ...c, defaultOn: true, detail: c.id.split(":").pop() } : c)) };
+}
+/** After saving: every hand-picked field the document now holds is marked manual (and locked); a box member gets it in its `locked`. */
+function markHand(doc: Doc, p: SitePlan, picks: Map<string, Set<string>>) {
+  for (const [key, fields] of picks) {
+    const it = p.items.find((i) => i.key === key);
+    if (!it) continue;
+    const id = "api:" + (it.dev.apiId ?? key);
+    const unit = p.plan.units.find((u) => u.itemKey === key);
+    const devWant = (f: string) => (f === "type" ? it.typeOver ?? unit?.tpl.type : it.modelOver);
+    const epWant = (f: string) => (f === "type" ? it.type : it.modelOver);
+    for (const d of doc.devices as X[]) {
+      if ((d.auvik_id ?? "").split("#")[0] === id) for (const f of fields) { const w = devWant(f); if (w && (d as any)[f] === w) markManual(d, f); }
+      for (const e of d.endpoints ?? []) {
+        if (e.key !== id) continue;
+        for (const f of fields) { const w = epWant(f); if (w && (e as any)[f] === w && !e.locked?.includes(f)) e.locked = [...(e.locked ?? []), f]; }
+      }
+    }
+  }
+}
 /** A device found in another rack document is left where it is: it is not offered as new here. */
 const dropElsewhere = (d: Diff, keys: Set<string>): Diff => ({ ...d, changes: d.changes.filter((c) => !(c.id.startsWith("new:") && keys.has(c.id.slice(4)))) });
 
-export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>): SitePlan {
+export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>, over?: Overrides): SitePlan {
   const found = findAuvikDoc(siteDocs, tenant.id);
   const mine = found ? siteDocs.racks.find((r) => r.id === found.id)! : null;
-  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }));
+  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }), over);
   const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
+  const picks = handPicks(over);
   const elsewhere = new Set<string>();
   for (const r of siteDocs.racks) {
     if (r.id === mine?.id) continue;
-    const d = computeDiff(r.doc, plan, items, { fill });
+    const d = tickHand(computeDiff(r.doc, plan, items, { fill }), plan, picks);
     for (const k of d.matched.keys()) elsewhere.add(k);
     const changes = d.changes.filter((c) => isFld(c.id));
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, parsed, items, plan, other, elsewhere,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, parsed, items, plan, other, elsewhere,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
-    diff: mine ? dropElsewhere(computeDiff(mine.doc, plan, items, { fill }), elsewhere) : null,
+    diff: mine ? dropElsewhere(tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks), elsewhere) : null,
   };
   if (layout) p.layoutRows = build(p, null).rows;
   return p;
@@ -106,7 +150,7 @@ function heldElsewhere(it: SitePlan["items"][number], doc: Doc, others: Doc[]): 
 
 /** The API has no neighbours, so endpoints cannot hang off a switch. They go in one unattached box per kind in the Inventory column.
  *  An endpoint the site already holds somewhere else stays where it is (in this document its Auvik id is recorded); it is never added twice. */
-function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[]) {
+function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[], picks: Map<string, Set<string>>) {
   const byKind = new Map<EpKind, SitePlan["items"]>();
   for (const it of items) {
     if (!isEndpointMode(it.mode)) continue;
@@ -127,8 +171,13 @@ function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[]) {
     for (const it of list) {
       const a = it.dev, key = "api:" + (a.apiId ?? it.key);
       const have = eps.find((e) => e.key === key);
-      if (have) { have.status = a.status; continue; }
-      eps.push({ name: a.name, type: it.type, model: a.model, ip: a.ips[0] || "", mac: a.macs[0] || "", port: "", status: a.status, kind, key });
+      if (have) {
+        have.status = a.status;
+        if (picks.get(it.key)?.has("type")) have.type = it.type;   // a hand pick on a member that is already there
+        if (picks.get(it.key)?.has("model") && it.modelOver) have.model = it.modelOver;
+        continue;
+      }
+      eps.push({ name: a.name, type: it.type, model: it.modelOver || a.model, ip: a.ips[0] || "", mac: a.macs[0] || "", port: "", status: a.status, kind, key });
     }
     d.name = EP_WORD[kind]; d.model = summarize(eps.map((e) => e.kind ?? "other")); d.u_size = 1; d.rows = 0; d.half = false;
     d.notes = "Auvik endpoints that are not attached to a switch";
@@ -144,7 +193,8 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   const rackId = doc.racks[0].id;
   const before = new Set(doc.devices.map((d) => d.id));
   const ticked = new Set(sel ?? []);
-  const diff0 = dropElsewhere(computeDiff(doc, p.plan, p.items, { fill: p.fill }), p.elsewhere);
+  const picks = handPicks(p.over);
+  const diff0 = dropElsewhere(tickHand(computeDiff(doc, p.plan, p.items, { fill: p.fill }), p.plan, picks), p.elsewhere);
   if (!mine || !sel) for (const id of defaultSelection(diff0)) ticked.add(id);
   for (const k of p.elsewhere) ticked.delete(`new:${k}`);
   // A matched device is imported when it has nothing to tick, or one of its changes is ticked.
@@ -160,7 +210,8 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
     setOffColumn(doc, d, it && specKinds.has(it.kind) ? 0 : 1);
   }
 
-  fillEndpointBoxes(doc, p.items, p.siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc));
+  fillEndpointBoxes(doc, p.items, p.siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc), picks);
+  markHand(doc, p, picks);
 
   let rows: Row[] = [];
   if (p.layout) {
@@ -175,7 +226,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
   for (const r of p.siteDocs.racks) {
     if (r.id === mine?.id) continue;
     const od = clone(r.doc);
-    const diff = computeDiff(od, p.plan, p.items, { fill: p.fill });
+    const diff = tickHand(computeDiff(od, p.plan, p.items, { fill: p.fill }), p.plan, picks);
     const pre = `${r.id}:`;
     const pick = sel ? new Set([...sel].filter((x) => x.startsWith(pre)).map((x) => x.slice(pre.length))) : new Set(diff.changes.filter((c) => isFld(c.id) && c.defaultOn).map((c) => c.id));
     let changed = false;
@@ -190,7 +241,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
         changed = true;
       }
     }
-    if (changed) others.push({ rackId: r.id, doc: od });
+    if (changed) { markHand(od, p, picks); others.push({ rackId: r.id, doc: od }); }
   }
   return { auvikDoc: doc, others, rows };
 }
@@ -248,7 +299,7 @@ export async function saveSite(p: SitePlan, sel: Set<string>, ctx: SaveCtx, api:
       try {
         const r = await api.getRack(id);
         const docs: SiteDocs = { ...p.siteDocs, racks: p.siteDocs.racks.map((x) => (x.id === id ? { id, name: r.name, version: r.version, doc: r.doc } : x)) };
-        const np = planSite(p.inv, p.tenant, docs, p.defaults, p.fill, p.layout, p.hosts);
+        const np = planSite(p.inv, p.tenant, docs, p.defaults, p.fill, p.layout, p.hosts, p.over);
         const out = applySite(np, sel);
         const nd = np.target.docId === id ? out.auvikDoc : out.others.find((o) => o.rackId === id)?.doc;
         if (!nd) return;   // their version needs nothing from us

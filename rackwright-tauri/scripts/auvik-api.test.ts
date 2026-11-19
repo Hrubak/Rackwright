@@ -8,7 +8,8 @@ import { computeDiff, matchUnits } from "../src/auvik/diff";
 import { applyInPlace } from "../src/auvik/apply";
 import { makeXlsx, devices } from "./fixtures/auvikFixture";
 import type { Device, Doc } from "../src/types";
-import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, type AuvikApiDevice } from "../src/auvik/api/map";
+import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, KIND_LABEL, KIND_TYPE, VM_MODELS, defaultModelChoice, isVirtual, vmVendor, type AuvikApiDevice } from "../src/auvik/api/map";
+import { CATALOG } from "../src/edit";
 import { classify, setMode, resolvePlan as resolveP } from "../src/auvik/plan";
 import { setOffColumn } from "../src/edit";
 import { findAuvikDoc, mapTenantToSite, planSite, applySite, saveSite, skipLine, type SiteDocs } from "../src/auvik/api/sync";
@@ -411,6 +412,116 @@ async function main() {
     t("I3: virtual controller still skipped", by("EX-VCTRL").mode === "skip", by("EX-VCTRL").mode);
     t("I4: ipmi without host is off-rack, no placeholder", by("EX-IPMI99").mode === "off" && by("EX-IPMI99").host !== "new" && !resolveP({ site: "EX", devices: items.map((i) => i.dev), warnings: [] } as any, items).units.some((u) => u.placeholder));
     t("T7: internetOfThings classifies as iot", classify(by("EX-CAM01").dev) === "iot" || by("EX-CAM01").mode === "iot", by("EX-CAM01").mode);
+  }
+
+  // --- 3.19.2: kind, type and model overrides, saved as hand edits; Virtual Machine models
+  {
+    const inv = JSON.parse(readFileSync(new URL("../../web/server/tests/fixtures/auvik/expected-inventory-main.json", import.meta.url), "utf8")) as { status: "ok"; note: string; devices: AuvikApiDevice[] };
+    const tenant = { id: "t-1001", name: "EX Main Office", type: "client" as const, parent: "t-1" };
+    const defaults = { model: "apc-ar3100", u: 42 };
+    const mkDocs = (racks: { id: number; name: string; doc: Doc }[]): SiteDocs => ({ siteId: 5, racks: racks.map((r) => ({ ...r, version: 1 })) });
+    const byName = (d: Doc, n: string) => d.devices.find((x) => x.name === n && !x.endpoints)!;
+    const keyOf = (n: string) => "api:" + inv.devices.find((d) => d.name === n)!.id;
+    const api = (id: string, name: string, type: string, makeModel: string, extra: Partial<AuvikApiDevice> = {}): AuvikApiDevice =>
+      ({ id, name, type, makeModel, vendor: "", serial: "", firmware: "", software: "", ips: ["192.0.2." + id.slice(-2)], macs: [], status: "online", discovery: "", components: [], ...extra });
+    const memberOf = (d: Doc, key: string) => d.devices.flatMap((x) => x.endpoints ?? []).find((e) => e.key === key);
+    const sel = (p: ReturnType<typeof planSite>) => new Set([...(p.diff?.changes ?? []), ...p.other.flatMap((o) => o.diff.changes)].filter((c) => c.defaultOn).map((c) => c.id));
+
+    t("KIND_TYPE / KIND_LABEL / VM_MODELS", KIND_TYPE.endpoint === "Generic Device" && KIND_TYPE.ipmi === "Intelligent Platform Management Interface" && KIND_LABEL.ap === "Access point" && KIND_LABEL.ipmi === "OOBM (iDRAC/iLO)" && KIND_LABEL.switch === "Switch" && VM_MODELS.kvm === "Virtual Machine – KVM (Scale HyperCore)");
+
+    // vmVendor: model, description (discovery) and software; checked Hyper-V, VMware, KVM
+    const ad = (makeModel: string, discovery = "", software = "") => toAuvikDevice(api("x-01", "EX-VMX", "virtualMachine", makeModel, { discovery, software }), "EX");
+    t("vmVendor: Hyper-V", vmVendor(ad("Microsoft Virtual Machine")) === "hyperv" && vmVendor(ad("Virtual Machine", "", "Hyper-V 10")) === "hyperv");
+    t("vmVendor: VMware", vmVendor(ad("VMware7,1")) === "vmware" && vmVendor(ad("Example VM", "esxi authorized")) === "vmware");
+    t("vmVendor: KVM", vmVendor(ad("QEMU Standard PC")) === "kvm" && vmVendor(ad("Scale HyperCore guest")) === "kvm" && vmVendor(ad("Example KVM guest")) === "kvm");
+    t("vmVendor: unknown is null", vmVendor(ad("Acme Box")) === null);
+
+    // kind override Switch -> Endpoint: EX-SW01 leaves To place for an Endpoints box
+    const sw1 = keyOf("EX-SW01");
+    const base = planSite(inv, tenant, mkDocs([]), defaults, "empty");
+    t("base: EX-SW01 is a To place unit", base.plan.units.some((u) => u.itemKey === sw1 && u.mode === "off"));
+    const pk = planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { kinds: { [sw1]: "endpoint" } });
+    const ik = pk.items.find((i) => i.key === sw1)!;
+    t("kind override: row is an endpoint now", ik.kind === "endpoint" && ik.mode === "endpoint" && ik.kindOver === true && !pk.plan.units.some((u) => u.itemKey === sw1), `${ik.kind} ${ik.mode}`);
+    t("kind override kept on SitePlan.over", pk.over?.kinds?.[sw1] === "endpoint");
+    const dk = applySite(pk, new Set()).auvikDoc;
+    const mk1 = memberOf(dk, sw1);
+    t("kind override: EX-SW01 is a member of an Endpoints box, type locked", !!mk1 && dk.devices.some((x) => x.type === "Endpoints" && x.endpoints?.includes(mk1!)) && !!mk1!.locked?.includes("type") && !byName(dk, "EX-SW01"), JSON.stringify(mk1));
+
+    // kind override Endpoint -> Server: the printer becomes a server in column 0, type manual and locked
+    const prn = keyOf("EX-PRN01");
+    const ps = planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { kinds: { [prn]: "server" } });
+    const ds = applySite(ps, new Set()).auvikDoc;
+    const prnDev = byName(ds, "EX-PRN01");
+    t("kind override Endpoint -> Server: a device in column 0", !!prnDev && prnDev.rack === null && prnDev.type === "Server" && prnDev.fx === byName(ds, "EX-SW01").fx && !memberOf(ds, prn), JSON.stringify(prnDev && { type: prnDev.type, fx: prnDev.fx }));
+    t("kind override Endpoint -> Server: type manual and locked", prnDev?.source?.type === "manual" && !!prnDev?.locked?.includes("type"), JSON.stringify(prnDev?.source));
+
+    // type override: saved as Device.type, manual and locked; the template stays the same
+    const sw2 = keyOf("EX-SW02");
+    const pt = planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { types: { [sw2]: "Patch panel" } });
+    t("type override: typeOver set, template unchanged", pt.items.find((i) => i.key === sw2)!.typeOver === "Patch panel" && pt.plan.units.find((u) => u.itemKey === sw2)!.tpl.name === base.plan.units.find((u) => u.itemKey === sw2)!.tpl.name);
+    const dt = applySite(pt, new Set()).auvikDoc;
+    const sw2Dev = byName(dt, "EX-SW02");
+    t("type override saved, manual and locked", sw2Dev.type === "Patch panel" && sw2Dev.source?.type === "manual" && !!sw2Dev.locked?.includes("type"), JSON.stringify({ type: sw2Dev.type, src: sw2Dev.source }));
+    t("no override: types stay Auvik's", byName(applySite(base, new Set()).auvikDoc, "EX-SW02").source?.type !== "manual");
+
+    // catalog model override: changes the template (U) and saves that model
+    const srv = keyOf("EX-SRV01");
+    const before = base.plan.units.find((u) => u.itemKey === srv)!;
+    const tpl2 = CATALOG.find((c) => c.type === "Server" && c.u_size === 2 && c.model && c.u_size !== before.tpl.u_size)!;
+    t("a 2U catalog server exists and differs from the matched one", !!tpl2, before.tpl.name);
+    const pm = planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { models: { [srv]: "tpl:" + tpl2.name } });
+    const um = pm.plan.units.find((u) => u.itemKey === srv)!;
+    const im = pm.items.find((i) => i.key === srv)!;
+    t("tpl override: unit template and U", um.tpl.name === tpl2.name && um.tpl.u_size === 2 && !um.generic && im.tplOver === tpl2.name && im.tplName === tpl2.name && im.modelOver === tpl2.model, `${um.tpl.name} ${um.tpl.u_size}`);
+    const dm = applySite(pm, new Set()).auvikDoc;
+    const srvDev = byName(dm, "EX-SRV01");
+    t("tpl override: model saved, manual and locked, 2U", srvDev.model === tpl2.model && srvDev.u_size === 2 && srvDev.source?.model === "manual" && !!srvDev.locked?.includes("model"), JSON.stringify({ m: srvDev.model, u: srvDev.u_size, s: srvDev.source }));
+
+    // VM pre-pick (an Auvik value, not a hand edit)
+    const vInv = { ...inv, devices: [...inv.devices, api("d-1001-90", "EX-VM01", "virtualMachine", "VMware Virtual Platform"), api("d-1001-91", "EX-VM02", "virtualMachine", "Acme Box")] };
+    const vm1 = "api:d-1001-90", vm2 = "api:d-1001-91";
+    const pv = planSite(vInv, tenant, mkDocs([]), defaults, "empty");
+    const iv1 = pv.items.find((i) => i.key === vm1)!, iv2 = pv.items.find((i) => i.key === vm2)!;
+    t("VM pre-pick: VMware model, host still guessed", iv1.mode === "vm" && iv1.modelOver === VM_MODELS.vmware && iv1.hostGuessed === true, JSON.stringify({ m: iv1.modelOver, h: iv1.host, g: iv1.hostGuessed }));
+    t("VM pre-pick: defaultModelChoice", defaultModelChoice(iv1) === "vm:vmware" && defaultModelChoice(iv2) === "" && isVirtual(iv2) && iv2.modelOver === undefined);
+    t("isVirtual: by model words, not for a plain switch", isVirtual({ ...pv.items.find((i) => i.key === sw1)!, dev: { ...iv1.dev } } as any) && !isVirtual(pv.items.find((i) => i.key === sw1)!));
+    const dv = applySite(pv, new Set()).auvikDoc;
+    const mv1 = memberOf(dv, vm1);
+    t("VM pre-pick: box member has the model, not locked", mv1?.model === VM_MODELS.vmware && !mv1?.locked?.includes("model"), JSON.stringify(mv1));
+    t("VM pre-pick: unknown vendor keeps Auvik's model", memberOf(dv, vm2)?.model === "Acme Box");
+
+    // hand-picked VM model on a VM box member
+    const ph = planSite(vInv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { models: { [vm1]: "vm:hyperv" } });
+    const mh = memberOf(applySite(ph, new Set()).auvikDoc, vm1);
+    t("hand vm:hyperv: member model and locked", mh?.model === VM_MODELS.hyperv && !!mh?.locked?.includes("model"), JSON.stringify(mh));
+    const pa = planSite(vInv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { models: { [vm1]: "" } });
+    t("explicit Auvik choice: no pre-pick", pa.items.find((i) => i.key === vm1)!.modelOver === undefined && memberOf(applySite(pa, new Set()).auvikDoc, vm1)?.model === "VMware Virtual Platform");
+
+    // matched devices: a hand pick's field change is ticked by default (defaultOn), even when "Fill empty" would keep it
+    const saved = applySite(base, new Set()).auvikDoc;
+    const docs1 = mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: saved }]);
+    const pr = planSite(inv, tenant, docs1, defaults, "empty", undefined, undefined, { types: { [sw2]: "Patch panel" }, models: { [srv]: "tpl:" + tpl2.name } });
+    const cType = pr.diff!.changes.find((c) => c.id === `fld:${sw2}:type`), cModel = pr.diff!.changes.find((c) => c.id === `fld:${srv}:model`);
+    t("matched: hand-picked type and model changes are on by default", !!cType && cType.defaultOn && cType.to === "Patch panel" && !!cModel && cModel.defaultOn && cModel.to === tpl2.model, JSON.stringify([cType, cModel]));
+    const pr0 = planSite(inv, tenant, docs1, defaults, "empty");
+    t("matched: no override, no type change", !pr0.diff!.changes.some((c) => c.id === `fld:${sw2}:type`));
+    const pkm = planSite(inv, tenant, docs1, defaults, "empty", undefined, undefined, { kinds: { [sw2]: "router" } });
+    const cKind = pkm.diff!.changes.find((c) => c.id === `fld:${sw2}:type`);
+    t("matched: kind override gives a ticked type change", !!cKind && cKind.defaultOn && cKind.to === "Router", JSON.stringify(cKind));
+    const dr = applySite(pr, sel(pr)).auvikDoc;
+    t("matched: saved manual and locked", byName(dr, "EX-SW02").type === "Patch panel" && byName(dr, "EX-SW02").source?.type === "manual" && !!byName(dr, "EX-SW02").locked?.includes("type") && byName(dr, "EX-SRV01").model === tpl2.model && byName(dr, "EX-SRV01").source?.model === "manual");
+    const unt = new Set([...sel(pr)].filter((id) => id !== `fld:${sw2}:type`));
+    const du = applySite(pr, unt).auvikDoc;
+    t("matched: unticked hand pick is not saved and not locked", byName(du, "EX-SW02").type !== "Patch panel" && !byName(du, "EX-SW02").locked?.includes("type"));
+
+    // re-import with no overrides and Overwrite: the manual values stay
+    const pre = planSite(inv, tenant, mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: dr }]), defaults, "overwrite");
+    const dre = applySite(pre, sel(pre)).auvikDoc;
+    t("re-import (Overwrite): manual type and model stay", byName(dre, "EX-SW02").type === "Patch panel" && byName(dre, "EX-SRV01").model === tpl2.model && byName(dre, "EX-SRV01").source?.model === "manual", JSON.stringify({ t: byName(dre, "EX-SW02").type, m: byName(dre, "EX-SRV01").model }));
+    // and on a fresh import too
+    const fr = applySite(planSite(inv, tenant, mkDocs([{ id: 2, name: "EX Main Office (Auvik)", doc: dt }]), defaults, "overwrite"), new Set()).auvikDoc;
+    t("re-import (Overwrite, nothing ticked): type stays", byName(fr, "EX-SW02").type === "Patch panel");
   }
 
   console.log(fails ? `${fails} FAILED` : "all passed");

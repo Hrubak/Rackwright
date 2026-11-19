@@ -1,6 +1,7 @@
 // Trimmed Auvik API devices (from the server) -> the existing import plan. Pure; no backend.ts import.
 import type { AuvikDevice, ParsedAuvik } from "../parse";
-import { buildItems, setMode, type HostCtx, type Kind, type PlanItem } from "../plan";
+import { CATALOG } from "../../edit";
+import { buildItems, retype, setMode, type HostCtx, type Kind, type PlanItem } from "../plan";
 
 export interface AuvikApiComponent { type: string; name: string; detail: string }
 export interface AuvikApiDevice {
@@ -50,9 +51,46 @@ export const TO_PLACE_KINDS: Kind[] = ["firewall", "router", "switch", "server",
 
 export type ApiPlanItem = PlanItem & { specs?: Record<string, string> };
 
-export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
+/** The type word each kind is re-classified from when the person picks a kind. */
+export const KIND_TYPE: Record<Kind, string> = {
+  firewall: "Firewall", router: "Router", switch: "Switch", server: "Server", storage: "Storage", ups: "UPS", pdu: "PDU",
+  ap: "Access Point", ipmi: "Intelligent Platform Management Interface", controller: "Controller", vm: "Virtual Machine", endpoint: "Generic Device",
+};
+/** What the Kind dropdown shows. */
+export const KIND_LABEL: Record<Kind, string> = { ...KIND_TYPE, ap: "Access point", ipmi: "OOBM (iDRAC/iLO)", vm: "Virtual machine", endpoint: "Endpoint" };
+/** Model text saved for a virtual device. */
+export const VM_MODELS = { hyperv: "Virtual Machine – Hyper-V", vmware: "Virtual Machine – VMware", kvm: "Virtual Machine – KVM (Scale HyperCore)" } as const;
+export type VmVendor = keyof typeof VM_MODELS;
+
+/** A virtual device: kind Virtual machine, or Auvik's model says so. */
+export function isVirtual(i: Pick<PlanItem, "kind" | "dev">): boolean {
+  return i.kind === "vm" || /virtual machine|virtual platform|vmware|qemu|\bkvm\b|hyper-?v/i.test(i.dev.model);
+}
+/** Which hypervisor a VM runs on, from its model, description (discovery) and software. */
+export function vmVendor(d: Pick<AuvikDevice, "model" | "description" | "software">): VmVendor | null {
+  const s = `${d.model} ${d.description} ${d.software}`;
+  if (/hyper-?v|microsoft/i.test(s)) return "hyperv";
+  if (/vmware|esxi/i.test(s)) return "vmware";
+  if (/\bkvm\b|qemu|scale|hypercore/i.test(s)) return "kvm";
+  return null;
+}
+/** The Model dropdown's default: the Virtual Machine choice for a virtual device whose vendor is known, else Auvik's text (""). */
+export function defaultModelChoice(i: Pick<PlanItem, "kind" | "dev">): string {
+  const v = isVirtual(i) ? vmVendor(i.dev) : null;
+  return v ? "vm:" + v : "";
+}
+
+/** The person's picks on the import page, by plan item key.
+ *  A model value is "" (Auvik's text), "tpl:<catalog name>" or "vm:hyperv|vmware|kvm". */
+export interface Overrides { kinds?: Record<string, Kind>; types?: Record<string, string>; models?: Record<string, string> }
+
+export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
   const parsed: ParsedAuvik = { site: org, devices: devs.map((d) => toAuvikDevice(d, org)), warnings: [] };
   let items: PlanItem[] = buildItems(parsed, ctx);
+  for (const [key, kind] of Object.entries(over?.kinds ?? {})) {
+    if (!items.some((i) => i.key === key) || !KIND_TYPE[kind]) continue;
+    items = retype(parsed, items, key, KIND_TYPE[kind], ctx).map((i) => (i.key === key ? { ...i, kindOver: true } : i));
+  }
   for (const i of items.filter((x) => x.mode === "rack")) items = setMode(items, i.key, "off", ctx);
   const byId = new Map(devs.map((d) => [d.id, d]));
   return {
@@ -65,6 +103,19 @@ export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx): { 
       if (i.kind === "controller" && i.mode === "skip" && !/virtual|\bvm\b/i.test(`${i.dev.name} ${i.dev.model}`)) { out.mode = "off"; out.virtual = false; }   // a real controller is inventory, never silently dropped
       if (i.kind === "ipmi" && i.host === "new") { out.mode = "off"; out.host = "off"; }   // no host to attach to: off-rack only, a layout places devices
       if (Object.keys(specs).length) out.specs = specs;
+      const m = over?.models?.[i.key];
+      if (m?.startsWith("tpl:")) {
+        const t = CATALOG.find((c) => c.name === m.slice(4));
+        if (t) { out.tplOver = t.name; out.modelOver = t.model || t.name; out.tplName = t.name; out.generic = false; }
+      } else if (m?.startsWith("vm:")) {
+        const v = m.slice(3);
+        if (v in VM_MODELS) out.modelOver = VM_MODELS[v as VmVendor];
+      } else if (m === undefined) {
+        const v = defaultModelChoice(out);   // pre-pick for a virtual device: an Auvik value, not a hand edit
+        if (v) out.modelOver = VM_MODELS[v.slice(3) as VmVendor];
+      }
+      const ty = over?.types?.[i.key];
+      if (ty) out.typeOver = ty;
       return out;
     }),
   };
