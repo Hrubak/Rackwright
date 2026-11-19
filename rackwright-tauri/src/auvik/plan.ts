@@ -120,7 +120,7 @@ export function meaningful(kind: Kind, iface: string): boolean {
   return p.x || p.slot != null;
 }
 /** Same port written two ways ("GigabitEthernet1/1/5", "Gi1/1/5") gets one canonical key. */
-const portKey = (iface: string) => { const p = parsePort(iface); return p ? `${p.unit ?? ""}/${p.slot ?? ""}/${p.num}${p.x ? "x" : ""}` : iface.toLowerCase(); };
+export const portKey = (iface: string) => { const p = parsePort(iface); return p ? `${p.unit ?? ""}/${p.slot ?? ""}/${p.num}${p.x ? "x" : ""}` : iface.toLowerCase(); };
 
 // ---------------------------------------------------------------- templates
 const tok = (s: string) => ` ${s.toLowerCase().replace(/([a-z])(\d)/g, "$1 $2").replace(/(\d)([a-z])/g, "$1 $2").replace(/[^a-z0-9+]+/g, " ").trim()} `;

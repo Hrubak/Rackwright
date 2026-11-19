@@ -14,6 +14,7 @@ import { applyInPlace } from "../apply";
 import { Change, Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
 import { classify, epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type HostCtx, type ImportPlan, type Kind } from "../plan";
+import { NO_PORT, endpointPorts } from "./links";
 import { KIND_FAMILY, TO_PLACE_KINDS, apiItems, type ApiPlanItem, type Family, type Overrides } from "./map";
 
 export interface SiteDocs { siteId: number; racks: { id: number; name: string; version: number; doc: Doc }[] }
@@ -49,6 +50,7 @@ export interface SitePlan {
   layoutRows?: Row[];
   links?: AuvikLinks;                                          // the site's cables, when read
   over?: Overrides;                                            // the person's kind / type / model picks, by plan item key
+  epPorts?: Map<string, { sw: string; port: string; attach: boolean }>;   // the switch and port of each endpoint that has one (see endpointPorts)
 }
 
 const isFld = (id: string) => id.startsWith("fld:");
@@ -163,6 +165,20 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
   if (over?.kinds) over = { ...over, kinds: Object.fromEntries(Object.entries(over.kinds).filter(([k, kind]) => !fam[k] || KIND_FAMILY[kind] === fam[k])) };   // a cross-family pick on a held row is no pick
   const { parsed, items: raw } = apiItems(inv.devices, tenant.name, ctx, over, kept, fam, links?.links);
   const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
+  // Endpoints that hang off a switch move onto it, unless the port looks like an uplink or is shared, or the site already holds
+  // the endpoint somewhere else (a hand-made group, an older .xlsx group, another rack document): those keep their place.
+  const epPorts = links?.links.length ? endpointPorts(parsed, items) : new Map<string, { sw: string; port: string; attach: boolean }>();
+  if (epPorts.size) {
+    const others = siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc);
+    const stay = new Set<string>();
+    for (const it of items) {
+      if (!epPorts.has(it.key)) continue;
+      const h = heldElsewhere(it, mine?.doc ?? { devices: [] } as unknown as Doc, others);
+      const own = !!h && h.mine && !!(h.box as X).auvik_id?.startsWith("g:api:");   // a group this import made: it keeps its members
+      if (!own && (h || !epPorts.get(it.key)!.attach)) stay.add(it.dev.rawName.toLowerCase());
+    }
+    for (const d of parsed.devices) d.neighbors = d.neighbors.filter((n) => !stay.has(n.name.toLowerCase()) && !stay.has(d.rawName.toLowerCase()));
+  }
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
   const picks = handPicks(over);
@@ -176,7 +192,7 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, links, parsed, items, plan, other, elsewhere, heldIn, held,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, links, epPorts, parsed, items, plan, other, elsewhere, heldIn, held,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
     diff: mine ? dropElsewhere(tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks), elsewhere) : null,
   };
@@ -214,14 +230,19 @@ function heldElsewhere(it: SitePlan["items"][number], doc: Doc, others: Doc[]): 
   return look(doc, true) ?? others.reduce<HeldEp | null>((hit, d) => hit ?? look(d, false), null);
 }
 
-/** The API has no neighbours, so endpoints cannot hang off a switch. They go in one unattached box per kind in the Inventory column.
- *  An endpoint the site already holds somewhere else stays where it is (in this document its Auvik id is recorded); it is never added twice. */
-function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[], picks: Map<string, Set<string>>) {
+/** Endpoints the plan puts on a switch go in its "Endpoints on" group. The rest (no cable data, an uplink or shared port) go in one unattached
+ *  box per kind in the Inventory column, with the switch and port in the Port column. A member that is in such a box stays there until its
+ *  move is ticked. An endpoint the site already holds somewhere else stays where it is (in this document its Auvik id is recorded); it is never added twice. */
+function fillEndpointBoxes(doc: Doc, p: SitePlan, others: Doc[], picks: Map<string, Set<string>>) {
+  const items = p.items, inGroup = new Set(p.plan.groups.flatMap((g) => g.members.map((m) => m.key)));
+  const portText = (key: string) => { const e = p.epPorts?.get(key); return e ? (e.port ? `${e.sw} ${e.port}` : `${e.sw} (${NO_PORT})`) : null; };
+  const boxed = (key: string) => doc.devices.some((x) => (x as any).auvik_epbox && x.endpoints?.some((e) => e.key === key));
   const byKind = new Map<EpKind, SitePlan["items"]>();
   for (const it of items) {
     if (!isEndpointMode(it.mode)) continue;
     const held = heldElsewhere(it, doc, others);
     if (held) { if (held.mine) { held.ep.key = "api:" + (it.dev.apiId ?? it.key); held.ep.status = it.dev.status; } continue; }
+    if (inGroup.has(it.key) && !boxed("api:" + (it.dev.apiId ?? it.key))) continue;   // the switch's group takes it
     const k = epKindOf(it); byKind.set(k, [...(byKind.get(k) ?? []), it]);
   }
   for (const [kind, list] of byKind) {
@@ -239,16 +260,19 @@ function fillEndpointBoxes(doc: Doc, items: SitePlan["items"], others: Doc[], pi
       const have = eps.find((e) => e.key === key);
       if (have) {
         have.status = a.status;
+        const pt = portText(it.key);
+        if (pt !== null && !have.locked?.includes("port")) have.port = pt;
         // a hand pick on a member that is already there applies without a tick, by design: these boxes are not part of the diff
         if (picks.get(it.key)?.has("type")) have.type = it.type;
         if (picks.get(it.key)?.has("model") && it.modelOver) have.model = it.modelOver;
         continue;
       }
-      eps.push({ name: a.name, type: it.type, model: it.modelOver || a.model, ip: a.ips[0] || "", mac: a.macs[0] || "", port: "", status: a.status, kind, key });
+      eps.push({ name: a.name, type: it.type, model: it.modelOver || a.model, ip: a.ips[0] || "", mac: a.macs[0] || "", port: portText(it.key) ?? "", status: a.status, kind, key });
     }
     d.name = EP_WORD[kind]; d.model = summarize(eps.map((e) => e.kind ?? "other")); d.u_size = 1; d.rows = 0; d.half = false;
     d.notes = "Auvik endpoints that are not attached to a switch";
   }
+  doc.devices = doc.devices.filter((x) => !((x as any).auvik_epbox && x.endpoints && !x.endpoints.length));   // every member moved onto its switch
 }
 
 function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: { rackId: number; doc: Doc }[]; rows: Row[] } {
@@ -277,7 +301,7 @@ function build(p: SitePlan, sel: Set<string> | null): { auvikDoc: Doc; others: {
     setOffColumn(doc, d, it && specKinds.has(it.kind) ? 0 : 1);
   }
 
-  fillEndpointBoxes(doc, p.items, p.siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc), picks);
+  fillEndpointBoxes(doc, p, p.siteDocs.racks.filter((r) => r.id !== mine?.id).map((r) => r.doc), picks);
   markHand(doc, p, picks);
 
   let rows: Row[] = [];

@@ -96,6 +96,8 @@ export function findEp(list: Ep[], m: { key: string; mac: string; name: string }
 }
 
 export interface FieldChange { field: string; from: string; to: string; kept: boolean }
+/** A member found in one of the API import's Endpoints boxes: its move onto the switch is one change (mvm), cable included. */
+const fromEpBox = (loc: MemberLoc | undefined, opts?: DiffOpts) => !!opts?.fill && loc?.kind === "moved" && !!(loc.dev as any)?.auvik_epbox;
 export interface DiffOpts { fill?: "empty" | "overwrite" }
 /** Field differences between a document device and what Auvik says now. */
 export function deviceFields(d: X, u: PlanUnit): FieldChange[] {
@@ -176,7 +178,8 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
   const allMembers = boxes.flatMap((b) => b.members);
   for (const b of boxes) {
     const dev = all.find((x) => x.auvik_id === b.key);
-    const peers = all.filter((x) => x.auvik_id?.startsWith(b.family) && x.endpoints);
+    // API import (opts.fill): the import's own Endpoints boxes count as peers, so a member found there is offered a move
+    const peers = all.filter((x) => x.endpoints && (x.auvik_id?.startsWith(b.family) || (!!opts?.fill && b.family === "g:" && !!(x as any).auvik_epbox)));
     for (const m of b.members) {
       let loc: MemberLoc = { kind: "new" };
       const here = dev?.endpoints ? findEp(dev.endpoints, m) : -1;
@@ -265,6 +268,9 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
       changes.push({ id: `mv:${c.key}`, cat: "moved", title: names.get(leaf!) ?? leaf!, from: describe(d), to: describe(p), detail: loc?.kind === "moved" ? `moves to ${g!.name}` : undefined, locked: lockedPort, defaultOn: !lockedPort });
     } else {
       cableStatus.set(c.key, { kind: "new" });
+      const mg = c.a.target.isGroup ? c.a.target : c.b.target.isGroup ? c.b.target : null;
+      const me = p.a.kind === "member" ? p.a : p.b.kind === "member" ? p.b : null;
+      if (mg && me && fromEpBox(members.get(`${mg.key}|${me.id}`), opts)) continue;   // the move change carries the cable
       changes.push({ id: `cn:${c.key}`, cat: "newCable", title: describe(p), detail: c.label, defaultOn: true });
     }
   }
@@ -276,6 +282,10 @@ export function computeDiff(doc: Doc, plan: ImportPlan, items: PlanItem[] = [], 
   for (const b of boxes) for (const m of b.members) {
     const loc = members.get(`${b.key}|${m.key}`)!;
     if (loc.kind !== "moved") continue;
+    if (fromEpBox(loc, opts)) {
+      changes.push({ id: `mvm:${m.key}`, cat: "moved", title: `Move to ${b.name}`, detail: `${m.name} - ${m.port ? "port " + m.port : "no port data"}`, from: loc.dev!.name, to: b.name, defaultOn: true });
+      continue;
+    }
     if (cableStatus.get(`${b.key}|${m.key}`)?.kind === "moved") continue;
     changes.push({ id: `mvm:${m.key}`, cat: "moved", title: m.name, from: loc.dev!.name, to: b.name, defaultOn: true });
   }

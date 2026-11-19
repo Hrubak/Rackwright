@@ -55,6 +55,11 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   const diff = computeDiff(doc, plan, items, diffOpts);
   const ticked = sel ?? defaultSelection(diff);
   const on = (id: string) => ticked.has(id);
+  /** A member found in an API import's Endpoints box and ticked to move: its cable comes with it. */
+  const boxMove = (cid: string) => {
+    const loc = diff.members.get(cid);
+    return !!diffOpts?.fill && loc?.kind === "moved" && !!(loc.dev as any)?.auvik_epbox && on("mvm:" + cid.slice(cid.indexOf("|") + 1));
+  };
   res.missing = diff.changes.filter((c) => c.cat === "missingDev").map((c) => c.title);
 
   // ---- removals first: gone cables, cables that move, devices and members the user chose to remove
@@ -235,8 +240,9 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
       }
       if (withPorts) {
         const st = diff.cable.get(cid);
-        const ok = !st || st.kind === "existing" || (st.kind === "new" ? on(`cn:${cid}`) : on(`mv:${cid}`));
+        const ok = !st || st.kind === "existing" || (st.kind === "new" ? on(`cn:${cid}`) || boxMove(cid) : on(`mv:${cid}`));
         if (m.port && ok) { ep.port = m.port; if (port) port.label = m.port; if (st?.kind === "moved") unlock(ep, "port"); }
+        else if (!m.port && boxMove(cid)) ep.port = "";   // the box said "<switch> (no port data)"; the group has no port to name
         if (!port) port = { id: nid(doc), name: ep.name.slice(0, 28), type: "RJ45", label: ep.port };
       }
       taken.add(ep);
@@ -320,7 +326,7 @@ export function applyInPlace(doc: Doc, plan: ImportPlan, opt: ApplyOptions, item
   const dev = (t: PlanUnit | PlanGroup) => (t.isGroup ? groupDev.get(t.key)! : devOf.get(t.key)!);
   for (const c of plan.cables) {
     const st = diff.cable.get(c.key);
-    if (st?.kind === "existing" || (st?.kind === "new" && !on(`cn:${c.key}`)) || (st?.kind === "moved" && !on(`mv:${c.key}`))) { res.cablesSkipped++; continue; }
+    if (st?.kind === "existing" || (st?.kind === "new" && !on(`cn:${c.key}`) && !boxMove(c.key)) || (st?.kind === "moved" && !on(`mv:${c.key}`))) { res.cablesSkipped++; continue; }
     const da = dev(c.a.target), db = dev(c.b.target);
     if (!da || !db) continue;
     const get = (r: PortRef, dv: Device) => (r.target.isGroup ? memberPorts.get(r.target.key)?.[r.member!] : r.oobm ? oobmPort.get(r.oobm) : resolvePort(doc, dv, r, r.target as PlanUnit));
