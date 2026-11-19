@@ -2,6 +2,16 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.20.0 — 2026-11-19
+Web only; the desktop app is unchanged. Update the LXC as usual.
+- **Cables from Auvik.** Import from Auvik now reads each site's cables too. After a site's devices you see "Reading cables for site 2 of 5". Switch ports get cables to the firewall, the other switches, servers and endpoints that Auvik sees on them. Both ports of a LAG get their own cable.
+- **Endpoints move onto their switch.** A printer, phone or PC that 3.19 put in an unattached box such as "Printers" now has a ticked change "Move to Endpoints on EX-SW01" when Auvik knows its switch port. Untick it to keep it in the box. Endpoints you placed yourself (in your own group, an older spreadsheet group, or another rack) are never moved.
+- **Uplinks stay put.** If the switch port also connects to another switch, router or firewall, or more than one device sits behind it (an unmanaged switch or hub), the endpoint stays in its box and the box lists its port, for example "EX-SW01 1/1/5".
+- **"No port data".** When Auvik only knows that two devices are connected, not which ports, the preview says so ("EX-SRV02 and EX-NAS01 are connected (no port data)") and no cable is drawn.
+- **Your cables are kept.** On a re-import, a cable that is on a different port than Auvik says is listed unticked ("kept (differs from Auvik)"); tick Overwrite existing values to move them. A cable you added is never removed.
+- **Cables in other racks.** A cable is drawn in another rack of the site only when both of its devices are in that rack. A cable between two racks is listed as "Not drawn" so you can add it by hand.
+- If Auvik won't give a site's cables, its devices still import and the preview says "Cables could not be read for <site>; devices are imported without them." Wireless and VLAN links are left out; the preview counts them.
+
 ## 3.19.2 — 2026-11-19
 Mostly web: Import from Auvik is easier to work through. The desktop app gets one change, the Type dropdown in the device panel. Update the LXC as usual.
 - **You can see when it's working.** "Loading the Auvik clients", "Reading site 2 of 5" and the other waiting lines are green and pulse gently. If your computer is set to reduce motion, they stay steady green.

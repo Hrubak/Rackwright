@@ -55,7 +55,7 @@ Response: `{"status": "ok"|"denied"|"empty", "note": str, "links": [{"device": i
 
 ### Endpoints in the import's own boxes
 
-- An endpoint that is a member of an Endpoints box the import made (`auvik_epbox`) and that the plan now puts in "Endpoints on <switch>" gets a change `mvbox:<key>` titled "Move to Endpoints on <switch>", **ticked by default**. Applying it removes the member from the box and lets the plan's group add it with its cable.
+- An endpoint that is a member of an Endpoints box the import made (`auvik_epbox`) and that the plan now puts in "Endpoints on <switch>" gets a member-move change (`mvm:<member key>`, the existing member-move id) titled "Move to Endpoints on <switch>", **ticked by default**. Applying it removes the member from the box and lets the plan's group add it with its cable.
 - **No move** (the member stays in its box, and the box shows its port as "<switch> <port>") when:
   - the switch port it hangs off also connects to a switch, router or firewall (an uplink), or
   - more than one endpoint is behind that same switch port (an unmanaged switch or hub).
