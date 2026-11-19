@@ -1,0 +1,247 @@
+{
+  "data": [
+    {
+      "type": "interface",
+      "id": "ix-001",
+      "attributes": {
+        "interfaceName": "1/1/1",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-01"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-002"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-002",
+      "attributes": {
+        "interfaceName": "X1",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-03"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-001"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-003",
+      "attributes": {
+        "interfaceName": "1/1/47",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-01"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-005"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-004",
+      "attributes": {
+        "interfaceName": "1/1/48",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-01"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-006"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-005",
+      "attributes": {
+        "interfaceName": "1/1/47",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-02"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-003"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-006",
+      "attributes": {
+        "interfaceName": "1/1/48",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-02"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-004"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-007",
+      "attributes": {
+        "interfaceName": "Port-Channel1",
+        "interfaceType": "ieee8023AdLag"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-01"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-008"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-008",
+      "attributes": {
+        "interfaceName": "Port-Channel1",
+        "interfaceType": "ieee8023AdLag"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-02"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-007"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    }
+  ],
+  "links": {
+    "next": "http://{HOST}/inventory/interface/info?tenants=1001&page[first]=1000&page[after]=p2"
+  }
+}

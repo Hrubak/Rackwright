@@ -21,6 +21,31 @@
               }
             }
           ]
+        },
+        "connectedDevices": {
+          "data": [
+            {
+              "type": "device",
+              "id": "d-1001-03",
+              "attributes": {
+                "deviceName": "EX-FW01"
+              }
+            },
+            {
+              "type": "device",
+              "id": "d-1001-02",
+              "attributes": {
+                "deviceName": "EX-SW02"
+              }
+            },
+            {
+              "type": "device",
+              "id": "d-1001-10",
+              "attributes": {
+                "deviceName": "EX-PRN01"
+              }
+            }
+          ]
         }
       }
     },
@@ -66,6 +91,17 @@
               "attributes": {
                 "interfaceName": "eth0",
                 "macAddress": "00:00:5e:00:53:03"
+              }
+            }
+          ]
+        },
+        "connectedDevices": {
+          "data": [
+            {
+              "type": "device",
+              "id": "d-1001-01",
+              "attributes": {
+                "deviceName": "EX-SW01"
               }
             }
           ]
@@ -162,6 +198,17 @@
               }
             }
           ]
+        },
+        "connectedDevices": {
+          "data": [
+            {
+              "type": "device",
+              "id": "d-1001-99",
+              "attributes": {
+                "deviceName": "EX-GONE01"
+              }
+            }
+          ]
         }
       }
     },
@@ -188,6 +235,17 @@
               }
             }
           ]
+        },
+        "connectedDevices": {
+          "data": [
+            {
+              "type": "device",
+              "id": "d-1001-08",
+              "attributes": {
+                "deviceName": "EX-NAS01"
+              }
+            }
+          ]
         }
       }
     },
@@ -209,6 +267,17 @@
               "attributes": {
                 "interfaceName": "eth0",
                 "macAddress": "00:00:5e:00:53:08"
+              }
+            }
+          ]
+        },
+        "connectedDevices": {
+          "data": [
+            {
+              "type": "device",
+              "id": "d-1001-07",
+              "attributes": {
+                "deviceName": "EX-SRV02"
               }
             }
           ]

@@ -2,7 +2,7 @@
 //! `Authorization` header, and never appears in a response, a log line or `Debug` output.
 //! No reqwest error text is ever used: every error is mapped to fixed text.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -611,5 +611,199 @@ async fn read_site(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<
         }
         Ok(Ok(v)) => Ok(json_ok(&v)),
         Ok(Err(e)) => Err(api_err(e, "inventory")),
+    }
+}
+
+fn links_result(status: &str, note: &str, links: Vec<Value>, dropped: u64) -> Value {
+    json!({ "status": status, "note": note, "links": links, "dropped": dropped })
+}
+
+fn links_denied() -> Value {
+    links_result("denied", "Auvik denied access to this site's cables.", Vec::new(), 0)
+}
+
+/// One interface of the site: its device id, name and Auvik interface type.
+struct Iface {
+    device: String,
+    name: String,
+    kind: String,
+}
+
+/// device, iface, peerDevice, peerIface, portless
+type LinkRow = (String, String, String, String, bool);
+
+fn is_cable(kind: &str) -> bool {
+    matches!(kind, "ethernet" | "optical" | "inferredWired")
+}
+
+fn is_aggregate(kind: &str) -> bool {
+    matches!(kind, "ieee8023AdLag" | "linkAggregation")
+}
+
+fn sorted_pair(a: &str, b: &str) -> (String, String) {
+    if a <= b {
+        (a.to_string(), b.to_string())
+    } else {
+        (b.to_string(), a.to_string())
+    }
+}
+
+/// The ids in a relationship list such as `relationships.connectedTo.data`.
+fn rel_ids(v: &Value, rel: &str) -> Vec<String> {
+    match v.pointer(&format!("/relationships/{rel}/data")) {
+        Some(Value::Array(items)) => items.iter().map(id_of).filter(|x| !x.is_empty()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+async fn read_links(a: &Auvik, id: &str) -> Result<Value, AuvikErr> {
+    let q = format!("tenants={id}&page[first]=1000");
+    let ifaces_raw = match a.paged(&format!("/inventory/interface/info?{q}")).await {
+        Ok(v) => v,
+        Err(AuvikErr::Denied(_)) => return Ok(links_denied()),
+        Err(e) => return Err(e),
+    };
+    let info = match a.paged(&format!("/inventory/device/info?{q}")).await {
+        Ok(v) => v,
+        Err(AuvikErr::Denied(_)) => return Ok(links_denied()),
+        Err(e) => return Err(e),
+    };
+    let detail = match a.paged(&format!("/inventory/device/detail?{q}")).await {
+        Ok(v) => v,
+        Err(AuvikErr::Denied(_)) => return Ok(links_denied()),
+        Err(e) => return Err(e),
+    };
+
+    let mut by_id: HashMap<String, Iface> = HashMap::new();
+    for i in &ifaces_raw {
+        let iid = id_of(i);
+        if iid.is_empty() {
+            continue;
+        }
+        by_id.insert(
+            iid,
+            Iface { device: rel_id(i, "parentDevice"), name: text(i, "interfaceName"), kind: text(i, "interfaceType") },
+        );
+    }
+
+    let mut rows: Vec<LinkRow> = Vec::new();
+    let mut aggs: Vec<(String, String)> = Vec::new();
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+    // Device pairs (sorted) that already have a row.
+    let mut linked: HashSet<(String, String)> = HashSet::new();
+    let mut dropped: u64 = 0;
+    for i in &ifaces_raw {
+        let iid = id_of(i);
+        let from = match by_id.get(&iid) {
+            Some(f) => f,
+            None => continue,
+        };
+        for tid in rel_ids(i, "connectedTo") {
+            if tid == iid {
+                continue;
+            }
+            if !seen.insert(sorted_pair(&iid, &tid)) {
+                continue;
+            }
+            let to = match by_id.get(&tid) {
+                Some(t) => t,
+                None => {
+                    dropped += 1;
+                    continue;
+                }
+            };
+            if is_cable(&from.kind) && is_cable(&to.kind) {
+                let (first, second) = if iid <= tid { (from, to) } else { (to, from) };
+                linked.insert(sorted_pair(&from.device, &to.device));
+                rows.push((first.device.clone(), first.name.clone(), second.device.clone(), second.name.clone(), false));
+            } else if is_aggregate(&from.kind) && is_aggregate(&to.kind) {
+                aggs.push((iid.clone(), tid.clone()));
+            } else {
+                dropped += 1;
+            }
+        }
+    }
+
+    // A LAG whose members carry no connection of their own becomes one port-less row.
+    for (x, y) in &aggs {
+        let (fx, fy) = match (by_id.get(x), by_id.get(y)) {
+            (Some(p), Some(q)) => (p, q),
+            _ => continue,
+        };
+        let dp = sorted_pair(&fx.device, &fy.device);
+        if linked.contains(&dp) {
+            continue;
+        }
+        linked.insert(dp);
+        let (f, s) = if x <= y { (fx, fy) } else { (fy, fx) };
+        rows.push((f.device.clone(), String::new(), s.device.clone(), String::new(), true));
+    }
+
+    // Device-to-device fallback from the device details.
+    let mut device_ids: HashSet<String> = HashSet::new();
+    let mut owner: HashMap<String, String> = HashMap::new();
+    for d in &info {
+        let did = id_of(d);
+        if did.is_empty() {
+            continue;
+        }
+        let dd = rel_id(d, "deviceDetail");
+        if !dd.is_empty() {
+            owner.insert(dd, did.clone());
+        }
+        device_ids.insert(did);
+    }
+    for det in &detail {
+        let dd = id_of(det);
+        let me = owner.get(&dd).cloned().unwrap_or(dd);
+        if !device_ids.contains(&me) {
+            continue;
+        }
+        for peer in rel_ids(det, "connectedDevices") {
+            if peer == me || !device_ids.contains(&peer) {
+                continue;
+            }
+            let dp = sorted_pair(&me, &peer);
+            if linked.contains(&dp) {
+                continue;
+            }
+            linked.insert(dp.clone());
+            rows.push((dp.0, String::new(), dp.1, String::new(), true));
+        }
+    }
+
+    if ifaces_raw.is_empty() && rows.is_empty() {
+        return Ok(links_result("empty", "Auvik lists no connections for this site.", Vec::new(), 0));
+    }
+    rows.sort();
+    rows.dedup();
+    let links: Vec<Value> = rows
+        .into_iter()
+        .map(|r| json!({ "device": r.0, "iface": r.1, "peerDevice": r.2, "peerIface": r.3, "portless": r.4 }))
+        .collect();
+    Ok(links_result("ok", "", links, dropped))
+}
+
+pub async fn get_links(st: State<Shared>, headers: HeaderMap, id: Path<String>) -> Response {
+    no_store(read_site_links(st, headers, id).await)
+}
+
+async fn read_site_links(State(st): State<Shared>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
+    auth(&st, &headers)?;
+    let a = match st.auvik.as_ref() {
+        Some(a) => a,
+        None => return Err(not_set_up()),
+    };
+    if id.is_empty() || id.len() > 64 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+        return Err(ApiError::bad("That site id is not valid."));
+    }
+    let run = tokio::time::timeout(Duration::from_secs(INVENTORY_TIMEOUT_SECS), read_links(a, &id)).await;
+    match run {
+        Err(_) => {
+            log("links: timed out");
+            Err(ApiError::new(StatusCode::BAD_GATEWAY, FIXED_TOO_SLOW))
+        }
+        Ok(Ok(v)) => Ok(json_ok(&v)),
+        Ok(Err(e)) => Err(api_err(e, "links")),
     }
 }

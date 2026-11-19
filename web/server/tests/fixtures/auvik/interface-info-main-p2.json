@@ -1,0 +1,210 @@
+{
+  "data": [
+    {
+      "type": "interface",
+      "id": "ix-009",
+      "attributes": {
+        "interfaceName": "1/1/5",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-01"
+          }
+        },
+        "connectedTo": {
+          "data": []
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-010",
+      "attributes": {
+        "interfaceName": "eth0",
+        "interfaceType": "inferredWired"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-10"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-009"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-011",
+      "attributes": {
+        "interfaceName": "wlan0",
+        "interfaceType": "wifi"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-04"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-012"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-012",
+      "attributes": {
+        "interfaceName": "wlan0",
+        "interfaceType": "wifi"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-05"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-011"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-013",
+      "attributes": {
+        "interfaceName": "Vlan10",
+        "interfaceType": "vlan"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-01"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-014"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-014",
+      "attributes": {
+        "interfaceName": "Vlan10",
+        "interfaceType": "vlan"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-02"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-013"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    },
+    {
+      "type": "interface",
+      "id": "ix-015",
+      "attributes": {
+        "interfaceName": "1/1/1",
+        "interfaceType": "ethernet"
+      },
+      "relationships": {
+        "parentDevice": {
+          "data": {
+            "type": "device",
+            "id": "d-1001-02"
+          }
+        },
+        "connectedTo": {
+          "data": [
+            {
+              "type": "interface",
+              "id": "ix-999"
+            }
+          ]
+        },
+        "tenant": {
+          "data": {
+            "type": "tenant",
+            "id": "1001"
+          }
+        }
+      }
+    }
+  ],
+  "links": {}
+}

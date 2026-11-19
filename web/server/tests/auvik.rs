@@ -258,6 +258,9 @@ const DETAIL_MAIN: &str = include_str!("fixtures/auvik/device-detail-main.json")
 const COMPONENTS_MAIN: &str = include_str!("fixtures/auvik/component-info-main.json");
 const INFO_WAREHOUSE: &str = include_str!("fixtures/auvik/device-info-warehouse.json");
 const EXPECTED_MAIN: &str = include_str!("fixtures/auvik/expected-inventory-main.json");
+const IFACE_P1: &str = include_str!("fixtures/auvik/interface-info-main-p1.json");
+const IFACE_P2: &str = include_str!("fixtures/auvik/interface-info-main-p2.json");
+const EXPECTED_LINKS: &str = include_str!("fixtures/auvik/expected-links-main.json");
 
 const NO_DATA: &str = r#"{"data":[],"links":{}}"#;
 
@@ -277,6 +280,10 @@ struct Mock {
     detail_fails: bool,
     /// The component list answers 403 for tenant 1002 (its device list still reads).
     components_403: bool,
+    /// The interface list answers 403 for tenant 1002.
+    interfaces_403: bool,
+    /// The LAG member interfaces (1/1/47 and 1/1/48) report no connections; only the aggregates do.
+    no_members: bool,
     /// Requests to the device list.
     info_hits: AtomicUsize,
     /// Requests to all inventory routes (429 answers included).
@@ -294,6 +301,8 @@ impl Mock {
             echo500: false,
             detail_fails: false,
             components_403: false,
+            interfaces_403: false,
+            no_members: false,
             info_hits: AtomicUsize::new(0),
             hits: AtomicUsize::new(0),
         }
@@ -389,6 +398,33 @@ async fn m_components(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String
     }
 }
 
+async fn m_interfaces(State(m): State<Arc<Mock>>, Query(q): Query<HashMap<String, String>>) -> Response {
+    if let Some(r) = throttle(&m) {
+        return r;
+    }
+    let tenant = q.get("tenants").cloned().unwrap_or_default();
+    if m.interfaces_403 && tenant == "1002" {
+        return (StatusCode::FORBIDDEN, VERIFY_DENIED.to_string()).into_response();
+    }
+    if tenant != "1001" {
+        return answer(NO_DATA.to_string());
+    }
+    let after = q.get("page[after]").cloned().unwrap_or_default();
+    let raw = if after == "p2" { IFACE_P2 } else { IFACE_P1 };
+    let mut v: Value = serde_json::from_str(&raw.replace("{HOST}", m.host.as_str())).unwrap();
+    if m.no_members {
+        if let Some(items) = v["data"].as_array_mut() {
+            for it in items.iter_mut() {
+                let name = it["attributes"]["interfaceName"].as_str().unwrap_or("").to_string();
+                if name == "1/1/47" || name == "1/1/48" {
+                    it["relationships"]["connectedTo"]["data"] = json!([]);
+                }
+            }
+        }
+    }
+    answer(v.to_string())
+}
+
 /// Starts the inventory mock and returns the app wired to it.
 async fn inv_app(set: impl FnOnce(&mut Mock)) -> (Router, tempfile::TempDir, Arc<Mock>) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -402,6 +438,7 @@ async fn inv_app(set: impl FnOnce(&mut Mock)) -> (Router, tempfile::TempDir, Arc
         .route("/inventory/device/info", get(m_info))
         .route("/inventory/device/detail", get(m_detail))
         .route("/inventory/component/info", get(m_components))
+        .route("/inventory/interface/info", get(m_interfaces))
         .with_state(mock.clone());
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
@@ -630,4 +667,156 @@ async fn key_never_leaks() {
         assert!(!l.contains("TESTKEY"), "{l}");
         assert!(!l.contains(&token), "{l}");
     }
+}
+
+// ---- Cables ----
+
+const LINKS_MAIN: &str = "/api/auvik/tenants/1001/links";
+
+fn link_rows(v: &Value) -> Vec<Value> {
+    v["links"].as_array().unwrap().clone()
+}
+
+/// Rows whose two ends are exactly the devices `a` and `b`, in either direction.
+fn rows_between(v: &Value, a: &str, b: &str) -> Vec<Value> {
+    link_rows(v)
+        .into_iter()
+        .filter(|r| {
+            let d = r["device"].as_str().unwrap_or("");
+            let p = r["peerDevice"].as_str().unwrap_or("");
+            (d == a && p == b) || (d == b && p == a)
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn links_main_matches_fixture() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let want: Value = serde_json::from_str(EXPECTED_LINKS).unwrap();
+    assert_eq!(v, want);
+    // wifi, vlan and the connection to an interface that is not in the list.
+    assert_eq!(v["dropped"], 3);
+}
+
+#[tokio::test]
+async fn links_one_row_per_cable() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // d-1001-01 is EX-SW01 and d-1001-03 is EX-FW01; Auvik lists the cable on both sides.
+    let rows = rows_between(&v, "d-1001-01", "d-1001-03");
+    assert_eq!(rows.len(), 1, "{v}");
+    assert_eq!(rows[0]["device"], "d-1001-01");
+    assert_eq!(rows[0]["iface"], "1/1/1");
+    assert_eq!(rows[0]["peerDevice"], "d-1001-03");
+    assert_eq!(rows[0]["peerIface"], "X1");
+    assert_eq!(rows[0]["portless"], false);
+}
+
+#[tokio::test]
+async fn links_lag_members() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // d-1001-01 is EX-SW01 and d-1001-02 is EX-SW02.
+    let rows = rows_between(&v, "d-1001-01", "d-1001-02");
+    assert_eq!(rows.len(), 2, "{v}");
+    assert_eq!(rows[0]["iface"], "1/1/47");
+    assert_eq!(rows[0]["peerIface"], "1/1/47");
+    assert_eq!(rows[1]["iface"], "1/1/48");
+    assert_eq!(rows[1]["peerIface"], "1/1/48");
+    assert!(rows.iter().all(|r| r["portless"] == false));
+}
+
+#[tokio::test]
+async fn links_lag_aggregate_only() {
+    let (app, _d, _m) = inv_app(|m| m.no_members = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let rows = rows_between(&v, "d-1001-01", "d-1001-02");
+    assert_eq!(rows.len(), 1, "{v}");
+    assert_eq!(rows[0]["iface"], "");
+    assert_eq!(rows[0]["peerIface"], "");
+    assert_eq!(rows[0]["portless"], true);
+}
+
+#[tokio::test]
+async fn links_portless_fallback() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // EX-SRV02 and EX-NAS01 only know each other through connectedDevices, listed on both sides.
+    let rows = rows_between(&v, "d-1001-07", "d-1001-08");
+    assert_eq!(rows.len(), 1, "{v}");
+    assert_eq!(rows[0]["iface"], "");
+    assert_eq!(rows[0]["peerIface"], "");
+    assert_eq!(rows[0]["portless"], true);
+    // A device id that is not in the site is ignored.
+    assert!(rows_between(&v, "d-1001-06", "d-1001-99").is_empty());
+    assert_eq!(link_rows(&v).iter().filter(|r| r["portless"] == true).count(), 1);
+}
+
+#[tokio::test]
+async fn links_denied() {
+    let (app, _d, _m) = inv_app(|m| m.interfaces_403 = true).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants/1002/links").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, json!({"status": "denied", "note": "Auvik denied access to this site's cables.", "links": [], "dropped": 0}));
+}
+
+#[tokio::test]
+async fn links_empty() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get("/api/auvik/tenants/1004/links").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, json!({"status": "empty", "note": "Auvik lists no connections for this site.", "links": [], "dropped": 0}));
+}
+
+#[tokio::test]
+async fn links_not_configured() {
+    let (app, _d) = make_app(None);
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert_eq!(v, json!({"error": "Auvik is not set up on this server."}));
+}
+
+#[tokio::test]
+async fn links_rate_limit() {
+    let (app, _d, _m) = inv_app(|m| m.rate_limits = AtomicUsize::new(2)).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let want: Value = serde_json::from_str(EXPECTED_LINKS).unwrap();
+    assert_eq!(v, want);
+}
+
+#[tokio::test]
+async fn links_bad_id_and_signed_out() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, _) = c.get("/api/auvik/tenants/a.b/links").await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let mut out = Client::new(&app);
+    let (s, _) = out.get(LINKS_MAIN).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+}
+
+/// The detail fixture gained connectedDevices; the inventory answer must not change.
+#[tokio::test]
+async fn inventory_unchanged() {
+    let (app, _d, _m) = inv_app(|_| {}).await;
+    let mut c = signed_in(&app).await;
+    let (s, v) = c.get(INV_MAIN).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v, expected_main());
 }
