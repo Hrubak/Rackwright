@@ -11,7 +11,7 @@ Rackwright is used two ways: by an MSP's own staff for internal knowledge and pl
 
 ## Integrations
 
-- 3.19.0: Import from Auvik over the Auvik API (web): one "(Auvik)" rack per site, fill-empty re-imports, per-field source tracking. Done. 3.19.1 fixes doubled endpoints on sites first imported from the spreadsheet.
+- 3.19.0: Import from Auvik over the Auvik API (web): one "(Auvik)" rack per site, fill-empty re-imports, per-field source tracking. Done. 3.19.1 fixes doubled endpoints on sites first imported from the spreadsheet. 3.19.2 polishes the device table (sort, filter, select all, kind/type/model pickers, Virtual Machine models).
 - 3.20.0: cables from Auvik's interface and topology data.
 
 Design: `docs/superpowers/specs/2026-11-18-auvik-api-import-design.md`.

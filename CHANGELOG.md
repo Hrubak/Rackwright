@@ -2,6 +2,18 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.19.2 — 2026-11-18
+Mostly web: Import from Auvik is easier to work through. The desktop app gets one change, the Type dropdown in the device panel. Update the LXC as usual.
+- **You can see when it's working.** "Loading the Auvik clients", "Reading site 2 of 5" and the other waiting lines are green and pulse gently. If your computer is set to reduce motion, they stay steady green.
+- **Sort and filter the device list.** Click a column header to sort by it; click again to reverse. Names sort with numbers in order (EX-SW2 before EX-SW10), and IP addresses sort by number. Type in Filter devices to show only matching rows.
+- **Select all, Select none and the header tickbox** act on the rows you can see, so you can filter and then tick or untick just those.
+- **Change a device's kind.** Each row has a Kind dropdown (Switch, Server, Endpoint, Virtual machine and so on), and "Set kind for the ticked rows shown" changes many at once. The row moves to the right place (To place, Inventory, Endpoints or a VM box). Your choice counts as a hand edit: it is saved as yours, and later imports keep it.
+- **Type is a dropdown** of Rackwright's device types instead of Auvik's wording. A type you pick is kept on later imports.
+- **Model is a dropdown.** Keep Auvik's model, pick a catalog model (the height and faceplate follow it), or pick Virtual Machine – Hyper-V, VMware or KVM (Scale HyperCore). Rackwright pre-picks the virtual machine kind from Auvik's details, and still marks a host it guessed from names with "Guessed host — check". A pre-pick is not a hand edit; a model you pick yourself is.
+- A new **Rack** column shows the rack document each device is in, or goes to.
+- **Device panel (desktop and web):** Type is now a dropdown of the same device types. A type that isn't in the list, for example from an older file, stays as it is and shows at the top of the list.
+- Cables from Auvik are still next, in 3.20.0.
+
 ## 3.19.1 — 2026-11-18
 Web only; the desktop app is unchanged. Update the LXC as usual.
 - **Test connection works with a valid key.** It said "Auvik sent an answer that could not be read" because Auvik confirms a good key with an empty answer. Any success from Auvik now counts.
