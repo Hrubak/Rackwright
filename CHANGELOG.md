@@ -2,6 +2,10 @@
 
 Newest first. Every push to `web` adds an entry here (CI checks it). From 3.0.0 the web server and the desktop app share one version number. Set it with `node scripts/version.mjs x.y.z`; CI fails if they differ. Upstream changes from hast3/Rackwright arrive under `## Unreleased` through the Sync upstream pull request and get a version when that pull request is merged.
 
+## 3.22.1 — 2026-11-19
+Web and desktop. Update the LXC as usual and download the new desktop exe.
+- **Fit to screen with loose cables.** With the loose cable style on, Fit to screen now makes room for cables that hang below the racks, so none are cut off at the edge.
+
 ## 3.22.0 — 2026-11-19
 Web and desktop. Update the LXC as usual and download the new desktop exe.
 - **Loose cables.** A new cable style shows patch cables as they really hang: straight from port to port with a little sag, instead of routed through the ducts and tray. Pick **loose** under Style in the cable box at the bottom left of the Rack view, or View › Cables › Loose. Each cable sags a little differently, so a bundle fans out and stays readable.

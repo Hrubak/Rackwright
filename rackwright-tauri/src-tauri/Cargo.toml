@@ -1,6 +1,6 @@
 [package]
 name = "rackwright"
-version = "3.22.0"
+version = "3.22.1"
 edition = "2021"
 
 [lib]

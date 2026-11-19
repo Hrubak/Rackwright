@@ -1,5 +1,5 @@
 // Loose cable style: the path, and the saved setting. Made-up coordinates only.
-import { loosePath, loadOpts, saveOpts, DEFAULT_OPTS } from "../src/cableView";
+import { loosePath, looseBounds, loadOpts, saveOpts, DEFAULT_OPTS } from "../src/cableView";
 
 let fail = 0;
 const t = (name: string, ok: boolean) => { if (!ok) { fail++; console.log("FAIL " + name); } };
@@ -28,6 +28,18 @@ t("sag is capped", far < 10 + 110 + 64 * 1.3 + 1);
 for (const d of [loosePath([5, 5], 1, [5, 5], 1, 0), loosePath([5, 5], 0, [5, 5], 0, -3), loosePath([NaN, 1], 1, [Infinity, 2], -1, 9)])
   t("finite: " + d, !/NaN|Infinity/.test(d) && nums(d).length === 12);
 t("dir 0 counts as down", loosePath([0, 0], 0, [50, 0], 0, 4) === loosePath([0, 0], 1, [50, 0], 1, 4));
+
+// Fit to screen: the box around loose cables as drawn
+const rt = (cable: number, a: [number, number], da: number, b: [number, number], db: number) => ({ cable, pts: [a, [0, 0] as [number, number], b], dir_a: da, dir_b: db });
+const lbx = looseBounds([rt(5, [100, 200], 1, [400, 200], 1)])!;
+const lowest = Math.max(...nums(loosePath([100, 200], 1, [400, 200], 1, 5)).map(Number).filter((_, i) => i % 2 === 1));
+t("bounds reach below the ports", lbx.b > 210 && lbx.t === 200 && lbx.l <= 100 && lbx.r >= 400);
+t("bounds stay inside the control points", lbx.b < lowest);
+const mid = (() => { const n = nums(loosePath([100, 200], 1, [400, 200], 1, 5).split("C")[1]).map(Number); return 0.125 * 210 + 0.375 * n[1] + 0.375 * n[3] + 0.125 * 210; })();
+t("bounds include the curve's middle", lbx.b >= mid - 0.01);
+t("bounds of many is the union", (() => { const u = looseBounds([rt(5, [100, 200], 1, [400, 200], 1), rt(6, [0, 50], -1, [20, 600], 1)])!; return u.l <= 0 && u.t <= 40 && u.b >= lbx.b && u.b > 600; })());
+t("no routes gives null", looseBounds([]) === null && looseBounds([{ cable: 1, pts: [], dir_a: 1, dir_b: 1 }]) === null);
+t("bounds are finite", Object.values(looseBounds([rt(1, [NaN, 1], 1, [Infinity, 2], -1)])!).every(Number.isFinite));
 
 // the saved setting
 const store = new Map<string, string>();

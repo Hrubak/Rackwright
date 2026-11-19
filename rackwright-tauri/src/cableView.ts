@@ -122,8 +122,9 @@ const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x
 const fin = (n: number) => (Number.isFinite(n) ? n : 0);
 const pt = (x: number, y: number) => `${+fin(x).toFixed(2)} ${+fin(y).toFixed(2)}`;
 
-/** SVG path for the loose style: out of port a along da (+1 down, -1 up), one sagging curve, into port b along db. */
-export function loosePath(a: [number, number], da: number, b: [number, number], db: number, id: number): string {
+type P = [number, number];
+/** The loose cable's points: port a, out of the plug, two curve controls, into the plug, port b. */
+function looseCurve(a: P, da: number, b: P, db: number, id: number): P[] {
   const sa = da < 0 ? -1 : 1, sb = db < 0 ? -1 : 1;
   const ax = fin(a[0]), ay = fin(a[1]), bx = fin(b[0]), by = fin(b[1]);
   const a1y = ay + sa * 10, b1y = by + sb * 10; // past the plug body
@@ -131,5 +132,28 @@ export function loosePath(a: [number, number], da: number, b: [number, number], 
   const k = clamp(0.35 * dist, 14, 110);
   const sag = clamp(0.16 * dist, 6, 64) * (0.7 + 0.6 * jitter(id, 1));
   const jx = (jitter(id, 2) - 0.5) * Math.min(14, dist * 0.08);
-  return `M${pt(ax, ay)}L${pt(ax, a1y)}C${pt(ax + jx, a1y + sa * k + sag)} ${pt(bx + jx, b1y + sb * k + sag)} ${pt(bx, b1y)}L${pt(bx, by)}`;
+  return [[ax, ay], [ax, a1y], [ax + jx, a1y + sa * k + sag], [bx + jx, b1y + sb * k + sag], [bx, b1y], [bx, by]];
+}
+
+/** SVG path for the loose style: out of port a along da (+1 down, -1 up), one sagging curve, into port b along db. */
+export function loosePath(a: P, da: number, b: P, db: number, id: number): string {
+  const [p0, p1, c1, c2, p2, p3] = looseCurve(a, da, b, db, id);
+  return `M${pt(...p0)}L${pt(...p1)}C${pt(...c1)} ${pt(...c2)} ${pt(...p2)}L${pt(...p3)}`;
+}
+
+/** Box around every loose cable as drawn (the curve sampled, not its control points), or null with no routes. */
+export function looseBounds(routes: { cable: number; pts: P[]; dir_a: number; dir_b: number }[]): { l: number; t: number; r: number; b: number } | null {
+  let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+  const add = (x: number, y: number) => { l = Math.min(l, x); r = Math.max(r, x); t = Math.min(t, y); b = Math.max(b, y); };
+  for (const rt of routes) {
+    const n = rt.pts.length; if (!n) continue;
+    const [p0, p1, c1, c2, p2, p3] = looseCurve(rt.pts[0], rt.dir_a, rt.pts[n - 1], rt.dir_b, rt.cable);
+    add(...p0); add(...p3);
+    for (let i = 0; i <= 24; i++) {
+      const s = i / 24, u = 1 - s;
+      const w0 = u * u * u, w1 = 3 * u * u * s, w2 = 3 * u * s * s, w3 = s * s * s;
+      add(w0 * p1[0] + w1 * c1[0] + w2 * c2[0] + w3 * p2[0], w0 * p1[1] + w1 * c1[1] + w2 * c2[1] + w3 * p2[1]);
+    }
+  }
+  return Number.isFinite(l) ? { l, t, r, b } : null;
 }

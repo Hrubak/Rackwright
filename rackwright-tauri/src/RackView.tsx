@@ -5,7 +5,7 @@ import { kindLabel } from "./racks";
 import { Target, devDims, mountOf, rackUsage, resolveTarget, shapeOf, showsRear, xOffset } from "./edit";
 import { drawPlate, drawPort, fgFor, shade } from "./Plate";
 import Cables, { CableColorMode } from "./Cables";
-import type { CableOpts } from "./cableView";
+import { looseBounds, visibleCables, type CableOpts } from "./cableView";
 import VmLinks from "./VmLinks";
 import { fmtW, type PowerBudget } from "./power/model";
 import type { IpEntry } from "./attention/model";
@@ -87,20 +87,43 @@ export default function RackView({ doc: committed, liveDoc, onDragTarget, onDrag
     const w = world({ clientX: cx, clientY: cy });
     return resolveTarget(committed, dev, w.x, w.y);
   };
-  useEffect(() => {
+  // Fit to screen. With loose cables on, the cables hang below the racks, so they count too; a fit asked for before
+  // the cables have arrived (opening or importing a rack) runs once more when they do.
+  const fitPending = useRef<Doc | null>(null); // the doc a fit is still waiting on cables for
+
+  const routesDoc = useRef<Doc | null>(null); // the doc that was showing when the current routes arrived
+  const fit = () => {
     const el = svgRef.current; if (!el) return;
     const bb = el.getBoundingClientRect();
     const boxes = [
       ...doc.racks.map((r) => ({ l: r.x, t: r.y, r: r.x + RW + 2 * RAIL, b: r.y + HDR + r.u * UH + PADB })),
       ...doc.devices.filter((d) => d.rack == null).map((d) => { const q = devRect(doc, d); return { l: q.l, t: q.t, r: q.l + q.w, b: q.t + q.h + 24 }; }),
     ];
+    if (cableOpts?.style === "loose" && boxes.length) {
+      const vis = visibleCables(doc, cableOpts, selected, null);
+      const lb = looseBounds(routes.routes.filter((r) => vis.has(r.cable)));
+      if (lb) boxes.push({ l: lb.l, t: lb.t, r: lb.r, b: lb.b + 4 });
+    }
     if (!boxes.length) { setView({ x: 120, y: 60, z: 1 }); return; }
     const l = Math.min(...boxes.map((x) => x.l)), t = Math.min(...boxes.map((x) => x.t));
     const r = Math.max(...boxes.map((x) => x.r)), bt = Math.max(...boxes.map((x) => x.b));
     const z = Math.max(0.2, Math.min(1.2, (bb.width - 60) / (r - l), (bb.height - 60) / (bt - t)));
     setView({ z, x: (bb.width - (r - l) * z) / 2 - l * z, y: 30 - t * z });
+  };
+  useEffect(() => {
+    fit();
+    fitPending.current = cableOpts?.style === "loose" && routesDoc.current !== doc ? doc : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitTick]);
+  useEffect(() => {
+    routesDoc.current = doc;
+    // Only the cables for the doc the fit was asked on: if routing failed and the doc has changed since, skip it.
+    const pending = fitPending.current;
+    fitPending.current = null;
+    if (pending !== doc) return;
+    fit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routes]);
   // Escape while moving a device puts it back and shows the saved cables again.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
