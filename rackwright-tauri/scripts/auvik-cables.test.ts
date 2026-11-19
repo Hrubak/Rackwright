@@ -1,7 +1,7 @@
 // Auvik cables: server links -> neighbours -> plan cables. Synthetic fixtures from the server tests.
 import { readFileSync } from "node:fs";
-import { linksToNeighbors } from "../src/auvik/api/links";
-import { toAuvikDevice, type AuvikApiDevice } from "../src/auvik/api/map";
+import { endpointPorts, linksToNeighbors } from "../src/auvik/api/links";
+import { apiItems, toAuvikDevice, type AuvikApiDevice } from "../src/auvik/api/map";
 import { applySite, planSite, type SiteDocs } from "../src/auvik/api/sync";
 import type { Doc } from "../src/types";
 import type { AuvikInventory, AuvikLinks, AuvikTenant } from "../src/api";
@@ -108,6 +108,21 @@ t("portless endpoint: moved, port stays empty, no cable", boxOf(nm, "EX-PRN01").
 // first import: straight into the group
 const fresh = applySite(sitePlan(inv, undefined, links), null as any).auvikDoc;
 t("new endpoint on clean port", boxOf(fresh, "EX-PRN01").join() === "Endpoints on EX-SW01" && cabled(fresh, "Endpoints on EX-SW01", "EX-PRN01", "EX-SW01 1/1/5") && !fresh.devices.some((x) => (x as any).auvik_epbox === "printer"), boxOf(fresh, "EX-PRN01").join());
+
+// two switch neighbours, one of them an uplink port: the endpoint is not attached
+const two: AuvikLinks = { ...links, links: [...links.links,
+  { device: "d-1001-02", iface: "1/1/9", peerDevice: "d-1001-10", peerIface: "eth1", portless: false },
+  { device: "d-1001-02", iface: "1/1/9", peerDevice: "d-1001-03", peerIface: "X2", portless: false }] };
+const twop = sitePlan(inv, doc1, two);
+t("two switch neighbours, one uplink: no move", !twop.diff!.changes.some((c) => c.title === MOVE || c.id.startsWith("mvm:")) && twop.epPorts!.get("api:d-1001-10")?.attach === false);
+// the person skips the uplink switch / one of two endpoints: the wire is still shared
+const raw = (l: AuvikLinks, skip: string[]) => {
+  const { parsed, items } = apiItems(inv2.devices, "Example Site", undefined, undefined, undefined, undefined, l.links);
+  return endpointPorts(parsed, items.map((i) => (skip.includes(i.dev.name) ? { ...i, mode: "skip" as const } : i)));
+};
+t("uplink switch skipped: still not attached", raw(up, []).get("api:d-1001-10")?.attach === false && raw(up, ["EX-SW02"]).get("api:d-1001-10")?.attach === false);
+t("clean port attaches", raw(links, [])?.get("api:d-1001-10")?.attach === true);
+t("one of two endpoints skipped: the other is still not attached", raw(shared, []).get("api:d-1001-10")?.attach === false && raw(shared, ["EX-PRN02"]).get("api:d-1001-10")?.attach === false);
 
 // second import after the move changes nothing
 const again = sitePlan(inv, moved, links);
