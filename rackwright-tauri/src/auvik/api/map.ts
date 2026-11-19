@@ -25,7 +25,7 @@ export function toAuvikDevice(a: AuvikApiDevice, org: string): AuvikDevice {
     apiId: a.id, name: a.name, rawName: a.name, unnamed: false, org, status: a.status,
     type: TYPE_WORDS[a.type] ?? "Unknown", model: a.makeModel,
     macs: a.macs, ips: a.ips, networks: "", neighbors: [],
-    software: a.software, serial: a.serial, firmware: a.firmware,
+    software: a.software, serial: a.serial, firmware: a.firmware, vendor: a.vendor,
     description: a.discovery ? "discovery " + a.discovery : "", rows: 1,
   };
 }
@@ -63,16 +63,22 @@ export const KIND_LABEL: Record<Kind, string> = { ...KIND_TYPE, ap: "Access poin
 export const VM_MODELS = { hyperv: "Virtual Machine – Hyper-V", vmware: "Virtual Machine – VMware", kvm: "Virtual Machine – KVM (Scale HyperCore)" } as const;
 export type VmVendor = keyof typeof VM_MODELS;
 
-/** A virtual device: kind Virtual machine, or Auvik's model says so. */
+/** A virtual device: kind Virtual machine, or Auvik's model says so. "KVM" / QEMU alone count only on a VM row:
+ *  a KVM console is a real box. */
 export function isVirtual(i: Pick<PlanItem, "kind" | "dev">): boolean {
-  return i.kind === "vm" || /virtual machine|virtual platform|vmware|qemu|\bkvm\b|hyper-?v/i.test(i.dev.model);
+  return i.kind === "vm" || /virtual machine|virtual platform|vmware|hyper-?v/i.test(i.dev.model);
 }
-/** Which hypervisor a VM runs on, from its model, description (discovery) and software. */
-export function vmVendor(d: Pick<AuvikDevice, "model" | "description" | "software">): VmVendor | null {
-  const s = `${d.model} ${d.description} ${d.software}`;
+/** Which hypervisor a VM runs on. Model and Auvik's vendor first, then a hypervisor named in the software. Only then the
+ *  discovery text, and there only "vmware authorized|success" counts: Auvik lists "vmware <status>" for every device. */
+export function vmVendor(d: Pick<AuvikDevice, "model" | "description" | "software" | "vendor">): VmVendor | null {
+  const s = `${d.model} ${d.vendor ?? ""}`;
   if (/hyper-?v|microsoft/i.test(s)) return "hyperv";
   if (/vmware|esxi/i.test(s)) return "vmware";
   if (/\bkvm\b|qemu|scale|hypercore/i.test(s)) return "kvm";
+  if (/hyper-?v/i.test(d.software)) return "hyperv";
+  if (/vmware|esxi/i.test(d.software)) return "vmware";
+  if (/\bkvm\b|qemu|hypercore/i.test(d.software)) return "kvm";
+  if (/\bvmware (authorized|success)\b/i.test(d.description)) return "vmware";
   return null;
 }
 /** The Model dropdown's default: the Virtual Machine choice for a virtual device whose vendor is known, else Auvik's text (""). */
@@ -81,26 +87,39 @@ export function defaultModelChoice(i: Pick<PlanItem, "kind" | "dev">): string {
   return v ? "vm:" + v : "";
 }
 
+/** Where a row the site already holds sits: as a device, in an Endpoints box (or older endpoint group), in a VM box,
+ *  or as an OOBM on its host. A held row only takes a kind of its own family: the import cannot move it between those
+ *  places, so a pick across them would add it a second time. The person moves it by hand. */
+export type Family = "device" | "endpoint" | "vm" | "ipmi";
+export const KIND_FAMILY: Record<Kind, Family> = {
+  firewall: "device", router: "device", switch: "device", server: "device", storage: "device", ups: "device", pdu: "device", ap: "device", controller: "device",
+  endpoint: "endpoint", vm: "vm", ipmi: "ipmi",
+};
+/** The kinds a row can take: all of them, or only its family's when the site already holds it. */
+export const kindsFor = (held?: Family): Kind[] => (Object.keys(KIND_LABEL) as Kind[]).filter((k) => !held || KIND_FAMILY[k] === held);
+
 /** The person's picks on the import page, by plan item key.
  *  A model value is "" (Auvik's text), "tpl:<catalog name>" or "vm:hyperv|vmware|kvm". */
 export interface Overrides { kinds?: Record<string, Kind>; types?: Record<string, string>; models?: Record<string, string> }
 
 /** `kept` = kinds the site's documents hold from an earlier hand pick (see keptKinds in sync.ts). They re-classify the row
- *  like a pick, but are not a new hand edit (no kindOver). The person's own `over.kinds` win. */
-export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides, kept?: Record<string, Kind>): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
+ *  like a pick, but are not a new hand edit (no kindOver). The person's own `over.kinds` win.
+ *  `held` = the family of each row the site already holds (see Family): a kept or picked kind of another family is ignored. */
+export function apiItems(devs: AuvikApiDevice[], org: string, ctx?: HostCtx, over?: Overrides, kept?: Record<string, Kind>, held?: Record<string, Family>): { parsed: ParsedAuvik; items: ApiPlanItem[] } {
   const parsed: ParsedAuvik = { site: org, devices: devs.map((d) => toAuvikDevice(d, org)), warnings: [] };
   let items: PlanItem[] = buildItems(parsed, ctx);
+  const ok = (key: string, kind: Kind | undefined): kind is Kind => !!kind && !!KIND_TYPE[kind] && (!held?.[key] || KIND_FAMILY[kind] === held[key]);
   for (const [key, kind] of Object.entries(kept ?? {})) {
     const i = items.find((x) => x.key === key);
-    if (!i || i.kind === kind || over?.kinds?.[key] || !KIND_TYPE[kind]) continue;
+    if (!i || i.kind === kind || ok(key, over?.kinds?.[key]) || !ok(key, kind)) continue;
     items = retype(parsed, items, key, KIND_TYPE[kind], ctx);
   }
   const baseKind = new Map<string, Kind>();
   for (const [key, kind] of Object.entries(over?.kinds ?? {})) {
     const before = items.find((i) => i.key === key);
-    if (!before || !KIND_TYPE[kind]) continue;
+    if (!before || !ok(key, kind)) continue;
     const k0 = kept?.[key];
-    baseKind.set(key, k0 && KIND_TYPE[k0] ? k0 : before.kind);   // without this pick the kept kind would apply
+    baseKind.set(key, ok(key, k0) ? k0 : before.kind);   // without this pick the kept kind would apply
     items = retype(parsed, items, key, KIND_TYPE[kind], ctx).map((i) => (i.key === key ? { ...i, kindOver: true } : i));
   }
   for (const i of items.filter((x) => x.mode === "rack")) items = setMode(items, i.key, "off", ctx);

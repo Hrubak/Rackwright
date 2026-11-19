@@ -11,6 +11,7 @@ export interface AuvikDevice {
   neighbors: Neighbor[]; // "<name> through <interface of that neighbour>"
   software: string; serial: string; firmware: string; description: string;
   apiId?: string; hostname?: string;
+  vendor?: string;       // Auvik API only: the vendor Auvik reports (the .xlsx has none)
   rows: number;          // export rows merged into this device
 }
 export interface ParsedAuvik { site: string; devices: AuvikDevice[]; warnings: string[] }

@@ -1,5 +1,6 @@
 // The Import from Auvik device table: sort, filter, ticks. Pure; no backend.ts import.
 import type { Kind, Mode } from "../plan";
+import { typeOptions } from "../../deviceTypes";
 import { TO_PLACE_KINDS, VM_MODELS, type VmVendor } from "./map";
 
 export type SortCol = "name" | "kind" | "type" | "model" | "template" | "u" | "rack" | "ip" | "status";
@@ -70,6 +71,12 @@ export function destOf(mode: Mode, kind: Kind): string {
   if (mode === "endpoint" || mode === "phone" || mode === "iot") return "Endpoints";
   if (mode === "skip") return "";
   return TO_PLACE_KINDS.includes(kind) ? "To place" : "Inventory";
+}
+
+/** A device row's Type choices: the app's types without the box types (Endpoints, Virtual machines), which belong to
+ *  box members. A current value is always kept. */
+export function deviceRowTypes(current: string): string[] {
+  return typeOptions(current).filter((t) => t === current || (t !== "Endpoints" && t !== "Virtual machines"));
 }
 
 /** The text of a Model dropdown value: Auvik's text (""), a catalog name ("tpl:") or a Virtual Machine model ("vm:"). */

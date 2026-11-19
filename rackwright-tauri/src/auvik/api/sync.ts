@@ -13,8 +13,8 @@ import type { ImportSpec } from "../../imports/spec";
 import { applyInPlace } from "../apply";
 import { Change, Diff, computeDiff, defaultSelection, deviceFields, findEp, orderUnits, type Ep, type X } from "../diff";
 import type { ParsedAuvik } from "../parse";
-import { classify, epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type ImportPlan, type Kind } from "../plan";
-import { TO_PLACE_KINDS, apiItems, type ApiPlanItem, type Overrides } from "./map";
+import { classify, epKindOf, groupTemplate, hostCtxOf, isEndpointMode, resolvePlan, summarize, type EpKind, type HostCtx, type ImportPlan, type Kind } from "../plan";
+import { KIND_FAMILY, TO_PLACE_KINDS, apiItems, type ApiPlanItem, type Family, type Overrides } from "./map";
 
 export interface SiteDocs { siteId: number; racks: { id: number; name: string; version: number; doc: Doc }[] }
 type Fill = "empty" | "overwrite";
@@ -45,6 +45,7 @@ export interface SitePlan {
   other: { rackId: number; rackName: string; diff: Diff }[]; // fill-only changes in the site's other rack documents
   elsewhere: Set<string>;                                      // plan unit keys already held by another rack document: never added to "(Auvik)"
   heldIn: Record<string, string>;                              // the same keys -> the name of the rack document that holds the device
+  held: Record<string, Held>;                                  // plan item keys the site's documents already hold (any document, "(Auvik)" too)
   layoutRows?: Row[];
   over?: Overrides;                                            // the person's kind / type / model picks, by plan item key
 }
@@ -72,14 +73,16 @@ function tickHand(d: Diff, plan: ImportPlan, picks: Map<string, Set<string>>): D
     const key = m[1] === "fld" ? itemOf.get(m[2]) : m[2];
     return !!key && !!picks.get(key)?.has(m[3]);
   };
-  return { ...d, changes: d.changes.map((c) => (hand(c) ? { ...c, defaultOn: true, detail: c.id.split(":").pop() } : c)) };
+  const detail = (c: Change) => { const f = c.id.split(":").pop()!; return c.locked ? `${f} – replaces your earlier value` : f; };   // a kept (hand-set) value: say so
+  return { ...d, changes: d.changes.map((c) => (hand(c) ? { ...c, defaultOn: true, detail: detail(c) } : c)) };
 }
-/** Device.type -> the kind it stands for. Types that name no kind (Patch panel, Shelf, ...) give none, so a Type pick never moves a row. */
+/** Device.type -> the kind it stands for. Types that name no kind (Patch panel, Shelf, ...) give none, so a Type pick never moves a row.
+ *  Only device kinds: a device's Type never makes it a VM, an Endpoint or an OOBM (that would add it a second time). */
 const TYPE_KIND: Record<string, Kind> = { Firewall: "firewall", Router: "router", Switch: "switch", Server: "server", Storage: "storage", UPS: "ups", PDU: "pdu", Wireless: "ap" };
 const kindOfType = (type: string): Kind | null => {
   if (TYPE_KIND[type]) return TYPE_KIND[type];
   const k = classify({ type, name: "", model: "" });
-  return k === "endpoint" ? null : k;
+  return KIND_FAMILY[k] === "device" ? k : null;
 };
 /** Kinds an earlier import's hand pick left in the site's documents, by plan key "api:<id>": a device whose type is
  *  manual or locked, a member of an Endpoints box ("endpoint") or a VM box ("vm") whose `locked` has "type".
@@ -94,7 +97,9 @@ export function keptKinds(s: SiteDocs): Record<string, Kind> {
   }
   return out;
 }
-/** After saving: every hand-picked field the document now holds is marked manual (and locked); a box member gets it in its `locked`. */
+/** After saving: every hand-picked field the document now holds is marked manual (and locked); a box member gets it in its `locked`.
+ *  An OOBM (kind ipmi) sits on its host, with no unit or member of its own, so a pick that makes a row an OOBM is not marked and
+ *  not kept on the next import. That is fine: a held row never changes family (see Family in map.ts). */
 function markHand(doc: Doc, p: SitePlan, picks: Map<string, Set<string>>) {
   for (const [key, fields] of picks) {
     const it = p.items.find((i) => i.key === key);
@@ -115,10 +120,47 @@ function markHand(doc: Doc, p: SitePlan, picks: Map<string, Set<string>>) {
 /** A device found in another rack document is left where it is: it is not offered as new here. */
 const dropElsewhere = (d: Diff, keys: Set<string>): Diff => ({ ...d, changes: d.changes.filter((c) => !(c.id.startsWith("new:") && keys.has(c.id.slice(4)))) });
 
+/** A row the site already holds: where (see Family), in which rack document, and a device's current type there. */
+export interface Held { family: Family; rack: string; type?: string }
+
+/** The rows the site's rack documents already hold, by plan item key. By Auvik id first (devices, box members, OOBMs on a
+ *  host), then by the import's own matching (serial, MAC, name) for documents made by hand or by an older .xlsx import. */
+function heldOf(inv: AuvikInventory, org: string, siteDocs: SiteDocs, ctx: HostCtx, kept: Record<string, Kind>): Record<string, Held> {
+  const out: Record<string, Held> = {};
+  const { parsed, items } = apiItems(inv.devices, org, ctx, undefined, kept);   // without the person's picks
+  const kindOf = new Map(items.map((i) => [i.key, i.kind]));
+  const set = (k: string, family: Family, rack: string, type?: string) => {
+    if (!kindOf.has(k) || out[k]) return;
+    if (family === "device" && kindOf.get(k) === "ipmi") family = "ipmi";   // an OOBM that is a device of its own: no cross moves either
+    out[k] = type === undefined ? { family, rack } : { family, rack, type };
+  };
+  for (const r of siteDocs.racks) for (const d of r.doc.devices as X[]) {
+    if (!d.endpoints) set((d.auvik_id ?? "").split("#")[0], "device", r.name, d.type ?? "");
+    if (d.oobm?.key) set(d.oobm.key, "ipmi", r.name);
+    for (const e of d.endpoints ?? []) if (e.key) set(e.key, isVmBox(d) ? "vm" : "endpoint", r.name);
+  }
+  const plan = resolvePlan(parsed, items);
+  for (const r of siteDocs.racks) {
+    const m = computeDiff(r.doc, plan, items).matched;
+    for (const u of plan.units) { const d = m.get(u.key); if (d) set(u.itemKey, "device", r.name, d.type ?? ""); }
+    for (const it of items) {
+      if (!isEndpointMode(it.mode) && it.mode !== "vm") continue;
+      const h = heldElsewhere(it, r.doc, []);
+      if (h) set(it.key, isVmBox(h.box) ? "vm" : "endpoint", r.name);
+    }
+  }
+  return out;
+}
+const isVmBox = (d: Device) => !!(d as X).auvik_id?.startsWith("vm:") || d.type === "Virtual machines";
+
 export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: SiteDocs, defaults: Defaults, fill: Fill, layout?: ImportSpec, hosts?: Record<string, string>, over?: Overrides): SitePlan {
   const found = findAuvikDoc(siteDocs, tenant.id);
   const mine = found ? siteDocs.racks.find((r) => r.id === found.id)! : null;
-  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, hostCtxOf(mine?.doc ?? { devices: [] }), over, keptKinds(siteDocs));
+  const ctx = hostCtxOf(mine?.doc ?? { devices: [] }), kept = keptKinds(siteDocs);
+  const held = heldOf(inv, tenant.name, siteDocs, ctx, kept);
+  const fam: Record<string, Family> = Object.fromEntries(Object.entries(held).map(([k, h]) => [k, h.family]));
+  if (over?.kinds) over = { ...over, kinds: Object.fromEntries(Object.entries(over.kinds).filter(([k, kind]) => !fam[k] || KIND_FAMILY[kind] === fam[k])) };   // a cross-family pick on a held row is no pick
+  const { parsed, items: raw } = apiItems(inv.devices, tenant.name, ctx, over, kept, fam);
   const items = hosts ? raw.map((i) => (i.mode === "vm" && hosts[i.key] !== undefined ? { ...i, host: hosts[i.key] } : i)) : raw;   // the person's host choices from the preview
   const plan = resolvePlan(parsed, items);
   const other: SitePlan["other"] = [];
@@ -133,7 +175,7 @@ export function planSite(inv: AuvikInventory, tenant: AuvikTenant, siteDocs: Sit
     if (changes.length) other.push({ rackId: r.id, rackName: r.name, diff: { ...d, changes: changes.map((c) => ({ ...c, id: `${r.id}:${c.id}` })) } });   // ids carry the rack so one shared selection can tell the documents apart
   }
   const p: SitePlan = {
-    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, parsed, items, plan, other, elsewhere, heldIn,
+    tenant, inv, siteDocs, defaults, fill, layout, hosts, over, parsed, items, plan, other, elsewhere, heldIn, held,
     target: { docId: mine?.id ?? null, version: mine?.version ?? null, name: mine?.name ?? tenant.name + " (Auvik)", legacy: found?.legacy ?? false },
     diff: mine ? dropElsewhere(tickHand(computeDiff(mine.doc, plan, items, { fill }), plan, picks), elsewhere) : null,
   };
@@ -155,19 +197,20 @@ const EP_WORD: Record<EpKind, string> = { pc: "PCs", phone: "Phones", iot: "IoT 
 
 /** An endpoint the site already holds outside the Endpoints boxes: in an endpoint group or VM box from an older
  *  .xlsx import, or in another rack document. Matched by Auvik id, then the .xlsx key (serial, MAC, name), MAC, name. */
-function heldElsewhere(it: SitePlan["items"][number], doc: Doc, others: Doc[]): { ep: Ep; mine: boolean } | null {
+type HeldEp = { ep: Ep; mine: boolean; box: Device };
+function heldElsewhere(it: SitePlan["items"][number], doc: Doc, others: Doc[]): HeldEp | null {
   const a = it.dev, apiKey = "api:" + (a.apiId ?? it.key);
-  const look = (d: Doc, mine: boolean): { ep: Ep; mine: boolean } | null => {
+  const look = (d: Doc, mine: boolean): HeldEp | null => {
     for (const x of d.devices) {
       if ((x as any).auvik_epbox || !x.endpoints?.length) continue;
       const byId = x.endpoints.find((e) => e.key === apiKey);
-      if (byId) return { ep: byId, mine };
+      if (byId) return { ep: byId, mine, box: x };
       const i = findEp(x.endpoints, { key: a.serial || a.macs[0] || a.name, mac: a.macs[0] || "", name: a.name });
-      if (i >= 0) return { ep: x.endpoints[i], mine };
+      if (i >= 0) return { ep: x.endpoints[i], mine, box: x };
     }
     return null;
   };
-  return look(doc, true) ?? others.reduce<{ ep: Ep; mine: boolean } | null>((hit, d) => hit ?? look(d, false), null);
+  return look(doc, true) ?? others.reduce<HeldEp | null>((hit, d) => hit ?? look(d, false), null);
 }
 
 /** The API has no neighbours, so endpoints cannot hang off a switch. They go in one unattached box per kind in the Inventory column.

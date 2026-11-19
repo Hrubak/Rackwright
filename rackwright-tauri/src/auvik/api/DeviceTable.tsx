@@ -3,13 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { v } from "../../theme";
 import { CATALOG } from "../../edit";
-import { typeOptions } from "../../deviceTypes";
 import { StatusChip } from "../Panels";
 import { hostsOf, type Kind } from "../plan";
-import { KIND_LABEL, VM_MODELS, defaultModelChoice, type ApiPlanItem } from "./map";
+import { KIND_FAMILY, KIND_LABEL, VM_MODELS, defaultModelChoice, kindsFor, type ApiPlanItem } from "./map";
 import type { SitePlan } from "./sync";
 import type { SiteState } from "./SitePreview";
-import { destOf, filterRows, headState, modelLabel, setPick, setTicked, sortRows, type Row, type SortCol } from "./table";
+import { destOf, deviceRowTypes, filterRows, headState, modelLabel, setPick, setTicked, sortRows, type Row, type SortCol } from "./table";
 import { btn, inp } from "./ui";
 
 const KINDS = Object.keys(KIND_LABEL) as Kind[];
@@ -22,6 +21,7 @@ export default function DeviceTable({ view, eff, st, setSt }: {
   st: SiteState; setSt: (f: (s: SiteState) => SiteState) => void;
 }) {
   const [bulk, setBulk] = useState<Kind>("switch");
+  const [skipNote, setSkipNote] = useState("");
   const head = useRef<HTMLInputElement>(null);
   const hosts = hostsOf(view.items);
   const hostName = (k: string) => view.items.find((i) => i.key === k)?.dev.name ?? k;
@@ -34,7 +34,9 @@ export default function DeviceTable({ view, eff, st, setSt }: {
   // Per row: the computed defaults and the display strings the sort and filter use.
   const info = useMemo(() => view.items.map((i) => {
     const units = view.plan.units.filter((u) => u.itemKey === i.key);
-    const tplType = units[0]?.tpl.type ?? "";
+    const hd = view.held[i.key];
+    // a matched device shows the type it has now (maybe set by hand); a kind pick shows the type it will get
+    const tplType = !i.kindOver && hd?.type ? hd.type : units[0]?.tpl.type ?? "";
     const type = isDev(i) ? i.typeOver ?? tplType : i.mode === "vm" ? "Virtual machines" : i.mode === "skip" ? "" : "Endpoints";
     const model = st.models[i.key] ?? defaultModelChoice(i);
     const held = units.map((u) => view.heldIn[u.key]).find(Boolean);
@@ -44,7 +46,7 @@ export default function DeviceTable({ view, eff, st, setSt }: {
       rack: i.mode === "skip" ? "" : held ?? eff.target.name, dest: held ? "" : destOf(i.mode, i.kind),
       ip: i.dev.ips[0] ?? "", status: i.dev.status,
     };
-    return { i, row, tplType, model, baseKind: i.baseKind ?? i.kind };
+    return { i, row, tplType, model, baseKind: i.baseKind ?? i.kind, hd };
   }), [view, eff.target.name, st.models]);
 
   const shown = useMemo(() => {
@@ -57,11 +59,17 @@ export default function DeviceTable({ view, eff, st, setSt }: {
   const bulkRows = shown.filter((x) => !st.excluded.has(x.row.id));
 
   const tick = (ids: string[], on: boolean) => setSt((s) => ({ ...s, excluded: setTicked(s.excluded, ids, on) }));
-  const setKind = (list: typeof info, k: Kind) => setSt((s) => {
-    let kinds = s.kinds;
-    for (const x of list) if (x.i.kind !== k) kinds = setPick(kinds, x.i.key, k, x.baseKind);
-    return { ...s, kinds };
-  });
+  // a row the site already holds only takes a kind of its own family (see Family in map.ts): the rest are skipped
+  const fits = (x: (typeof info)[number], k: Kind) => !x.hd || KIND_FAMILY[k] === x.hd.family;
+  const setKind = (list: typeof info, k: Kind) => {
+    const skipped = list.filter((x) => !fits(x, k)).length;
+    setSkipNote(skipped ? `Skipped ${skipped} row${skipped === 1 ? "" : "s"} already in a rack document. Move those by hand.` : "");
+    setSt((s) => {
+      let kinds = s.kinds;
+      for (const x of list) if (x.i.kind !== k && fits(x, k)) kinds = setPick(kinds, x.i.key, k, x.baseKind);
+      return { ...s, kinds };
+    });
+  };
   const sortBy = (col: SortCol) => setSt((s) => ({ ...s, sort: s.sort?.col === col ? { col, dir: s.sort.dir === 1 ? -1 : 1 } : { col, dir: 1 } }));
 
   return (
@@ -75,6 +83,7 @@ export default function DeviceTable({ view, eff, st, setSt }: {
           {KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
         </select>
         <button style={{ ...btn, marginRight: 0 }} disabled={!bulkRows.length} onClick={() => setKind(bulkRows, bulk)}>Apply</button>
+        {skipNote && <span style={{ opacity: 0.75 }}>{skipNote}</span>}
       </div>
       <div style={{ overflow: "auto", border: `1px solid ${v("border-subtle")}`, borderRadius: 4, flex: 1, minHeight: 200 }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -94,24 +103,26 @@ export default function DeviceTable({ view, eff, st, setSt }: {
             </tr>
           </thead>
           <tbody>
-            {shown.map(({ i, row, tplType, model, baseKind }) => {
+            {shown.map(({ i, row, tplType, model, baseKind, hd }) => {
               const off = st.excluded.has(row.id);
               const tpls = isDev(i) ? byType.get(row.type) ?? [] : [];
               const extraTpl = model.startsWith("tpl:") && !tpls.includes(model.slice(4)) ? model.slice(4) : null;
+              const kinds = kindsFor(hd?.family);
               return (
                 <tr key={i.key} style={{ borderTop: `1px solid ${v("border-faint")}`, opacity: off ? 0.45 : 1 }}>
                   <td style={{ padding: "2px 4px" }}><input type="checkbox" aria-label={`Import ${i.dev.name}`} checked={!off} onChange={(e) => tick([row.id], e.target.checked)} /></td>
                   <td>{i.dev.name}{i.units.length > 1 && <span style={{ opacity: 0.6 }}> (stack of {i.units.length})</span>}</td>
                   <td>
-                    <select style={sel} aria-label={`Kind of ${i.dev.name}`} value={i.kind} onChange={(e) => { const k = e.target.value as Kind; setSt((s) => ({ ...s, kinds: setPick(s.kinds, i.key, k, baseKind) })); }}>
-                      {KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+                    <select style={sel} aria-label={`Kind of ${i.dev.name}`} title={hd ? `Already in ${hd.rack}. Move it by hand to change where it goes.` : undefined} value={i.kind} onChange={(e) => { const k = e.target.value as Kind; setSt((s) => ({ ...s, kinds: setPick(s.kinds, i.key, k, baseKind) })); }}>
+                      {!kinds.includes(i.kind) && <option value={i.kind}>{KIND_LABEL[i.kind]}</option>}
+                      {kinds.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
                     </select>
                   </td>
                   <td>
                     {isDev(i) ? (
                       <select style={sel} aria-label={`Type of ${i.dev.name}`} value={row.type} onChange={(e) => { const ty = e.target.value; setSt((s) => ({ ...s, types: setPick(s.types, i.key, ty, tplType) })); }}>
                         {!row.type && <option value="">(none)</option>}
-                        {typeOptions(row.type).map((ty) => <option key={ty} value={ty}>{ty}</option>)}
+                        {deviceRowTypes(row.type).map((ty) => <option key={ty} value={ty}>{ty}</option>)}
                       </select>
                     ) : row.type}
                   </td>

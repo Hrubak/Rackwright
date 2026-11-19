@@ -103,7 +103,7 @@ export default function DevicePanel({ doc, dev, edit, epFocus, onSelect, onClose
       </div>}
       {tab === "specs" && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <label style={label}>Name{lockIcon("name")}<br /><input style={{ ...inp, width: "100%" }} value={dev.name} onChange={(e) => devSet("name", e.target.value)} /></label>
-        <label style={label}>Type{lockIcon("type")}<br /><select style={{ ...inp, width: "100%" }} value={dev.type} onChange={(e) => devSet("type", e.target.value)}>{typeOptions(dev.type).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
+        <label style={label}>Type{lockIcon("type")}<br /><select style={{ ...inp, width: "100%" }} value={dev.type ?? ""} onChange={(e) => devSet("type", e.target.value)}>{!dev.type && <option value="">(none)</option>}{typeOptions(dev.type ?? "").map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
         {specFieldsFor(dev).map((f) => {
           const raw = (dev as any)[f.key];
           const val = raw == null ? "" : String(raw);

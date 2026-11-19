@@ -1,5 +1,5 @@
 // Device table helpers for Import from Auvik (src/auvik/api/table.ts). Synthetic data only.
-import { natCmp, ipCmp, sortRows, filterRows, setTicked, headState, setPick, destOf, modelLabel, type Row } from "../src/auvik/api/table";
+import { natCmp, ipCmp, sortRows, filterRows, setTicked, headState, setPick, destOf, modelLabel, deviceRowTypes, type Row } from "../src/auvik/api/table";
 import { VM_MODELS } from "../src/auvik/api/map";
 
 let fails = 0;
@@ -71,6 +71,10 @@ t("destOf", destOf("off", "switch") === "To place" && destOf("off", "ap") === "I
 
 // modelLabel: the text of the Model dropdown's value
 t("modelLabel", modelLabel("", "Example C9300") === "Example C9300" && modelLabel("tpl:Example 48-port", "x") === "Example 48-port" && modelLabel("vm:vmware", "x") === VM_MODELS.vmware && modelLabel("vm:nope", "x") === "x");
+
+// deviceRowTypes: a device row's Type never offers a box type (Endpoints, Virtual machines) unless it already is one
+t("deviceRowTypes: no box types", !deviceRowTypes("Switch").includes("Endpoints") && !deviceRowTypes("Switch").includes("Virtual machines") && deviceRowTypes("Switch").includes("Server") && !deviceRowTypes("").includes("Endpoints"));
+t("deviceRowTypes: keeps a current box type shown", deviceRowTypes("Virtual machines").includes("Virtual machines") && !deviceRowTypes("Virtual machines").includes("Endpoints") && deviceRowTypes("Custom Box")[0] === "Custom Box");
 
 console.log(fails ? `${fails} FAILED` : "all passed");
 process.exit(fails ? 1 : 0);

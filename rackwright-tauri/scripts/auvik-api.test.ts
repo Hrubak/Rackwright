@@ -8,7 +8,7 @@ import { computeDiff, matchUnits } from "../src/auvik/diff";
 import { applyInPlace } from "../src/auvik/apply";
 import { makeXlsx, devices } from "./fixtures/auvikFixture";
 import type { Device, Doc } from "../src/types";
-import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, KIND_LABEL, KIND_TYPE, VM_MODELS, defaultModelChoice, isVirtual, vmVendor, type AuvikApiDevice } from "../src/auvik/api/map";
+import { apiItems, specsOf, toAuvikDevice, TO_PLACE_KINDS, KIND_LABEL, KIND_TYPE, VM_MODELS, defaultModelChoice, isVirtual, vmVendor, kindsFor, type AuvikApiDevice } from "../src/auvik/api/map";
 import { CATALOG } from "../src/edit";
 import { classify, setMode, resolvePlan as resolveP } from "../src/auvik/plan";
 import { setOffColumn } from "../src/edit";
@@ -434,7 +434,7 @@ async function main() {
     // vmVendor: model, description (discovery) and software; checked Hyper-V, VMware, KVM
     const ad = (makeModel: string, discovery = "", software = "") => toAuvikDevice(api("x-01", "EX-VMX", "virtualMachine", makeModel, { discovery, software }), "EX");
     t("vmVendor: Hyper-V", vmVendor(ad("Microsoft Virtual Machine")) === "hyperv" && vmVendor(ad("Virtual Machine", "", "Hyper-V 10")) === "hyperv");
-    t("vmVendor: VMware", vmVendor(ad("VMware7,1")) === "vmware" && vmVendor(ad("Example VM", "esxi authorized")) === "vmware");
+    t("vmVendor: VMware", vmVendor(ad("VMware7,1")) === "vmware" && vmVendor(ad("Example VM", "snmp notSupported, login authorized, wmi notSupported, vmware authorized")) === "vmware");
     t("vmVendor: KVM", vmVendor(ad("QEMU Standard PC")) === "kvm" && vmVendor(ad("Scale HyperCore guest")) === "kvm" && vmVendor(ad("Example KVM guest")) === "kvm");
     t("vmVendor: unknown is null", vmVendor(ad("Acme Box")) === null);
 
@@ -550,6 +550,67 @@ async function main() {
     // a tpl: pick on a VM row saves the model text but sets no template
     const pvt = planSite(vInv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { models: { [vm1]: "tpl:" + tpl2.name } }).items.find((i) => i.key === vm1)!;
     t("tpl pick on a VM row: model text only, no template", pvt.modelOver === tpl2.model && pvt.tplOver === undefined && pvt.tplName !== tpl2.name);
+
+    // --- final review fixes
+    // I1: a row the site already holds only takes a kind in the same family (device / Endpoints / VM box / OOBM).
+    // Endpoints and VM box are separate: the import cannot move a member between boxes (Endpoint -> VM gave 0/2).
+    const AV = "EX Main Office (Auvik)";
+    t("I1: kindsFor by family", kindsFor("endpoint").join() === "endpoint" && kindsFor("vm").join() === "vm" &&!kindsFor("device").some((k) => k === "endpoint" || k === "vm" || k === "ipmi") && kindsFor("device").includes("controller") && kindsFor("ipmi").join() === "ipmi" && kindsFor(undefined).length === 12, kindsFor("box").join());
+    t("I1: held rows from the saved document", base.held[sw1] === undefined && planSite(inv, tenant, docs1, defaults, "empty").held[sw1]?.family === "device" && planSite(inv, tenant, docs1, defaults, "empty").held[prn]?.family === "endpoint" && planSite(inv, tenant, docs1, defaults, "empty").held[sw1]?.rack === AV, JSON.stringify(planSite(inv, tenant, docs1, defaults, "empty").held[prn]));
+    for (const [n, kind, want] of [["EX-SW01", "endpoint", "1/0"], ["EX-PRN01", "server", "0/1"], ["EX-PRN01", "vm", "0/1"]] as const) {
+      const k = keyOf(n);
+      const p1 = planSite(inv, tenant, docs1, defaults, "empty", undefined, undefined, { kinds: { [k]: kind } });
+      const i1 = p1.items.find((i) => i.key === k)!;
+      t(`I1: ${n} held, cross pick ${kind} is ignored`, i1.kind !== kind && !i1.kindOver && !(p1.diff?.changes ?? []).some((c) => c.id === `new:${k}` && c.defaultOn), `${i1.kind} ${(p1.diff?.changes ?? []).filter((c) => c.id.includes(k)).map((c) => c.id)}`);
+      const d1 = applySite(p1, sel(p1)).auvikDoc;
+      t(`I1: ${n} -> ${kind}: no duplicate, nothing kept`, count(d1, n) === want && keptKinds(mkDocs([{ id: 2, name: AV, doc: d1 }]))[k] === undefined, count(d1, n));
+      const p2 = planSite(inv, tenant, mkDocs([{ id: 2, name: AV, doc: d1 }]), defaults, "empty");
+      t(`I1: ${n} re-import: still no duplicate`, count(applySite(p2, sel(p2)).auvikDoc, n) === want);
+    }
+    const pSame = planSite(inv, tenant, docs1, defaults, "empty", undefined, undefined, { kinds: { [sw2]: "router" } });
+    const dSame = applySite(pSame, sel(pSame)).auvikDoc;
+    t("I1: same family (Switch -> Router) still works", pSame.items.find((i) => i.key === sw2)!.kind === "router" && byName(dSame, "EX-SW02").type === "Router" && count(dSame, "EX-SW02") === "1/0");
+    // a kept kind from a document saved by the 3.19.2 build (device and a locked Endpoints member) is ignored too
+    const dup = JSON.parse(JSON.stringify(saved)) as Doc;
+    dup.devices.find((x) => x.type === "Endpoints")!.endpoints!.push({ name: "EX-SW01", type: "Generic Device", model: "", ip: "", mac: "", port: "", status: "online", kind: "other", key: sw1, locked: ["type"] } as any);
+    t("I1: kept cross-family kind is ignored for a held device", planSite(inv, tenant, mkDocs([{ id: 2, name: AV, doc: dup }]), defaults, "empty").items.find((i) => i.key === sw1)!.kind === "switch");
+    // held in a hand-made rack document (matched by serial, no Auvik id): the pick is ignored there too
+    const handDoc: Doc = { v: 1, nid: 9, racks: [], cables: [], devices: [{ ...JSON.parse(JSON.stringify(byName(saved, "EX-SW01"))), id: 1, auvik_id: undefined, source: undefined }] };
+    const pHand = planSite(inv, tenant, mkDocs([{ id: 7, name: "Rack A", doc: handDoc }]), defaults, "empty", undefined, undefined, { kinds: { [sw1]: "endpoint" } });
+    t("I1: held in another document (matched by serial): cross pick ignored", pHand.held[sw1]?.rack === "Rack A" && pHand.items.find((i) => i.key === sw1)!.kind === "switch" && !memberOf(applySite(pHand, sel(pHand)).auvikDoc, sw1), JSON.stringify(pHand.held[sw1]));
+    // a cross-family pick on a row the site does not hold yet still works
+    t("I1: not held: cross pick still works", planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { kinds: { [sw1]: "endpoint" } }).items.find((i) => i.key === sw1)!.kind === "endpoint");
+
+    // I2: a Type that names a box ("Virtual machines", "Endpoints") never turns a device into a box member
+    for (const ty of ["Virtual machines", "Endpoints", "Intelligent Platform Management Interface"]) {
+      const d1 = applySite(planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { types: { [sw2]: ty } }), new Set()).auvikDoc;
+      const p2 = planSite(inv, tenant, mkDocs([{ id: 2, name: AV, doc: d1 }]), defaults, "empty");
+      t(`I2: Type "${ty}" is not a kept kind; re-import keeps one device`, keptKinds(mkDocs([{ id: 2, name: AV, doc: d1 }]))[sw2] === undefined && p2.items.find((i) => i.key === sw2)!.kind === "switch" && count(applySite(p2, sel(p2)).auvikDoc, "EX-SW02") === "1/0", String(keptKinds(mkDocs([{ id: 2, name: AV, doc: d1 }]))[sw2]));
+    }
+    const dSrv = applySite(planSite(inv, tenant, mkDocs([]), defaults, "empty", undefined, undefined, { types: { [sw2]: "Server" } }), new Set()).auvikDoc;
+    t("I2: a Type naming a device kind is still kept", keptKinds(mkDocs([{ id: 2, name: AV, doc: dSrv }]))[sw2] === "server");
+
+    // I3: vendor from model + Auvik vendor first; discovery counts only "vmware authorized|success"
+    const disc = (vm: string) => `snmp notSupported, login authorized, wmi notSupported, vmware ${vm}`;
+    const av = (makeModel: string, vendor: string, discovery: string) => toAuvikDevice(api("x-02", "EX-VMY", "virtualMachine", makeModel, { vendor, discovery }), "EX");
+    t("I3: toAuvikDevice carries the vendor", av("x", "Example Vendor", "").vendor === "Example Vendor");
+    t("I3: QEMU + vmware notSupported -> kvm", vmVendor(av("QEMU Standard PC", "", disc("notSupported"))) === "kvm");
+    t("I3: Hyper-V guest by vendor", vmVendor(av("Virtual Machine", "Microsoft Corporation", disc("notSupported"))) === "hyperv");
+    t("I3: model first, before the discovery text", vmVendor(av("Virtual Machine", "Microsoft Corporation", disc("authorized"))) === "hyperv");
+    t("I3: discovery vmware authorized / success -> vmware", vmVendor(av("Example VM", "", disc("authorized"))) === "vmware" && vmVendor(av("Example VM", "", disc("success"))) === "vmware");
+    t("I3: bare word vmware in discovery is not VMware", vmVendor(av("Example VM", "", disc("notSupported"))) === null && vmVendor(av("Example VM", "", disc("notAuthorized"))) === null);
+
+    // M3: a physical KVM console is not virtual
+    const kvmSw = { kind: "switch" as const, dev: { ...iv1.dev, model: "Example KVM Console 8-port" } };
+    t("M3: KVM console (switch kind) is not virtual", !isVirtual(kvmSw) && !isVirtual({ ...kvmSw, kind: "server" }) && defaultModelChoice(kvmSw) === "");
+    t("M3: KVM / QEMU is virtual on a VM row", isVirtual({ kind: "vm", dev: { ...iv1.dev, model: "QEMU Standard PC" } }) && isVirtual({ kind: "server", dev: { ...iv1.dev, model: "VMware Virtual Platform" } }));
+
+    // M5: the document's current type for a held device; a kind pick over a hand-set type warns in the Changes list
+    const pM5 = planSite(inv, tenant, mkDocs([{ id: 2, name: AV, doc: dr }]), defaults, "empty", undefined, undefined, { kinds: { [sw2]: "router" } });
+    const cM5 = pM5.diff!.changes.find((c) => c.id === `fld:${sw2}:type`);
+    t("M5: held type is the document's", pM5.held[sw2]?.type === "Patch panel", JSON.stringify(pM5.held[sw2]));
+    t("M5: ticked change over a hand-set type says so", !!cM5 && cM5.defaultOn && /replaces your earlier value/.test(cM5.detail ?? ""), JSON.stringify(cM5));
+    t("M5: a plain hand pick keeps the short detail", pkm.diff!.changes.find((c) => c.id === `fld:${sw2}:type`)?.detail === "type");
   }
 
   console.log(fails ? `${fails} FAILED` : "all passed");
