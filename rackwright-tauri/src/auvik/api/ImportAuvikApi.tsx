@@ -9,7 +9,7 @@ import { useSettings } from "../../settings/context";
 import type { Doc } from "../../types";
 import SitePreview, { SiteState, ticksOf, newSiteState } from "./SitePreview";
 import { Defaults, SiteDocs, SitePlan, mapTenantToSite, planSite, saveSite, skipLine } from "./sync";
-import { btn, inp } from "./ui";
+import { Busy, BusyStyle, btn, inp } from "./ui";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 type Stage = "pick" | "reading" | "preview" | "saving" | "done";
@@ -183,6 +183,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
   return (
     <div style={{ position: "fixed", inset: 0, background: v("overlay"), display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
       <div style={{ background: v("panel"), padding: 14, borderRadius: 6, width: 1100, maxWidth: "96vw", maxHeight: "92vh", display: "flex", flexDirection: "column", border: `1px solid ${v("border")}`, color: v("text"), fontSize: 12 }}>
+        <BusyStyle />
         <div style={{ display: "flex", marginBottom: 10 }}>
           <b style={{ flex: 1, fontSize: 14 }}>Import from Auvik</b>
           <button style={{ ...btn, marginRight: 0, padding: "1px 8px" }} disabled={busy} onClick={close}>x</button>
@@ -192,17 +193,17 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
         {stage === "pick" && (
           <div style={body}>
             <div style={{ marginBottom: 6 }}>
-              {status ? `Connected to Auvik (${status.region}, ${status.username})` : "Checking the Auvik connection..."}
+              {status ? `Connected to Auvik (${status.region}, ${status.username})` : <Busy style={{ display: "inline-block" }}>Checking the Auvik connection...</Busy>}
               <button style={{ ...btn, marginLeft: 10 }} onClick={testConn}>Test connection</button>
-              <span style={{ opacity: 0.85 }}>{test}</span>
+              {test === "Testing..." ? <Busy style={{ display: "inline-block" }}>{test}</Busy> : <span style={{ opacity: 0.85 }}>{test}</span>}
             </div>
             <div style={{ margin: "10px 0 6px" }}>Choose the Auvik client to import into <b>{cl.name}</b>.</div>
-            {tenants === null && !err && <div style={{ opacity: 0.7 }}>Loading the Auvik clients...</div>}
+            {tenants === null && !err && <Busy>Loading the Auvik clients...</Busy>}
             {tenants && <select style={{ ...inp, minWidth: 260 }} value={parent} onChange={(e) => choose(e.target.value)}>
               <option value="">Choose a client...</option>
               {parents.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>}
-            {parent && !docs && !err && <div style={{ marginTop: 8, opacity: 0.7 }}>Checking the sites already in Rackwright...</div>}
+            {parent && !docs && !err && <Busy style={{ marginTop: 8 }}>Checking the sites already in Rackwright...</Busy>}
             {parent && docs && (
               <div style={{ marginTop: 10 }}>
                 {!kids.length && <div style={{ opacity: 0.8 }}>This Auvik client has no sites.</div>}
@@ -231,7 +232,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
 
         {stage === "reading" && (
           <div style={{ padding: "10px 0" }}>
-            <div style={{ marginBottom: 6 }}>Reading site {progress.n} of {progress.of}: {progress.name}…</div>
+            <Busy style={{ marginBottom: 6 }}>Reading site {progress.n} of {progress.of}: {progress.name}…</Busy>
             <progress style={{ width: "100%", accentColor: v("link") }} value={progress.n - 1} max={progress.of} />
             <div style={{ marginTop: 8 }}><button style={btn} onClick={stop}>Stop</button><span style={{ opacity: 0.7 }}>Stop keeps the sites already read.</span></div>
           </div>
@@ -261,7 +262,7 @@ export default function ImportAuvikApi({ client, onDone, onClose }: { client: Cl
         )}
 
         {stage === "saving" && (
-          <div style={{ padding: "10px 0" }}>Importing site {progress.n} of {progress.of}: {progress.name}…</div>
+          <Busy style={{ padding: "10px 0" }}>Importing site {progress.n} of {progress.of}: {progress.name}…</Busy>
         )}
 
         {stage === "done" && (
