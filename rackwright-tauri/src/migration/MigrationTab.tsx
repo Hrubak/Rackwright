@@ -96,7 +96,7 @@ export default function MigrationTab({ client, siteId, docs, onSaved }: Migratio
   const setRules = (r: Partial<FitRules>) => edit({ ...plan, rules: { ...plan.rules, ...r } });
   const setEntry = (key: string, e: VmEntry) => edit({ ...plan, vms: { ...plan.vms, [key]: e } });
   const num = (label: string, value: number, whole: boolean, set: (n: number) => void, w = 56) => (
-    <label style={lab}>{label}<SizeInput value={value} whole={whole} width={w} label={label} onChange={(n) => set(n ?? 0)} /></label>
+    <label style={lab}>{label}<SizeInput value={value} whole={whole} width={w} label={label} blankKeeps onChange={(n) => { if (n !== undefined) set(n); }} /></label>
   );
   const pickPreset = (id: string) => {
     const p = NODE_PRESETS.find((x) => x.id === id);

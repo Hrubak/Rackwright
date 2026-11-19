@@ -5,7 +5,7 @@ import { parseSize } from "./fit";
 
 export const inp = { background: v("bg"), color: v("text"), border: `1px solid ${v("border")}`, borderRadius: 4, padding: "3px 6px", fontSize: 12 } as const;
 
-export default function SizeInput({ value, whole, width = 64, label, onChange }: { value: number | undefined; whole: boolean; width?: number; label: string; onChange: (n: number | undefined) => void }) {
+export default function SizeInput({ value, whole, width = 64, label, blankKeeps, onChange }: { value: number | undefined; whole: boolean; width?: number; label: string; blankKeeps?: boolean; onChange: (n: number | undefined) => void }) {
   const [text, setText] = useState(value === undefined ? "" : String(value));
   useEffect(() => {
     const cur = parseSize(text, whole);
@@ -13,10 +13,11 @@ export default function SizeInput({ value, whole, width = 64, label, onChange }:
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <input type="text" inputMode="decimal" aria-label={label} style={{ ...inp, width, textAlign: "right" }} value={text}
+      onBlur={() => { if (blankKeeps && parseSize(text, whole) === undefined) setText(value === undefined ? "" : String(value)); }}
       onChange={(e) => {
         setText(e.target.value);
         const n = parseSize(e.target.value, whole);
-        if (n !== null) onChange(n);
+        if (n !== null && !(blankKeeps && n === undefined)) onChange(n);
       }} />
   );
 }
